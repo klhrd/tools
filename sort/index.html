@@ -1,0 +1,1540 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>排序演算法模擬器</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .bar {
+            transition: height 0.1s ease-out, background-color 0.1s ease-out;
+            border-radius: 0.25rem; /* rounded-md */
+        }
+        /* Hide number input arrows */
+        input[type='number']::-webkit-inner-spin-button,
+        input[type='number']::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type='number'] {
+            -moz-appearance: textfield;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <!-- Section 1: Sorting Controls (排序設定) -->
+    <div class="w-full max-w-4xl bg-white shadow-md rounded-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold text-center mb-4 text-gray-700">排序演算法模擬器</h2>
+        <div class="flex flex-col sm:flex-row flex-wrap gap-4 justify-center items-center">
+            <div class="flex flex-col items-center">
+                <label for="algorithmSelect" class="text-gray-600 mb-1">選擇排序法:</label>
+                <select id="algorithmSelect" class="p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="bubble">氣泡排序 (Bubble Sort)</option>
+                    <option value="selection">選擇排序 (Selection Sort)</option>
+                    <option value="insertion">插入排序 (Insertion Sort)</option>
+                    <option value="merge">合併排序 (Merge Sort)</option>
+                    <option value="quick">快速排序 (Quick Sort)</option>
+                    <option value="shell">希爾排序 (Shell Sort)</option>
+                    <option value="counting">計數排序 (Counting Sort)</option>
+                    <option value="radix">基數排序 (Radix Sort)</option>
+                    <option value="bucket">桶排序 (Bucket Sort)</option>
+                    <option value="cocktail">雞尾酒排序 (Cocktail Shaker Sort)</option>
+                </select>
+            </div>
+            <div class="flex flex-col items-center">
+                <label for="arraySizeInput" class="text-gray-600 mb-1">總共項目數:</label>
+                <input type="number" id="arraySizeInput" min="5" max="100" value="50"
+                       class="p-2 border border-gray-300 rounded-md w-24 text-center shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <button id="resetButton"
+                    class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md shadow-md
+                           transition-all duration-200 ease-in-out transform hover:scale-105">
+                重置
+            </button>
+        </div>
+    </div>
+
+    <!-- Section 2: Sorting Visualizer (排序模擬器) -->
+    <div id="visualizer"
+         class="visualizer-container flex items-end justify-center w-full max-w-4xl h-80 bg-gray-100 border border-gray-300 rounded-lg overflow-hidden p-2 shadow-inner mb-6">
+        <!-- Bars will be inserted here by JavaScript -->
+    </div>
+
+    <!-- Section 3: Action Log (動作提示) -->
+    <div id="actionLog"
+         class="w-full max-w-4xl p-4 bg-blue-50 border border-blue-200 rounded-lg text-center text-blue-800 font-semibold shadow-sm mb-6">
+        準備開始排序模擬。
+    </div>
+
+    <!-- Section 4 & 5: Controls (步進 & 播放控制) -->
+    <div class="w-full max-w-4xl bg-white shadow-md rounded-lg p-6 flex flex-col sm:flex-row flex-wrap gap-4 justify-center items-center">
+        <!-- Step Button -->
+        <button id="stepButton"
+                class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-md shadow-md
+                       transition-all duration-200 ease-in-out transform hover:scale-105">
+            步進 (單一步驟)
+        </button>
+
+        <!-- Playback Controls -->
+        <div class="flex items-center gap-4">
+            <button id="playPauseButton"
+                    class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md shadow-md
+                           transition-all duration-200 ease-in-out transform hover:scale-105">
+                播放 / 暫停
+            </button>
+            <button id="speedDownButton"
+                    class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-md shadow-md
+                           transition-all duration-200 ease-in-out transform hover:scale-105">
+                速度 -
+            </button>
+            <span id="speedDisplay"
+                  class="bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-md cursor-pointer shadow-md
+                         transition-all duration-200 ease-in-out transform hover:scale-105"
+                  title="點擊編輯速度">
+                速度: <span id="currentSpeedValue">50</span> ms
+            </span>
+            <button id="speedUpButton"
+                    class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-md shadow-md
+                           transition-all duration-200 ease-in-out transform hover:scale-105">
+                速度 +
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // DOM 元素的引用
+        const algorithmSelect = document.getElementById('algorithmSelect');
+        const arraySizeInput = document.getElementById('arraySizeInput');
+        const visualizer = document.getElementById('visualizer');
+        const actionLogDisplay = document.getElementById('actionLog');
+        const stepButton = document.getElementById('stepButton');
+        const resetButton = document.getElementById('resetButton');
+        const playPauseButton = document.getElementById('playPauseButton');
+        const speedDownButton = document.getElementById('speedDownButton');
+        const speedUpButton = document.getElementById('speedUpButton');
+        const speedDisplay = document.getElementById('speedDisplay');
+        const currentSpeedValue = document.getElementById('currentSpeedValue');
+
+        // 模擬器狀態變數
+        let array = []; // 儲存排序元素的陣列
+        let arraySize = parseInt(arraySizeInput.value); // 陣列大小
+        let animationSpeed = parseInt(currentSpeedValue.textContent); // 每次步驟之間的延遲 (毫秒)
+        let isPaused = true; // 是否暫停
+        let isSorting = false; // 排序是否正在進行
+        let currentAlgorithm = algorithmSelect.value; // 當前選擇的排序演算法
+        let algorithmState = {}; // 儲存當前演算法的內部狀態
+        let timeoutId = null; // 用於 setTimeout 的 ID
+        let totalOperations = 0; // 記錄操作次數 (比較、交換、複製等)
+
+        // 視覺化顏色定義
+        const COLOR_NORMAL = 'bg-blue-500';
+        const COLOR_COMPARING = 'bg-red-500';
+        const COLOR_SWAPPING = 'bg-yellow-500';
+        const COLOR_SORTED = 'bg-green-500';
+        const COLOR_PIVOT = 'bg-purple-500'; // 樞紐元素的顏色
+        const COLOR_PARTITION_LEFT = 'bg-indigo-500'; // 快速排序左分區
+        const COLOR_PARTITION_RIGHT = 'bg-pink-500'; // 快速排序右分區
+        const COLOR_AUXILIARY = 'bg-gray-400'; // 合併排序臨時陣列元素
+        const COLOR_COUNT = 'bg-cyan-400'; // 計數/基數排序中被計數的元素
+        const COLOR_BUCKET = 'bg-orange-400'; // 桶排序中被放入桶的元素
+
+        // 理論複雜度映射
+        const theoreticalComplexities = {
+            'bubble': { time: 'O(n²)', space: 'O(1)' },
+            'selection': { time: 'O(n²)', space: 'O(1)' },
+            'insertion': { time: 'O(n²)', space: 'O(1)' },
+            'merge': { time: 'O(n log n)', space: 'O(n)' },
+            'quick': { time: 'O(n log n) 平均, O(n²) 最壞', space: 'O(log n) 平均, O(n) 最壞 (遞歸棧)' },
+            'shell': { time: 'O(n log² n) to O(n^(4/3))', space: 'O(1)' }, // 基於常見間隙序列
+            'counting': { time: 'O(n + k)', space: 'O(k)' }, // k 為輸入數字範圍 (max value)
+            'radix': { time: 'O(nk)', space: 'O(n + k)' }, // n: 數字數量, k: 位數或數字範圍 (base)
+            'bucket': { time: 'O(n + k) 平均, O(n²) 最壞', space: 'O(n + k)' }, // n: 數字數量, k: 桶的數量
+            'cocktail': { time: 'O(n²)', space: 'O(1)' }
+        };
+
+        /**
+         * 根據大小生成初始陣列。
+         * 總是生成 1 到 size 的亂序數列。
+         * @param {number} size - 陣列大小。
+         * @returns {Array<Object>} 包含 { value, state } 的陣列。
+         */
+        function generateInitialArray(size) {
+            let arr = [];
+            // 生成 1 到 size 的有序數列
+            for (let k = 1; k <= size; k++) {
+                arr.push({ value: k, state: 'normal' });
+            }
+            // 洗牌 (Fisher-Yates shuffle)
+            for (let k = arr.length - 1; k > 0; k--) {
+                const j = Math.floor(Math.random() * (k + 1));
+                [arr[k], arr[j]] = [arr[j], arr[k]]; // Swap elements (value and state)
+            }
+            return arr;
+        }
+
+        /**
+         * 重置所有柱子的狀態為 normal，但保留已排序的狀態。
+         */
+        function resetBarStates() {
+            array.forEach(item => {
+                if (item.state !== 'sorted') {
+                    item.state = 'normal';
+                }
+            });
+        }
+
+        /**
+         * 顯示排序完成後的複雜度資訊。
+         */
+        function displayComplexities() {
+            const theoretical = theoreticalComplexities[currentAlgorithm];
+            let actualSpace = 'O(1)'; // 大部分原地排序的預設值
+
+            // 計算實際時間複雜度訊息
+            let actualTimeMessage = `實際操作數: ${totalOperations} 次`;
+
+            // 根據演算法估計實際空間複雜度
+            if (currentAlgorithm === 'merge') {
+                actualSpace = `O(${arraySize}) (臨時陣列: ${arraySize} 元素)`;
+            } else if (currentAlgorithm === 'counting') {
+                const maxVal = algorithmState.maxVal !== undefined ? algorithmState.maxVal : arraySize; // 確保 maxVal 有值，如果沒排序過則假設為 arraySize
+                actualSpace = `O(${maxVal + 1}) (計數陣列)`;
+            } else if (currentAlgorithm === 'radix') {
+                // Radix sort's space complexity depends on the range of digits (typically 10 for base-10) and array size for temporary storage.
+                const maxVal = array.reduce((max, item) => Math.max(max, item.value), 0);
+                actualSpace = `O(${arraySize} + 10) (桶/計數陣列: 10 個桶, 臨時陣列: ${arraySize} 元素)`;
+            } else if (currentAlgorithm === 'bucket') {
+                actualSpace = `O(${arraySize}) (桶: 最多 ${arraySize} 個元素)`; // 簡化，每個桶本身可能也需要空間
+            } else if (currentAlgorithm === 'quick') {
+                // 遞歸棧空間。平均 O(log n), 最壞 O(n)
+                actualSpace = `O(${algorithmState.stack ? algorithmState.stack.length : 0}) (遞歸棧深度) - 理論 O(log n) 平均`;
+            }
+
+            actionLogDisplay.innerHTML = `
+                <p class="text-xl font-bold text-green-700 mb-2">排序完成！</p>
+                <p>理論時間複雜度: <span class="font-bold text-gray-900">${theoretical.time}</span></p>
+                <p>理論空間複雜度: <span class="font-bold text-gray-900">${theoretical.space}</span></p>
+                <p>實際時間複雜度: <span class="font-bold text-gray-900">${actualTimeMessage}</span></p>
+                <p>實際空間複雜度: <span class="font-bold text-gray-900">${actualSpace}</span></p>
+            `;
+        }
+
+        /**
+         * 隨機生成一個新陣列並重置模擬器狀態。
+         */
+        function resetSimulation() {
+            clearTimeout(timeoutId); // 清除任何正在執行的 setTimeout
+            isPaused = true;
+            isSorting = false;
+            playPauseButton.textContent = '播放 / 暫停';
+            actionLogDisplay.textContent = '準備開始排序模擬。';
+            totalOperations = 0; // 重置操作計數
+
+            array = generateInitialArray(arraySize); // 使用新的生成邏輯
+
+            initializeAlgorithmState(currentAlgorithm); // 初始化演算法狀態
+            updateVisualizer(); // 更新視覺化顯示
+            enableControls(); // 啟用所有控制按鈕
+        }
+
+        /**
+         * 根據選定的演算法初始化其內部狀態。
+         * @param {string} algorithmName - 演算法名稱。
+         */
+        function initializeAlgorithmState(algorithmName) {
+            switch (algorithmName) {
+                case 'bubble':
+                    algorithmState = { i: 0, j: 0, finished: false };
+                    break;
+                case 'selection':
+                    algorithmState = { i: 0, j: 0, minIndex: 0, finished: false };
+                    break;
+                case 'insertion':
+                    algorithmState = { i: 1, j: 0, currentKey: null, finished: false };
+                    break;
+                case 'merge':
+                    algorithmState = { currSize: 1, leftStart: 0, tempArray: [], finished: false, mergeLeft: undefined, mergeRight: undefined, mergeK: undefined };
+                    break;
+                case 'quick':
+                    // 使用堆棧來模擬遞歸調用，儲存子陣列的 [low, high] 範圍
+                    algorithmState = { stack: [[0, arraySize - 1]], low: 0, high: arraySize - 1, i: -1, j: 0, pivotIndex: -1, phase: undefined, partitionedIndex: -1, finished: false };
+                    break;
+                case 'shell':
+                    algorithmState = {
+                        gap: undefined,   // Current gap value
+                        i: undefined,     // Outer loop counter for current gap
+                        j: undefined,     // Inner loop counter (for shifting)
+                        temp: undefined,  // Element being inserted
+                        gaps: [],         // Array of gaps
+                        gapIndex: 0,      // Current index in gaps array
+                        phase: 'init_gaps', // 'init_gaps', 'process_gap', 'outer_i_loop_init', 'inner_j_loop_compare', 'inner_j_loop_shift', 'place_temp'
+                        finished: false
+                    };
+                    break;
+                case 'counting':
+                    algorithmState = { phase: undefined, countArray: [], outputArray: [], i: 0, maxVal: undefined, finished: false };
+                    break;
+                case 'radix':
+                    algorithmState = { phase: undefined, maxVal: undefined, currentDigit: undefined, countingSortState: undefined, finished: false };
+                    break;
+                case 'bucket':
+                    algorithmState = { phase: undefined, buckets: [], i: 0, bucketIndex: 0, finished: false };
+                    break;
+                case 'cocktail':
+                    algorithmState = { start: 0, end: arraySize - 1, i: 0, currentPassSwapped: true, subPhase: 'forward_pass', finished: false };
+                    break;
+                default:
+                    algorithmState = { finished: true };
+            }
+        }
+
+        /**
+         * 更新視覺化顯示 (柱狀圖)。
+         */
+        function updateVisualizer() {
+            visualizer.innerHTML = ''; // 清除舊的柱狀圖
+            // 計算每個柱子的寬度，確保所有柱子都能顯示且有間距
+            const totalBarWidth = visualizer.clientWidth - (array.length * 2); // 減去總間距
+            const barWidth = Math.max(1, Math.floor(totalBarWidth / array.length)); // 確保至少 1px 寬度
+
+            array.forEach((item, index) => {
+                const bar = document.createElement('div');
+                bar.classList.add('bar', 'flex-shrink-0', 'flex', 'items-end', 'justify-center', 'text-xs', 'font-semibold', 'text-white');
+                bar.style.width = `${barWidth}px`;
+                bar.style.height = `${(item.value / arraySize) * 95}%`; // 高度基於值與 arraySize，最大 95% (確保高度隨 N 變化)
+                bar.style.margin = '0 1px'; // 柱子間的間距
+
+                // 根據狀態設定顏色
+                let barColor = COLOR_NORMAL;
+                if (item.state === 'comparing') {
+                    barColor = COLOR_COMPARING;
+                } else if (item.state === 'swapping') {
+                    barColor = COLOR_SWAPPING;
+                } else if (item.state === 'sorted') {
+                    barColor = COLOR_SORTED;
+                } else if (item.state === 'pivot') {
+                    barColor = COLOR_PIVOT;
+                } else if (item.state === 'partition-left') {
+                    barColor = COLOR_PARTITION_LEFT;
+                } else if (item.state === 'partition-right') {
+                    barColor = COLOR_PARTITION_RIGHT;
+                } else if (item.state === 'auxiliary') {
+                    barColor = COLOR_AUXILIARY;
+                } else if (item.state === 'count') {
+                    barColor = COLOR_COUNT;
+                } else if (item.state === 'bucket') {
+                    barColor = COLOR_BUCKET;
+                }
+                bar.classList.add(barColor);
+
+                // 顯示數字在柱子上
+                // 為了避免過小的柱子顯示數字導致混亂，當柱子數量較少時才顯示數字
+                if (arraySize <= 20) { // 當項目數 <= 20 時顯示數字
+                    bar.textContent = item.value;
+                }
+
+                visualizer.appendChild(bar);
+            });
+        }
+
+        // --- 排序演算法實現 (步進式) ---
+
+        // 氣泡排序
+        function bubbleSortStep() {
+            let { i, j } = algorithmState;
+            resetBarStates();
+
+            // 標記已排序的元素
+            for(let k = arraySize - 1; k > arraySize - 1 - i; k--) { // Changed to > to exclude the current element being processed
+                if (array[k]) array[k].state = 'sorted';
+            }
+
+            if (i < arraySize - 1) { // 外層循環
+                if (j < arraySize - 1 - i) { // 內層循環
+                    totalOperations++; // 比較操作
+                    if (array[j]) array[j].state = 'comparing';
+                    if (array[j + 1]) array[j + 1].state = 'comparing';
+                    actionLogDisplay.textContent = `比較 ${array[j].value} 和 ${array[j+1].value}`;
+
+                    if (array[j].value > array[j + 1].value) {
+                        totalOperations++; // 交換操作
+                        actionLogDisplay.textContent += `, 交換 ${array[j].value} 和 ${array[j+1].value}`;
+                        [array[j], array[j + 1]] = [array[j + 1], array[j]];
+                        if (array[j]) array[j].state = 'swapping';
+                        if (array[j + 1]) array[j + 1].state = 'swapping';
+                    }
+                    algorithmState.j++;
+                    return true;
+                } else {
+                    // 一輪結束，最大的元素已歸位，標記為已排序
+                    if (array[arraySize - 1 - i]) array[arraySize - 1 - i].state = 'sorted';
+                    actionLogDisplay.textContent = `${array[arraySize - 1 - i].value} 已排序到最終位置。`;
+                    algorithmState.i++;
+                    algorithmState.j = 0; // 重置內層循環索引
+                    return true;
+                }
+            } else {
+                array.forEach(item => item.state = 'sorted');
+                algorithmState.finished = true;
+                actionLogDisplay.textContent = '氣泡排序完成！';
+                return false;
+            }
+        }
+
+        // 選擇排序
+        function selectionSortStep() {
+            let { i, j, minIndex } = algorithmState;
+            resetBarStates();
+
+            // 標記已排序的部分
+            for(let k = 0; k < i; k++) {
+                if (array[k]) array[k].state = 'sorted';
+            }
+
+            // 標記當前最小值 (僅在有效索引範圍內)
+            if (array[minIndex] && minIndex >= i && minIndex < arraySize) array[minIndex].state = 'pivot';
+
+            if (i < arraySize - 1) { // 外層循環
+                if (j === undefined || j === i) { // 初始化本輪尋找最小值
+                    minIndex = i;
+                    j = i; // Start j from i
+                    algorithmState.minIndex = minIndex;
+                    algorithmState.j = j;
+                    if (array[minIndex]) array[minIndex].state = 'pivot';
+                    actionLogDisplay.textContent = `從索引 ${i} 開始尋找最小值。當前最小值為 ${array[i].value}。`;
+                    algorithmState.j++; // Advance j to start actual comparison
+                    return true;
+                }
+
+                if (j < arraySize) { // 內層循環尋找最小值
+                    totalOperations++; // 比較操作
+                    if (array[j]) array[j].state = 'comparing'; // 標記正在比較的元素
+
+                    actionLogDisplay.textContent = `尋找從索引 ${i} 開始的最小值: 比較 ${array[j].value} 和當前最小值 ${array[minIndex].value}`;
+
+                    if (array[j].value < array[minIndex].value) {
+                        minIndex = j; // 更新最小值索引
+                        actionLogDisplay.textContent += `, 更新最小值為 ${array[j].value} (索引 ${j})`;
+                        algorithmState.minIndex = minIndex; // 更新狀態
+                        // Keep previous minIndex normal, new minIndex as pivot
+                        array.forEach((item, idx) => { // Reset to normal if not new minIndex or sorted
+                            if (item.state !== 'sorted' && idx !== minIndex) {
+                                item.state = 'normal';
+                            }
+                        });
+                        if (array[minIndex]) array[minIndex].state = 'pivot'; // 更新顏色
+                    }
+                    algorithmState.j++;
+                    return true; // 繼續內層循環
+                } else {
+                    // 內層循環結束，找到本輪最小值，進行交換
+                    if (minIndex !== i) {
+                        totalOperations++; // 交換操作
+                        actionLogDisplay.textContent = `交換 ${array[i].value} (索引 ${i}) 和最小值 ${array[minIndex].value} (索引 ${minIndex})`;
+                        [array[i], array[minIndex]] = [array[minIndex], array[i]]; // 交換
+                        if (array[i]) array[i].state = 'swapping';
+                        if (array[minIndex]) array[minIndex].state = 'swapping';
+                    } else {
+                        actionLogDisplay.textContent = `${array[i].value} (索引 ${i}) 已在正確位置。`;
+                    }
+                    // 標記當前位置的元素為已排序
+                    if (array[i]) array[i].state = 'sorted';
+                    algorithmState.i++;
+                    algorithmState.j = algorithmState.i; // 重置內層循環索引從 i 開始
+                    algorithmState.minIndex = algorithmState.i; // 重置最小值索引
+                    return true; // 繼續外層循環
+                }
+            } else {
+                array.forEach(item => item.state = 'sorted');
+                algorithmState.finished = true;
+                actionLogDisplay.textContent = '選擇排序完成！';
+                return false;
+            }
+        }
+
+        // 插入排序
+        function insertionSortStep() {
+            let { i, j, currentKey } = algorithmState;
+            resetBarStates();
+
+            // 標記已排序的部分
+            for(let k = 0; k < i; k++) {
+                if (array[k]) array[k].state = 'sorted';
+            }
+
+            if (i < arraySize) { // 外層循環 (i 從 1 到 arraySize-1)
+                if (currentKey === null) { // 首次處理 array[i]
+                    currentKey = array[i].value; // 儲存當前要插入的元素的值
+                    algorithmState.currentKeyObject = { ...array[i] }; // Store full object for visual
+                    j = i - 1; // 從已排序部分的末尾開始比較
+                    algorithmState.currentKey = currentKey;
+                    algorithmState.j = j;
+                    actionLogDisplay.textContent = `處理元素 ${currentKey} (索引 ${i})。`;
+                    if (array[i]) array[i].state = 'comparing'; // 標記被選擇的元素
+                    return true; // 儲存 key 後，等待下一個步驟進行比較/移動
+                }
+
+                totalOperations++; // 比較操作
+                if (j >= 0 && array[j].value > currentKey) {
+                    actionLogDisplay.textContent = `比較 ${array[j].value} (索引 ${j}) 和待插入的 ${currentKey}。 ${array[j].value} > ${currentKey}，將 ${array[j].value} 移到索引 ${j+1}。`;
+                    if (array[j]) array[j].state = 'comparing';
+                    if (array[j+1]) array[j+1].value = array[j].value; // 元素後移
+                    if (array[j+1]) array[j+1].state = 'swapping'; // 顯示被移動的元素
+                    algorithmState.j--; // 移動到下一個比較位置
+                    return true; // 繼續內層循環
+                } else {
+                    // 找到正確位置或到達陣列開頭
+                    actionLogDisplay.textContent = `將 ${currentKey} 插入到索引 ${j + 1}。`;
+                    if (array[j+1]) {
+                        array[j+1].value = currentKey; // 插入元素
+                        array[j+1].state = 'swapping'; // 標記插入的元素
+                    }
+                    algorithmState.i++; // 移動到下一個未排序的元素
+                    algorithmState.j = 0; // 重置 J
+                    algorithmState.currentKey = null; // 重置 currentKey，準備處理下一個元素
+                    algorithmState.currentKeyObject = null;
+                    return true; // 繼續外層循環
+                }
+            } else {
+                array.forEach(item => item.state = 'sorted');
+                algorithmState.finished = true;
+                actionLogDisplay.textContent = '插入排序完成！';
+                return false;
+            }
+        }
+
+        // 合併排序 (迭代，自底向上)
+        function mergeSortStep() {
+            let { currSize, leftStart, tempArray, mergeLeft, mergeRight, mergeK, subPhase } = algorithmState;
+            resetBarStates();
+
+            // Initialize tempArray if not already
+            if (!tempArray || tempArray.length !== arraySize) {
+                tempArray = new Array(arraySize).fill(null).map(() => ({ value: 0, state: 'normal' }));
+                algorithmState.tempArray = tempArray;
+            }
+
+            if (currSize <= arraySize) {
+                if (subPhase === undefined) { // Start a new merge pass
+                    leftStart = 0;
+                    algorithmState.leftStart = leftStart;
+                    subPhase = 'merge_pairs';
+                    actionLogDisplay.textContent = `開始合併階段：子陣列大小為 ${currSize}。`;
+                    algorithmState.subPhase = subPhase;
+                    return true;
+                }
+
+                if (subPhase === 'merge_pairs') {
+                    if (leftStart < arraySize) {
+                        const mid = Math.min(leftStart + currSize - 1, arraySize - 1);
+                        const rightEnd = Math.min(leftStart + 2 * currSize - 1, arraySize - 1);
+
+                        // If right part doesn't exist, this pair is already "sorted" for this size
+                        if (mid + 1 > rightEnd) {
+                             actionLogDisplay.textContent = `子陣列 [${leftStart}, ${mid}] 單獨存在，跳過合併。`;
+                             leftStart += 2 * currSize; // Move to next potential pair
+                             algorithmState.leftStart = leftStart;
+                             return true;
+                        }
+
+                        // Initialize merge pointers for this pair
+                        mergeLeft = leftStart;
+                        mergeRight = mid + 1;
+                        mergeK = leftStart;
+                        actionLogDisplay.textContent = `合併子陣列: [${leftStart}, ${mid}] 和 [${mid + 1}, ${rightEnd}]`;
+                        for(let k = leftStart; k <= rightEnd; k++) {
+                            if (array[k]) array[k].state = 'comparing';
+                        }
+                        algorithmState.mergeLeft = mergeLeft;
+                        algorithmState.mergeRight = mergeRight;
+                        algorithmState.mergeK = mergeK;
+                        subPhase = 'perform_merge';
+                        algorithmState.subPhase = subPhase;
+                        return true;
+                    } else { // All pairs for current currSize processed
+                        currSize *= 2; // Double size for next pass
+                        algorithmState.currSize = currSize;
+                        actionLogDisplay.textContent = `完成大小為 ${currSize/2} 的合併階段。準備下一個大小為 ${currSize} 的合併。`;
+                        subPhase = undefined; // Reset to start new pass
+                        algorithmState.subPhase = subPhase;
+                        // If currSize becomes greater than arraySize, it means sorting is complete
+                        if (currSize > arraySize) {
+                             array.forEach(item => item.state = 'sorted');
+                             algorithmState.finished = true;
+                             actionLogDisplay.textContent = '合併排序完成！';
+                             return false;
+                        }
+                        return true;
+                    }
+                }
+
+                if (subPhase === 'perform_merge') {
+                    const mid = Math.min(leftStart + currSize - 1, arraySize - 1);
+                    const rightEnd = Math.min(leftStart + 2 * currSize - 1, arraySize - 1);
+
+                    // Perform merging logic
+                    if (mergeLeft <= mid && mergeRight <= rightEnd) {
+                        totalOperations++; // 比較操作
+                        if (array[mergeLeft]) array[mergeLeft].state = 'comparing';
+                        if (array[mergeRight]) array[mergeRight].state = 'comparing';
+                        actionLogDisplay.textContent = `比較 ${array[mergeLeft].value} (左) 和 ${array[mergeRight].value} (右)`;
+
+                        if (array[mergeLeft].value <= array[mergeRight].value) {
+                            tempArray[mergeK] = { ...array[mergeLeft], state: 'auxiliary' };
+                            mergeLeft++;
+                        } else {
+                            tempArray[mergeK] = { ...array[mergeRight], state: 'auxiliary' };
+                            mergeRight++;
+                        }
+                        mergeK++;
+                        algorithmState.mergeLeft = mergeLeft;
+                        algorithmState.mergeRight = mergeRight;
+                        algorithmState.mergeK = mergeK;
+                        return true;
+                    }
+                    // Copy remaining elements from left sub-array
+                    else if (mergeLeft <= mid) {
+                        actionLogDisplay.textContent = `複製剩餘元素從左子陣列: ${array[mergeLeft].value}`;
+                        if (array[mergeLeft]) array[mergeLeft].state = 'auxiliary';
+                        tempArray[mergeK] = { ...array[mergeLeft], state: 'auxiliary' };
+                        mergeLeft++;
+                        mergeK++;
+                        algorithmState.mergeLeft = mergeLeft;
+                        algorithmState.mergeK = mergeK;
+                        return true;
+                    }
+                    // Copy remaining elements from right sub-array
+                    else if (mergeRight <= rightEnd) {
+                        actionLogDisplay.textContent = `複製剩餘元素從右子陣列: ${array[mergeRight].value}`;
+                        if (array[mergeRight]) array[mergeRight].state = 'auxiliary';
+                        tempArray[mergeK] = { ...array[mergeRight], state: 'auxiliary' };
+                        mergeRight++;
+                        mergeK++;
+                        algorithmState.mergeRight = mergeRight;
+                        algorithmState.mergeK = mergeK;
+                        return true;
+                    }
+                    // All elements merged for this pair, copy back to original array
+                    else {
+                        for (let k = leftStart; k <= rightEnd; k++) {
+                            totalOperations++; // 複製操作
+                            array[k] = { ...tempArray[k], state: 'swapping' };
+                        }
+                        actionLogDisplay.textContent = `完成合併，將排序好的元素放回主陣列。`;
+                        // Reset merge-specific state for next pair
+                        algorithmState.mergeLeft = undefined;
+                        algorithmState.mergeRight = undefined;
+                        algorithmState.mergeK = undefined;
+                        subPhase = 'merge_pairs'; // Go back to picking next pair
+                        algorithmState.subPhase = subPhase;
+                        algorithmState.leftStart += 2 * currSize; // Move to next pair
+                        return true;
+                    }
+                }
+            }
+            return false; // Should not reach here if logic is complete
+        }
+
+        // 快速排序 (迭代，使用棧管理子陣列)
+        function quickSortStep() {
+            let { stack, low, high, i, j, pivotIndex, phase, partitionedIndex } = algorithmState;
+            resetBarStates();
+
+            // 標記已排序的元素（樞紐）
+            if (partitionedIndex !== -1 && array[partitionedIndex]) {
+                array[partitionedIndex].state = 'sorted';
+            }
+            // 標記當前分區的範圍
+            if (phase === 'partitioning' && low !== undefined && high !== undefined) {
+                for (let k = low; k <= high; k++) {
+                    if (array[k] && array[k].state !== 'sorted' && k !== pivotIndex && k !== i && k !== j) {
+                        array[k].state = 'normal'; // Reset other elements in current partition
+                    }
+                }
+                if (array[low]) array[low].state = 'partition-left';
+                if (array[high]) array[high].state = 'partition-right';
+            }
+
+            // 如果棧為空且沒有正在進行的分區，則排序完成
+            if (stack.length === 0 && (phase === undefined || phase === 'done_partition')) {
+                array.forEach(item => item.state = 'sorted');
+                algorithmState.finished = true;
+                actionLogDisplay.textContent = '快速排序完成！';
+                return false;
+            }
+
+            if (phase === undefined) { // 開始一個新的分區
+                if (stack.length > 0) {
+                    [low, high] = stack.pop(); // 從棧中取出要排序的子陣列範圍
+                    if (low >= high) { // 如果子陣列只有一個或零個元素，則已排序
+                        if(array[low]) array[low].state = 'sorted';
+                        actionLogDisplay.textContent = `子陣列 [${low}, ${high}] 已排序 (單一或空元素)。`;
+                        algorithmState.low = low; // Update state for visualizer
+                        algorithmState.high = high;
+                        // Important: if already sorted, continue to next step (pop from stack)
+                        algorithmState.phase = undefined; // Reset phase to immediately process next from stack
+                        return true;
+                    }
+                    pivotIndex = high; // 使用最後一個元素作為樞紐
+                    i = low - 1;
+                    j = low;
+                    phase = 'partitioning'; // 進入分區階段
+                    actionLogDisplay.textContent = `開始快速排序分區: 範圍 [${low}, ${high}]，樞紐為 ${array[pivotIndex].value}`;
+                    if(array[pivotIndex]) array[pivotIndex].state = 'pivot';
+                    algorithmState.low = low;
+                    algorithmState.high = high;
+                    algorithmState.i = i;
+                    algorithmState.j = j;
+                    algorithmState.pivotIndex = pivotIndex;
+                    algorithmState.phase = phase;
+                    algorithmState.partitionedIndex = -1; // Reset partitioned index
+                    return true;
+                } else {
+                    array.forEach(item => item.state = 'sorted');
+                    algorithmState.finished = true;
+                    actionLogDisplay.textContent = '快速排序完成！';
+                    return false;
+                }
+            }
+
+            if (phase === 'partitioning') {
+                if (j < high) { // 遍歷子陣列
+                    if(array[j]) array[j].state = 'comparing';
+                    if(array[pivotIndex]) array[pivotIndex].state = 'pivot'; // 保持樞紐顏色
+                    totalOperations++; // 比較操作
+                    actionLogDisplay.textContent = `比較 ${array[j].value} 和樞紐 ${array[pivotIndex].value}`;
+
+                    if (array[j].value < array[pivotIndex].value) {
+                        i++;
+                        if (i !== j) { // 只有在索引不同時才交換
+                            totalOperations++; // 交換操作
+                            actionLogDisplay.textContent += `, ${array[j].value} 小於樞紐，交換 ${array[i].value} 和 ${array[j].value}`;
+                            [array[i], array[j]] = [array[j], array[i]];
+                            if(array[i]) array[i].state = 'swapping';
+                            if(array[j]) array[j].state = 'swapping';
+                        } else {
+                            actionLogDisplay.textContent += `, ${array[j].value} 小於樞紐，已在正確位置`;
+                            if(array[i]) array[i].state = 'swapping';
+                        }
+                    }
+                    algorithmState.i = i;
+                    algorithmState.j++;
+                    return true;
+                } else {
+                    // 分區循環結束，將樞紐交換到正確位置
+                    actionLogDisplay.textContent = `將樞紐 ${array[pivotIndex].value} 放置到正確位置 (索引 ${i + 1})`;
+                    totalOperations++; // 交換操作
+                    [array[i + 1], array[pivotIndex]] = [array[pivotIndex], array[i + 1]];
+                    if(array[i + 1]) array[i + 1].state = 'swapping';
+                    if(array[pivotIndex]) array[pivotIndex].state = 'swapping';
+                    partitionedIndex = i + 1;
+                    algorithmState.partitionedIndex = partitionedIndex;
+                    algorithmState.phase = 'swap_pivot_and_push_subarrays'; // 過渡到下一個階段
+                    return true;
+                }
+            }
+            else if (phase === 'swap_pivot_and_push_subarrays') {
+                if(array[partitionedIndex]) array[partitionedIndex].state = 'sorted'; // 樞紐現在位於其最終排序位置
+                actionLogDisplay.textContent = `樞紐 ${array[partitionedIndex].value} 已歸位。`;
+
+                // 將子陣列添加到棧中以進行後續排序
+                // 注意：這裡應該先處理較小的子陣列，以減少遞歸深度 (雖然迭代實現不直接影響堆棧深度，但這是習慣)
+                // 為了簡單和可視化，我們按順序推入
+                if (partitionedIndex + 1 < high) { // Push right subarray first to process left first (LIFO)
+                    stack.push([partitionedIndex + 1, high]);
+                    actionLogDisplay.textContent += ` 推送右子陣列 [${partitionedIndex + 1}, ${high}] 到棧。`;
+                }
+                if (low < partitionedIndex - 1) { // Then push left subarray
+                    stack.push([low, partitionedIndex - 1]);
+                    actionLogDisplay.textContent += ` 推送左子陣列 [${low}, ${partitionedIndex - 1}] 到棧。`;
+                }
+                algorithmState.stack = stack;
+                algorithmState.phase = undefined; // 重置階段以從棧中取出下一個
+                algorithmState.partitionedIndex = -1; // Reset for next partition
+                return true;
+            }
+            return false; // 不應到達此處
+        }
+
+        // 希爾排序 (Shell Sort) - Based on user's provided code
+        function shellSortStep() {
+            let { gaps, gapIndex, i, j, temp, phase } = algorithmState;
+            resetBarStates();
+
+            // Phase 1: Initialize gaps (`for (let gap = arr.length >> 1; gap > 0; gap >>= 1)`)
+            if (phase === 'init_gaps') {
+                gaps = [];
+                // User's provided shell sort code: `for (let gap = arr.length >> 1; gap > 0; gap >>= 1)`
+                // This is a common sequence (N/2, N/4, ... 1). I will stick to this as it's directly from their code.
+                let h = arraySize >> 1; // Equivalent to Math.floor(arraySize / 2)
+                while (h > 0) {
+                    gaps.push(h);
+                    h >>= 1; // Equivalent to Math.floor(h / 2)
+                }
+                if (gaps.length === 0) gaps.push(1); // Ensure at least gap 1 for small arrays
+                algorithmState.gaps = gaps;
+                algorithmState.gapIndex = 0;
+                algorithmState.phase = 'process_gap'; // Move to next phase
+                actionLogDisplay.textContent = `希爾排序開始，間隙序列: [${gaps.join(', ')}]`;
+                return true;
+            }
+
+            // Phase 2: Process current gap (Outer loop for `gap`)
+            if (phase === 'process_gap') {
+                if (gapIndex < gaps.length) {
+                    const currentGap = gaps[gapIndex];
+                    i = currentGap; // Outer loop for `i` starts from `gap` (`for (let i = gap; i < arr.length; i++)`)
+                    algorithmState.gap = currentGap;
+                    algorithmState.i = i;
+                    algorithmState.phase = 'outer_i_loop_init'; // Move to outer `i` loop initialization
+                    actionLogDisplay.textContent = `希爾排序: 處理間隙 ${currentGap}。`;
+                    return true;
+                } else {
+                    // All gaps processed, sorting complete
+                    array.forEach(item => item.state = 'sorted');
+                    algorithmState.finished = true;
+                    actionLogDisplay.textContent = '希爾排序完成！';
+                    return false;
+                }
+            }
+
+            // Phase 3: Outer loop for `i` (for each gap) (`for (let i = gap; i < arr.length; i++)`)
+            if (phase === 'outer_i_loop_init') {
+                if (i < arraySize) {
+                    temp = { ...array[i] }; // Store array[i] as temp
+                    j = i - algorithmState.gap; // Initialize `j` as `i - gap` (`j = i - gap`)
+                    algorithmState.temp = temp;
+                    algorithmState.j = j;
+                    algorithmState.phase = 'inner_j_loop_compare'; // Move to inner `j` loop comparison
+                    actionLogDisplay.textContent = `希爾排序 (間隙 ${algorithmState.gap}): 選擇元素 ${temp.value} (索引 ${i}) 進行插入。`;
+                    if(array[i]) array[i].state = 'pivot'; // Highlight temp's original position
+                    return true;
+                } else {
+                    // Outer loop for current gap finished, move to next gap
+                    gapIndex++; // Advance to the next gap
+                    algorithmState.gapIndex = gapIndex;
+                    algorithmState.phase = 'process_gap'; // Go back to process the next gap
+                    actionLogDisplay.textContent = `希爾排序 (間隙 ${algorithmState.gap}) 完成。`;
+                    return true;
+                }
+            }
+
+            // Phase 4: Inner loop for `j` (comparison and shifting) (`for (j = i - gap; j >= 0 && arr[j] > temp; j -= gap)`)
+            if (phase === 'inner_j_loop_compare') {
+                // Check loop condition: `j >= 0 && array[j].value > temp.value`
+                totalOperations++; // Comparison
+                if (j >= 0 && array[j].value > temp.value) {
+                    actionLogDisplay.textContent = `希爾排序 (間隙 ${algorithmState.gap}): 比較 ${array[j].value} (索引 ${j}) 和待插入的 ${temp.value}。`; // Access temp.value
+                    if(array[j]) array[j].state = 'comparing'; // Highlight array[j]
+                    // Highlight the position where array[j] will be shifted to
+                    if(array[j + algorithmState.gap]) array[j + algorithmState.gap].state = 'swapping'; 
+
+                    algorithmState.phase = 'inner_j_loop_shift'; // Next step: perform shift
+                    return true;
+                } else {
+                    // Inner loop condition false, time to place `temp`
+                    algorithmState.phase = 'place_temp';
+                    return true;
+                }
+            }
+
+            if (phase === 'inner_j_loop_shift') {
+                // Perform the shift: `arr[j + gap] = arr[j];` (user's code)
+                if (array[j + algorithmState.gap]) {
+                    array[j + algorithmState.gap].value = array[j].value;
+                    array[j + algorithmState.gap].state = 'swapping'; // Keep highlight
+                }
+                actionLogDisplay.textContent += ` 將 ${array[j].value} 移到索引 ${j + algorithmState.gap}。`; // Correct message
+                
+                j -= algorithmState.gap; // Decrement `j` for the next iteration of the inner loop
+                algorithmState.j = j;
+                
+                // Reset colors for next step (either another comparison or placement)
+                resetBarStates();
+                // If the loop continues, prepare for the next comparison
+                if (j >= 0 && array[j].value > temp.value) { // Check `j` itself
+                    if(array[j]) array[j].state = 'comparing';
+                    if(array[j + algorithmState.gap]) array[j + algorithmState.gap].state = 'swapping'; // This element is the *new* element at temp's prev spot
+                }
+                algorithmState.phase = 'inner_j_loop_compare'; // Go back to comparison for the next `j`
+                return true;
+            }
+
+            // Phase 5: Place the temporary element (`arr[j + gap] = temp;`)
+            if (phase === 'place_temp') {
+                totalOperations++; // Insertion/assignment
+                // `j` has already been decremented by `gap` in the last inner loop iteration.
+                // So, the insertion position is `j + gap`.
+                actionLogDisplay.textContent = `希爾排序 (間隙 ${algorithmState.gap}): 將 ${temp.value} 插入到索引 ${j + algorithmState.gap}。`;
+                if(array[j + algorithmState.gap]) {
+                    array[j + algorithmState.gap].value = temp.value; // temp is already {value, state} object, so use temp.value
+                    array[j + algorithmState.gap].state = 'swapping'; // Temporarily highlight inserted
+                }
+                i++; // Advance outer loop counter (`i++`)
+                algorithmState.i = i;
+                algorithmState.phase = 'outer_i_loop_init'; // Go back to the outer `i` loop for the next element
+                return true;
+            }
+
+            return false; // Should not be reached
+        }
+
+        // 計數排序
+        function countingSortStep() {
+            let { phase, countArray, outputArray, i, maxVal } = algorithmState;
+            resetBarStates();
+
+            // 第一次運行時確定最大值
+            if (maxVal === undefined) {
+                maxVal = array.reduce((max, item) => Math.max(max, item.value), 0); // Find max in the current array
+                algorithmState.maxVal = maxVal;
+                actionLogDisplay.textContent = `計數排序: 找到最大值: ${maxVal}。初始化計數陣列。`;
+                phase = 'initialize_counts';
+                algorithmState.phase = phase;
+                return true;
+            }
+
+            if (phase === 'initialize_counts') {
+                countArray = new Array(maxVal + 1).fill(0);
+                outputArray = new Array(arraySize).fill(null).map(() => ({ value: 0, state: 'normal' })); // 臨時陣列用於輸出
+                actionLogDisplay.textContent = `計數排序: 計數陣列和輸出陣列已初始化。`;
+                phase = 'count_elements';
+                i = 0;
+                algorithmState.countArray = countArray;
+                algorithmState.outputArray = outputArray;
+                algorithmState.phase = phase;
+                algorithmState.i = i;
+                return true;
+            }
+
+            if (phase === 'count_elements') {
+                if (i < arraySize) {
+                    totalOperations++; // 訪問/遞增操作
+                    const val = array[i].value;
+                    countArray[val]++;
+                    if(array[i]) array[i].state = 'count'; // 標記被計數的元素
+                    actionLogDisplay.textContent = `計數排序: 計數元素: ${val} (計數陣列索引 ${val} 的值現在是 ${countArray[val]})。`;
+                    algorithmState.i++;
+                    return true;
+                } else {
+                    actionLogDisplay.textContent = `計數排序: 所有元素計數完成。計算累積計數。`;
+                    phase = 'prefix_sum';
+                    i = 1; // 從 1 開始計算前綴和
+                    algorithmState.phase = phase;
+                    algorithmState.i = i;
+                    return true;
+                }
+            }
+
+            if (phase === 'prefix_sum') {
+                if (i <= maxVal) { // Iterate up to maxVal to compute prefix sums
+                    totalOperations++; // 加法操作
+                    countArray[i] += countArray[i - 1];
+                    actionLogDisplay.textContent = `計數排序: 計算累積計數: count[${i}] = ${countArray[i]} (加上 count[${i-1}])。`;
+                    algorithmState.i++;
+                    return true;
+                } else {
+                    actionLogDisplay.textContent = `計數排序: 累積計數完成。開始放置元素到輸出陣列。`;
+                    phase = 'place_elements';
+                    i = arraySize - 1; // 從後向前遍歷以確保穩定性
+                    algorithmState.phase = phase;
+                    algorithmState.i = i;
+                    return true;
+                }
+            }
+
+            if (phase === 'place_elements') {
+                if (i >= 0) {
+                    totalOperations++; // 訪問/遞減/放置操作
+                    const val = array[i].value;
+                    const pos = countArray[val] - 1;
+                    if(array[i]) array[i].state = 'comparing'; // 正在放置的元素
+                    // 將元素放置到輸出陣列 (邏輯上)
+                    outputArray[pos] = { ...array[i], state: 'sorted' }; // 標記為已排序在輸出中
+                    countArray[val]--;
+                    actionLogDisplay.textContent = `計數排序: 放置元素 ${val} (索引 ${i}) 到輸出陣列的索引 ${pos}。計數更新。`;
+                    algorithmState.i--;
+                    return true;
+                } else {
+                    actionLogDisplay.textContent = `計數排序: 所有元素已放置。複製回原陣列。`;
+                    phase = 'copy_back';
+                    i = 0;
+                    algorithmState.phase = phase;
+                    algorithmState.i = i;
+                    return true;
+                }
+            }
+
+            if (phase === 'copy_back') {
+                if (i < arraySize) {
+                    totalOperations++; // 複製操作
+                    array[i] = { ...outputArray[i], state: 'swapping' }; // 暫時高亮
+                    actionLogDisplay.textContent = `計數排序: 複製元素 ${array[i].value} 回原陣列 (索引 ${i})。`;
+                    algorithmState.i++;
+                    return true;
+                } else {
+                    array.forEach(item => item.state = 'sorted');
+                    algorithmState.finished = true;
+                    actionLogDisplay.textContent = '計數排序完成！';
+                    return false;
+                }
+            }
+            return false; // 不應到達此處
+        }
+
+        // 基數排序
+        function radixSortStep() {
+            let { phase, maxVal, currentDigit, countingSortState } = algorithmState;
+            resetBarStates();
+
+            if (phase === undefined) {
+                maxVal = array.reduce((max, item) => Math.max(max, item.value), 0);
+                const numDigits = (maxVal === 0) ? 1 : Math.floor(Math.log10(maxVal)) + 1; // 最大值的位數
+                currentDigit = 1; // 從個位數 (1) 開始
+                phase = 'iterate_digits';
+                actionLogDisplay.textContent = `基數排序開始。最大值 ${maxVal} 有 ${numDigits} 位數。從個位數開始。`;
+                algorithmState.maxVal = maxVal;
+                algorithmState.numDigits = numDigits;
+                algorithmState.currentDigit = currentDigit;
+                algorithmState.phase = phase;
+                return true;
+            }
+
+            if (phase === 'iterate_digits') {
+                const numDigits = algorithmState.numDigits;
+                // Check if all digits have been processed (e.g., currentDigit > 10^(numDigits-1))
+                // For a value like 50, numDigits=2, so we need to process currentDigit=1 and currentDigit=10
+                // The loop should continue as long as currentDigit is less than or equal to 10^(numDigits-1)
+                // Or if maxVal is 0-9, only currentDigit=1 is needed.
+                const powerOf10 = Math.pow(10, numDigits - 1);
+                if (currentDigit <= powerOf10) {
+                    actionLogDisplay.textContent = `基數排序: 對當前位數 (權重 ${currentDigit}) 執行計數排序。`;
+                    // Initialize internal counting sort state for this digit pass
+                    countingSortState = {
+                        phase: 'initialize_counts',
+                        countArray: [],
+                        outputArray: [],
+                        i: 0,
+                        maxVal: 9, // Digits are 0-9
+                        getDigit: (val) => Math.floor(val / currentDigit) % 10 // Function to extract the current digit
+                    };
+                    algorithmState.countingSortState = countingSortState;
+                    algorithmState.phase = 'counting_sort_pass';
+                    return true;
+                } else {
+                    array.forEach(item => item.state = 'sorted');
+                    algorithmState.finished = true;
+                    actionLogDisplay.textContent = '基數排序完成！';
+                    return false;
+                }
+            }
+
+            if (phase === 'counting_sort_pass') {
+                let { countArray, outputArray, i, maxVal: innerMaxVal, getDigit, phase: innerPhase } = countingSortState;
+
+                // Visual feedback during internal counting sort
+                resetBarStates();
+
+                if (innerPhase === 'initialize_counts') {
+                    countArray = new Array(innerMaxVal + 1).fill(0);
+                    outputArray = new Array(arraySize).fill(null).map(() => ({ value: 0, state: 'normal' }));
+                    actionLogDisplay.textContent = `(內部計數排序) 初始化計數陣列。`;
+                    innerPhase = 'count_elements';
+                    i = 0;
+                    countingSortState.countArray = countArray;
+                    countingSortState.outputArray = outputArray;
+                    countingSortState.i = i;
+                    countingSortState.phase = innerPhase;
+                    return true;
+                }
+
+                if (innerPhase === 'count_elements') {
+                    if (i < arraySize) {
+                        totalOperations++; // Access/increment operation
+                        const val = array[i].value;
+                        const digit = getDigit(val);
+                        countArray[digit]++;
+                        if(array[i]) array[i].state = 'count'; // Mark element being counted
+                        actionLogDisplay.textContent = `(內部計數排序) 計數元素 ${val} 的位數 ${digit}。`;
+                        countingSortState.i++;
+                        return true;
+                    } else {
+                        actionLogDisplay.textContent = `(內部計數排序) 所有位數計數完成。計算累積計數。`;
+                        innerPhase = 'prefix_sum';
+                        i = 1;
+                        countingSortState.i = i;
+                        countingSortState.phase = innerPhase;
+                        return true;
+                    }
+                }
+
+                if (innerPhase === 'prefix_sum') {
+                    if (i <= innerMaxVal) {
+                        totalOperations++; // Addition operation
+                        countArray[i] += countArray[i - 1];
+                        actionLogDisplay.textContent = `(內部計數排序) 計算累積計數: count[${i}] = ${countArray[i]}。`;
+                        countingSortState.i++;
+                        return true;
+                    } else {
+                        actionLogDisplay.textContent = `(內部計數排序) 累積計數完成。開始放置元素到輸出陣列。`;
+                        innerPhase = 'place_elements';
+                        i = arraySize - 1; // Iterate backward to ensure stability
+                        countingSortState.i = i;
+                        countingSortState.phase = innerPhase;
+                        return true;
+                    }
+                }
+
+                if (innerPhase === 'place_elements') {
+                    if (i >= 0) {
+                        totalOperations++; // Access/decrement/placement operation
+                        const val = array[i].value;
+                        const digit = getDigit(val);
+                        const pos = countArray[digit] - 1;
+                        if(array[i]) array[i].state = 'comparing'; // Element being placed
+                        outputArray[pos] = { ...array[i], state: 'swapping' };
+                        countArray[digit]--;
+                        actionLogDisplay.textContent = `(內部計數排序) 放置元素 ${val} (位數 ${digit}) 到輸出陣列的索引 ${pos}。`;
+                        countingSortState.i--;
+                        return true;
+                    } else {
+                        actionLogDisplay.textContent = `(內部計數排序) 所有元素已放置。複製回原陣列。`;
+                        innerPhase = 'copy_back';
+                        i = 0;
+                        countingSortState.i = i;
+                        countingSortState.phase = innerPhase;
+                        return true;
+                    }
+                }
+
+                if (innerPhase === 'copy_back') {
+                    if (i < arraySize) {
+                        totalOperations++; // Copy operation
+                        array[i] = { ...outputArray[i], state: 'swapping' };
+                        actionLogDisplay.textContent = `(內部計數排序) 複製元素 ${array[i].value} 回原陣列 (索引 ${i})。`;
+                        i++;
+                        countingSortState.i = i;
+                        return true;
+                    } else {
+                        actionLogDisplay.textContent = `位數 ${currentDigit} 的計數排序完成。`;
+                        currentDigit *= 10; // Move to the next digit position
+                        algorithmState.currentDigit = currentDigit;
+                        algorithmState.phase = 'iterate_digits'; // Return to outer loop
+                        algorithmState.countingSortState = undefined; // Clear internal state
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        // 桶排序
+        function bucketSortStep() {
+            let { phase, buckets, i, bucketIndex } = algorithmState;
+            resetBarStates();
+
+            // Determine number of buckets and range based on current array values (1 to arraySize)
+            const numBuckets = Math.max(1, Math.floor(arraySize / 5)); // Use arraySize/5, at least 1 bucket
+            const maxVal = arraySize; // Max value in 1 to arraySize sequence
+            const minValue = 1;      // Min value in 1 to arraySize sequence
+            const range = maxVal - minValue + 1;
+            const bucketSize = Math.max(1, Math.ceil(range / numBuckets)); // Value range for each bucket
+
+            if (phase === undefined) {
+                buckets = new Array(numBuckets).fill(null).map(() => []);
+                phase = 'distribute';
+                i = 0;
+                actionLogDisplay.textContent = `桶排序開始。分 ${numBuckets} 個桶，每個桶大小約 ${bucketSize}。`;
+                algorithmState.buckets = buckets;
+                algorithmState.numBuckets = numBuckets;
+                algorithmState.maxVal = maxVal;
+                algorithmState.minValue = minValue;
+                algorithmState.bucketSize = bucketSize;
+                algorithmState.phase = phase;
+                algorithmState.i = i;
+                return true;
+            }
+
+            if (phase === 'distribute') {
+                if (i < arraySize) {
+                    totalOperations++; // Distribution operation
+                    const val = array[i].value;
+                    // Calculate bucket index (ensure it's within bounds)
+                    const bucketIdx = Math.min(numBuckets - 1, Math.floor((val - minValue) / bucketSize));
+                    buckets[bucketIdx].push({ value: val, state: 'normal' });
+                    if(array[i]) array[i].state = 'bucket'; // Mark element being distributed
+                    actionLogDisplay.textContent = `將元素 ${val} 放入桶 ${bucketIdx}。`;
+                    algorithmState.i++;
+                    return true;
+                } else {
+                    actionLogDisplay.textContent = `所有元素已分發到桶中。開始排序每個桶。`;
+                    phase = 'sort_buckets';
+                    bucketIndex = 0;
+                    algorithmState.bucketIndex = bucketIndex;
+                    algorithmState.phase = phase;
+                    return true;
+                }
+            }
+
+            if (phase === 'sort_buckets') {
+                if (bucketIndex < numBuckets) {
+                    const currentBucket = buckets[bucketIndex];
+                    if (currentBucket.length > 0) {
+                        actionLogDisplay.textContent = `對桶 ${bucketIndex} 執行插入排序。`;
+                        // Perform insertion sort within the current bucket in one step for simplicity of visualization
+                        for (let k = 1; k < currentBucket.length; k++) {
+                            let keyItem = currentBucket[k];
+                            let l = k - 1;
+                            while (l >= 0 && currentBucket[l].value > keyItem.value) {
+                                currentBucket[l + 1] = currentBucket[l];
+                                l--;
+                                totalOperations++; // Inner bucket comparison/move operations
+                            }
+                            currentBucket[l + 1] = keyItem;
+                        }
+                        actionLogDisplay.textContent += `桶 ${bucketIndex} 排序完成。`;
+                    } else {
+                        actionLogDisplay.textContent = `桶 ${bucketIndex} 為空，跳過。`;
+                    }
+                    bucketIndex++;
+                    algorithmState.bucketIndex = bucketIndex;
+                    return true;
+                } else {
+                    actionLogDisplay.textContent = `所有桶已排序。開始連接桶。`;
+                    phase = 'concatenate';
+                    i = 0; // Main array current index
+                    bucketIndex = 0; // Current bucket being read from
+                    algorithmState.i = i;
+                    algorithmState.bucketIndex = bucketIndex;
+                    algorithmState.phase = phase;
+                    return true;
+                }
+            }
+
+            if (phase === 'concatenate') {
+                if (i < arraySize) {
+                    if (bucketIndex < numBuckets) {
+                        const currentBucket = buckets[bucketIndex];
+                        if (currentBucket.length > 0) {
+                            // Take element from the front of the bucket and put into main array
+                            totalOperations++; // Copy operation
+                            const item = currentBucket.shift(); // Remove the first element from bucket
+                            array[i] = { ...item, state: 'sorted' }; // Mark as sorted
+                            actionLogDisplay.textContent = `從桶 ${bucketIndex} 複製元素 ${item.value} 到索引 ${i}。`;
+                            i++;
+                            algorithmState.i = i;
+                        } else {
+                            // Current bucket is empty, move to next bucket
+                            bucketIndex++;
+                            algorithmState.bucketIndex = bucketIndex;
+                        }
+                        return true;
+                    } else {
+                        // All buckets processed, if array size is reached, then complete
+                        array.forEach(item => item.state = 'sorted');
+                        algorithmState.finished = true;
+                        actionLogDisplay.textContent = '桶排序完成！';
+                        return false;
+                    }
+                } else {
+                    array.forEach(item => item.state = 'sorted');
+                    algorithmState.finished = true;
+                    actionLogDisplay.textContent = '桶排序完成！';
+                    return false;
+                }
+            }
+            return false;
+        }
+
+        // 雞尾酒排序 (Cocktail Shaker Sort)
+        function cocktailSortStep() {
+            let { start, end, i, currentPassSwapped, subPhase } = algorithmState;
+            resetBarStates();
+
+            // Mark sorted elements (elements that have 'settled' at the start or end)
+            for (let k = 0; k < start; k++) {
+                if (array[k]) array[k].state = 'sorted';
+            }
+            for (let k = arraySize - 1; k > end; k--) {
+                if (array[k]) array[k].state = 'sorted';
+            }
+
+            // Termination condition: If no swaps occurred in the last full pass, and bounds have met/crossed
+            // Only check this at the start of a new forward pass
+            if (subPhase === 'forward_pass' && !currentPassSwapped && (start >= end)) {
+                array.forEach(item => item.state = 'sorted');
+                algorithmState.finished = true;
+                actionLogDisplay.textContent = '雞尾酒排序完成！';
+                return false;
+            }
+
+            if (subPhase === 'forward_pass') {
+                if (i === start) { // Start of a new forward pass, reset swapped flag
+                    algorithmState.currentPassSwapped = false;
+                    actionLogDisplay.textContent = `雞尾酒排序: 開始向前遍歷 (從索引 ${start} 到 ${end})。`;
+                }
+
+                if (i < end) {
+                    totalOperations++; // Comparison
+                    if (array[i]) array[i].state = 'comparing';
+                    if (array[i+1]) array[i+1].state = 'comparing';
+                    actionLogDisplay.textContent = `雞尾酒排序 (向前遍歷): 比較 ${array[i].value} 和 ${array[i+1].value}`;
+
+                    if (array[i].value > array[i+1].value) {
+                        totalOperations++; // Swap
+                        actionLogDisplay.textContent += `, 交換 ${array[i].value} 和 ${array[i+1].value}`;
+                        [array[i], array[i+1]] = [array[i+1], array[i]];
+                        if (array[i]) array[i].state = 'swapping';
+                        if (array[i+1]) array[i+1].state = 'swapping';
+                        algorithmState.currentPassSwapped = true; // Mark that a swap occurred in this pass
+                    }
+                    algorithmState.i++;
+                    return true;
+                } else {
+                    // End of forward pass
+                    algorithmState.end--; // Shrink the sorted part from the right
+                    algorithmState.subPhase = 'backward_pass';
+                    algorithmState.i = algorithmState.end; // Start backward pass from the new 'end'
+                    actionLogDisplay.textContent = `雞尾酒排序: 向前遍歷完成。最大值 ${array[algorithmState.end + 1].value} 已歸位。開始向後遍歷 (從索引 ${algorithmState.end} 到 ${start})。`;
+                    return true;
+                }
+            } else { // subPhase === 'backward_pass'
+                if (i > start) {
+                    totalOperations++; // Comparison
+                    if (array[i-1]) array[i-1].state = 'comparing';
+                    if (array[i]) array[i].state = 'comparing';
+                    actionLogDisplay.textContent = `雞尾酒排序 (向後遍歷): 比較 ${array[i-1].value} 和 ${array[i].value}`;
+
+                    if (array[i-1].value > array[i].value) {
+                        totalOperations++; // Swap
+                        actionLogDisplay.textContent += `, 交換 ${array[i-1].value} 和 ${array[i].value}`;
+                        [array[i-1], array[i]] = [array[i], array[i-1]];
+                        if (array[i-1]) array[i-1].state = 'swapping';
+                        if (array[i]) array[i].state = 'swapping';
+                        algorithmState.currentPassSwapped = true; // Mark that a swap occurred in this pass
+                    }
+                    algorithmState.i--;
+                    return true;
+                } else {
+                    // End of backward pass
+                    algorithmState.start++; // Shrink the sorted part from the left
+                    // Move to next pass (forward), check termination at start of new forward pass
+                    algorithmState.subPhase = 'forward_pass';
+                    algorithmState.i = algorithmState.start; // Start forward pass from the new 'start'
+                    actionLogDisplay.textContent = `雞尾酒排序: 向後遍歷完成。最小值 ${array[algorithmState.start - 1].value} 已歸位。準備下一個向前遍歷。`;
+                    return true;
+                }
+            }
+        }
+
+        /**
+         * 執行當前選定演算法的一個步驟。
+         * @returns {boolean} 如果排序仍在進行則返回 true，否則返回 false。
+         */
+        function performStep() {
+            if (algorithmState.finished) {
+                actionLogDisplay.textContent = '排序已完成。';
+                isSorting = false;
+                isPaused = true;
+                playPauseButton.textContent = '播放 / 暫停';
+                enableControls();
+                displayComplexities(); // 顯示複雜度資訊
+                return false;
+            }
+
+            let continueSorting = false;
+            switch (currentAlgorithm) {
+                case 'bubble':
+                    continueSorting = bubbleSortStep();
+                    break;
+                case 'selection':
+                    continueSorting = selectionSortStep();
+                    break;
+                case 'insertion':
+                    continueSorting = insertionSortStep();
+                    break;
+                case 'merge':
+                    continueSorting = mergeSortStep();
+                    break;
+                case 'quick':
+                    continueSorting = quickSortStep();
+                    break;
+                case 'shell':
+                    continueSorting = shellSortStep();
+                    break;
+                case 'counting':
+                    continueSorting = countingSortStep();
+                    break;
+                case 'radix':
+                    continueSorting = radixSortStep();
+                    break;
+                case 'bucket':
+                    continueSorting = bucketSortStep();
+                    break;
+                case 'cocktail':
+                    continueSorting = cocktailSortStep();
+                    break;
+                default:
+                    actionLogDisplay.textContent = '未知的排序演算法。';
+                    return false;
+            }
+
+            updateVisualizer(); // 每次步驟後更新視覺化
+
+            if (!continueSorting) {
+                isSorting = false;
+                isPaused = true;
+                playPauseButton.textContent = '播放 / 暫停';
+                enableControls();
+                displayComplexities(); // 顯示複雜度資訊
+            }
+            return continueSorting;
+        }
+
+        /**
+         * 啟用或禁用控制按鈕 (當排序進行時禁用部分按鈕)。
+         * @param {boolean} enable - 是否啟用。
+         */
+        function enableControls(enable = true) {
+            algorithmSelect.disabled = !enable;
+            arraySizeInput.disabled = !enable;
+            resetButton.disabled = false; // 重置永遠啟用
+            stepButton.disabled = isSorting && !isPaused; // 播放時禁用步進
+            playPauseButton.disabled = isSorting && algorithmState.finished; // 排序完成後不能播放/暫停
+        }
+
+        /**
+         * 遊戲或動畫主循環。
+         */
+        function gameLoop() {
+            if (!isPaused && isSorting) {
+                const stillRunning = performStep();
+                if (stillRunning) {
+                    timeoutId = setTimeout(gameLoop, animationSpeed);
+                } else {
+                    // Sorting completed or paused
+                    isSorting = false;
+                    isPaused = true;
+                    playPauseButton.textContent = '播放 / 暫停';
+                    enableControls();
+                }
+            } else if (!isSorting && !algorithmState.finished) {
+                 // If in manual step mode and not finished
+                stepButton.disabled = false;
+                playPauseButton.textContent = '播放 / 暫停';
+            }
+        }
+
+        // 事件監聽器
+
+        // 選擇排序演算法
+        algorithmSelect.addEventListener('change', (event) => {
+            currentAlgorithm = event.target.value;
+            resetSimulation();
+        });
+
+        // 調整陣列大小
+        arraySizeInput.addEventListener('change', (event) => {
+            let newSize = parseInt(event.target.value);
+            if (isNaN(newSize) || newSize < 5) {
+                newSize = 5;
+            } else if (newSize > 100) {
+                newSize = 100;
+            }
+            arraySizeInput.value = newSize; // 確保顯示正確的值
+            arraySize = newSize;
+            resetSimulation();
+        });
+
+        // 重置按鈕
+        resetButton.addEventListener('click', () => {
+            resetSimulation();
+        });
+
+        // 步進按鈕
+        stepButton.addEventListener('click', () => {
+            if (!isSorting && algorithmState.finished) {
+                actionLogDisplay.textContent = '排序已完成，請重置。';
+                return;
+            }
+            isSorting = true; // Mark as sorting
+            isPaused = true; // Ensure it's single step mode
+            performStep();
+            enableControls();
+        });
+
+        // 播放 / 暫停 按鈕
+        playPauseButton.addEventListener('click', () => {
+            if (algorithmState.finished) {
+                actionLogDisplay.textContent = '排序已完成，請重置。';
+                return;
+            }
+
+            isPaused = !isPaused;
+            if (isPaused) {
+                playPauseButton.textContent = '播放 / 暫停';
+                clearTimeout(timeoutId); // Pause timer
+                actionLogDisplay.textContent = '模擬已暫停。';
+            } else {
+                playPauseButton.textContent = '暫停 / 播放';
+                isSorting = true; // Start sorting
+                actionLogDisplay.textContent = '模擬正在播放...';
+                gameLoop(); // Start automatic playback
+            }
+            enableControls();
+        });
+
+        // 速度減慢按鈕
+        speedDownButton.addEventListener('click', () => {
+            animationSpeed = Math.min(500, animationSpeed + 25); // Increase delay (slower)
+            currentSpeedValue.textContent = animationSpeed;
+            if (!isPaused && isSorting) { // If playing, update speed immediately
+                clearTimeout(timeoutId);
+                gameLoop();
+            }
+        });
+
+        // 速度加快按鈕
+        speedUpButton.addEventListener('click', () => {
+            animationSpeed = Math.max(10, animationSpeed - 25); // Decrease delay (faster)
+            currentSpeedValue.textContent = animationSpeed;
+            if (!isPaused && isSorting) { // If playing, update speed immediately
+                clearTimeout(timeoutId);
+                gameLoop();
+            }
+        });
+
+        // 點擊速度數字編輯
+        speedDisplay.addEventListener('click', () => {
+            const newSpeed = prompt('請輸入新的速度 (毫秒, 10-500):', animationSpeed);
+            if (newSpeed !== null) {
+                let parsedSpeed = parseInt(newSpeed);
+                if (isNaN(parsedSpeed) || parsedSpeed < 10) {
+                    parsedSpeed = 10;
+                } else if (parsedSpeed > 500) {
+                    parsedSpeed = 500;
+                }
+                animationSpeed = parsedSpeed;
+                currentSpeedValue.textContent = animationSpeed;
+                if (!isPaused && isSorting) {
+                    clearTimeout(timeoutId);
+                    gameLoop();
+                }
+            }
+        });
+
+        // 初始化
+        window.onload = function() {
+            resetSimulation();
+        };
+
+    </script>
+</body>
+</html>
