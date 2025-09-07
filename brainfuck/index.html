@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brainfuck 視覺化工具</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: "Inter", sans-serif;
+            background-color: #f0f4f8; /* Light gray background */
+        }
+        .tape-cell {
+            width: 50px; /* Increased width to accommodate both number and char */
+            height: 50px; /* Increased height */
+            display: flex;
+            flex-direction: column; /* Stack number and char vertically */
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #cbd5e1; /* Gray border */
+            border-radius: 8px; /* Rounded corners */
+            background-color: #ffffff; /* White background */
+            font-weight: bold;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            position: relative; /* For pointer indicator */
+        }
+        .tape-cell .numeric-value {
+            font-size: 1.1em; /* Larger for number */
+            color: #333;
+        }
+        .tape-cell .ascii-char {
+            font-size: 0.8em; /* Smaller for ASCII char */
+            color: #666;
+            margin-top: 2px;
+        }
+        .tape-cell.active {
+            background-color: #60a5fa; /* Blue for active cell */
+            color: white;
+            border-color: #3b82f6;
+            transform: scale(1.05);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .tape-cell.active .numeric-value,
+        .tape-cell.active .ascii-char {
+            color: white; /* Ensure text is white in active cell */
+        }
+        .tape-cell .pointer-indicator {
+            position: absolute;
+            bottom: 0px; /* Position at the bottom of the cell */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 20px; /* Width of the indicator */
+            height: 3px; /* Thickness of the indicator */
+            background-color: #ef4444; /* Red indicator */
+            border-radius: 2px;
+        }
+        .code-line {
+            display: inline; /* Keep lines inline for character-level highlighting */
+        }
+        .code-char {
+            padding: 1px 0px; /* Minimal padding for individual chars */
+            border-radius: 2px;
+            transition: background-color 0.1s ease-in-out;
+        }
+        .code-char.current-instruction {
+            background-color: #fcd34d; /* Yellow for current instruction */
+            font-weight: bold;
+            color: #333; /* Make text readable on yellow */
+        }
+        /* Custom scrollbar for textareas */
+        textarea::-webkit-scrollbar {
+            width: 8px;
+        }
+        textarea::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        textarea::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        textarea::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-lg p-6 md:p-8">
+        <h1 class="text-3xl font-extrabold text-center text-gray-800 mb-6">Brainfuck 視覺化工具</h1>
+
+        <!-- Controls and Code Area -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div>
+                <label for="brainfuckCode" class="block text-gray-700 text-sm font-bold mb-2">Brainfuck 程式碼:</label>
+                <textarea id="brainfuckCode" class="w-full h-48 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-gray-800 text-sm resize-y" placeholder="輸入您的 Brainfuck 程式碼...">++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++.
+</textarea>
+                <div class="mt-4 flex flex-wrap gap-3 items-center">
+                    <button id="runBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200">執行</button>
+                    <button id="stepBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200">單步執行</button>
+                    <button id="resetBtn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200">重置</button>
+                    <button id="pauseBtn" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200">暫停</button>
+                    <input type="range" id="speedSlider" min="10" max="1000" value="100" class="flex-grow accent-blue-500 cursor-pointer">
+                    <span class="text-gray-700 text-sm font-medium">速度: <span id="speedValue">100</span>ms</span>
+                </div>
+            </div>
+            <div>
+                <label for="programInput" class="block text-gray-700 text-sm font-bold mb-2">程式輸入 (字元):</label>
+                <textarea id="programInput" class="w-full h-24 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-gray-800 text-sm resize-y" placeholder="輸入程式的輸入資料..."></textarea>
+
+                <label for="programOutput" class="block text-gray-700 text-sm font-bold mt-4 mb-2">程式輸出:</label>
+                <textarea id="programOutput" class="w-full h-24 p-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-800 text-sm resize-y" readonly></textarea>
+            </div>
+        </div>
+
+        <!-- Visualization Area -->
+        <div class="bg-gray-50 rounded-lg p-6 shadow-inner">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">視覺化</h2>
+
+            <!-- Memory Tape Visualization -->
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-gray-700 mb-2">記憶體帶 (Memory Tape):</h3>
+                <div id="memoryTape" class="flex flex-wrap justify-center gap-2 p-2 bg-gray-100 rounded-lg overflow-x-auto pb-4">
+                    <!-- Memory cells will be rendered here by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Program Code Visualization (highlight current instruction) -->
+            <div>
+                <h3 class="text-lg font-semibold text-gray-700 mb-2">執行中的程式碼:</h3>
+                <pre id="codeDisplay" class="bg-gray-800 text-white p-4 rounded-lg overflow-x-auto text-sm leading-relaxed whitespace-pre-wrap">
+                    <!-- Brainfuck code with current instruction highlighted -->
+                </pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const brainfuckCodeEl = document.getElementById('brainfuckCode');
+        const programInputEl = document.getElementById('programInput');
+        const programOutputEl = document.getElementById('programOutput');
+        const runBtn = document.getElementById('runBtn');
+        const stepBtn = document.getElementById('stepBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const speedSlider = document.getElementById('speedSlider');
+        const speedValueEl = document.getElementById('speedValue');
+        const memoryTapeEl = document.getElementById('memoryTape');
+        const codeDisplayEl = document.getElementById('codeDisplay');
+
+        // Brainfuck Interpreter State
+        const MEMORY_SIZE = 30000;
+        let memory = new Uint8Array(MEMORY_SIZE); // Memory tape, initialized to 0s
+        let dataPointer = 0; // Pointer to the current cell in memory
+        let instructionPointer = 0; // Pointer to the current instruction in the code
+        let bfCode = ''; // Brainfuck code string
+        let inputBuffer = []; // Input characters
+        let outputBuffer = ''; // Output characters
+        let loopStack = []; // Stack for loop jumps
+        let isRunning = false;
+        let executionInterval = null;
+        let executionSpeed = 100; // ms per instruction
+
+        // --- Initialization ---
+        function initialize() {
+            memory.fill(0); // Reset all memory cells to 0
+            dataPointer = 0;
+            instructionPointer = 0;
+            // Clean code: remove non-BF chars and normalize newlines
+            bfCode = brainfuckCodeEl.value.replace(/[^+\-<>.,[\]\n]/g, '');
+            inputBuffer = programInputEl.value.split('').map(char => char.charCodeAt(0)); // Convert input string to ASCII codes
+            outputBuffer = '';
+            programOutputEl.value = '';
+            loopStack = [];
+            isRunning = false;
+            clearInterval(executionInterval);
+            executionInterval = null;
+            renderMemoryTape();
+            renderCodeDisplay();
+            updateButtons();
+        }
+
+        // --- Brainfuck Interpreter Logic ---
+        function executeInstruction() {
+            if (instructionPointer >= bfCode.length) {
+                // Program finished
+                isRunning = false;
+                clearInterval(executionInterval);
+                executionInterval = null;
+                updateButtons();
+                renderCodeDisplay(); // Remove highlight
+                return;
+            }
+
+            const instruction = bfCode[instructionPointer];
+
+            // Skip non-instruction characters (like newlines or spaces if they weren't removed)
+            // The bfCode cleaning already handles this, but this is a safeguard for future modifications
+            if (!['>', '<', '+', '-', '.', ',', '[', ']'].includes(instruction)) {
+                instructionPointer++;
+                renderVisualization(); // Still update to show code pointer moving
+                return;
+            }
+
+            switch (instruction) {
+                case '>':
+                    dataPointer = (dataPointer + 1) % MEMORY_SIZE; // Wrap around
+                    break;
+                case '<':
+                    dataPointer = (dataPointer - 1 + MEMORY_SIZE) % MEMORY_SIZE; // Wrap around
+                    break;
+                case '+':
+                    memory[dataPointer]++;
+                    break;
+                case '-':
+                    memory[dataPointer]--;
+                    break;
+                case '.':
+                    outputBuffer += String.fromCharCode(memory[dataPointer]);
+                    programOutputEl.value = outputBuffer;
+                    programOutputEl.scrollTop = programOutputEl.scrollHeight; // Scroll to bottom
+                    break;
+                case ',':
+                    if (inputBuffer.length > 0) {
+                        memory[dataPointer] = inputBuffer.shift();
+                    } else {
+                        // Handle no input gracefully, e.g., set to 0 or pause
+                        memory[dataPointer] = 0; // Or keep current value, depending on desired behavior
+                        console.warn("No more input available. Setting current cell to 0.");
+                    }
+                    break;
+                case '[':
+                    if (memory[dataPointer] === 0) {
+                        let openBrackets = 1;
+                        let tempPointer = instructionPointer;
+                        while (openBrackets > 0) {
+                            tempPointer++;
+                            if (tempPointer >= bfCode.length) {
+                                console.error("Unmatched '[' bracket!");
+                                isRunning = false;
+                                clearInterval(executionInterval);
+                                executionInterval = null;
+                                updateButtons();
+                                return;
+                            }
+                            if (bfCode[tempPointer] === '[') {
+                                openBrackets++;
+                            } else if (bfCode[tempPointer] === ']') {
+                                openBrackets--;
+                            }
+                        }
+                        instructionPointer = tempPointer; // Jump past matching ']'
+                    } else {
+                        loopStack.push(instructionPointer); // Push current position to stack
+                    }
+                    break;
+                case ']':
+                    if (memory[dataPointer] !== 0) {
+                        instructionPointer = loopStack[loopStack.length - 1]; // Jump back to matching '['
+                    } else {
+                        loopStack.pop(); // Pop from stack if loop condition is false
+                    }
+                    break;
+            }
+
+            instructionPointer++; // Move to the next instruction
+            renderVisualization(); // Update UI after each instruction
+        }
+
+        // --- UI Rendering ---
+        function renderMemoryTape() {
+            memoryTapeEl.innerHTML = '';
+            const cellsToShow = 25; // Number of cells to display
+            const startIdx = Math.max(0, dataPointer - Math.floor(cellsToShow / 2));
+            const endIdx = Math.min(MEMORY_SIZE, startIdx + cellsToShow);
+
+            for (let i = startIdx; i < endIdx; i++) {
+                const cellDiv = document.createElement('div');
+                cellDiv.classList.add('tape-cell', 'flex-shrink-0');
+
+                const numericValueSpan = document.createElement('span');
+                numericValueSpan.classList.add('numeric-value');
+                numericValueSpan.textContent = memory[i]; // Display numeric value
+                cellDiv.appendChild(numericValueSpan);
+
+                const asciiCharSpan = document.createElement('span');
+                asciiCharSpan.classList.add('ascii-char');
+                const charCode = memory[i];
+                // Check if the character is printable ASCII (32-126)
+                asciiCharSpan.textContent = (charCode >= 32 && charCode <= 126) ? String.fromCharCode(charCode) : '';
+                cellDiv.appendChild(asciiCharSpan);
+
+                if (i === dataPointer) {
+                    cellDiv.classList.add('active');
+                    // Add a visual indicator for the pointer
+                    const pointerIndicator = document.createElement('div');
+                    pointerIndicator.classList.add('pointer-indicator');
+                    cellDiv.appendChild(pointerIndicator);
+                }
+
+                memoryTapeEl.appendChild(cellDiv);
+            }
+
+            // Ensure the active cell is visible if overflow-x-auto is used
+            const activeCell = memoryTapeEl.querySelector('.tape-cell.active');
+            if (activeCell) {
+                // Scroll into view with a slight delay to allow rendering
+                setTimeout(() => {
+                    activeCell.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                }, 50);
+            }
+        }
+
+        function renderCodeDisplay() {
+            codeDisplayEl.innerHTML = '';
+            const codeContent = bfCode; // Use the cleaned code for display
+            let charIndex = 0;
+
+            for (let i = 0; i < codeContent.length; i++) {
+                const char = codeContent[i];
+                const charSpan = document.createElement('span');
+                charSpan.textContent = char;
+                charSpan.classList.add('code-char');
+
+                if (charIndex === instructionPointer && ['>', '<', '+', '-', '.', ',', '[', ']'].includes(char)) {
+                    charSpan.classList.add('current-instruction');
+                }
+
+                codeDisplayEl.appendChild(charSpan);
+                charIndex++;
+            }
+
+            // Scroll code display to keep current instruction in view
+            const currentInstructionEl = codeDisplayEl.querySelector('.current-instruction');
+            if (currentInstructionEl) {
+                const preRect = codeDisplayEl.getBoundingClientRect();
+                const charRect = currentInstructionEl.getBoundingClientRect();
+
+                // Check if the character is out of view horizontally
+                if (charRect.left < preRect.left || charRect.right > preRect.right) {
+                    currentInstructionEl.scrollIntoView({ behavior: 'smooth', inline: 'center' });
+                }
+                // Check if the character is out of view vertically
+                if (charRect.top < preRect.top || charRect.bottom > preRect.bottom) {
+                     currentInstructionEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        }
+
+        function renderVisualization() {
+            renderMemoryTape();
+            renderCodeDisplay();
+        }
+
+        function updateButtons() {
+            runBtn.disabled = isRunning;
+            stepBtn.disabled = isRunning;
+            pauseBtn.disabled = !isRunning;
+            resetBtn.disabled = false; // Always allow reset
+        }
+
+        // --- Event Listeners ---
+        runBtn.addEventListener('click', () => {
+            if (!isRunning) {
+                if (instructionPointer >= bfCode.length) {
+                    initialize(); // Re-initialize if already finished
+                }
+                isRunning = true;
+                executionInterval = setInterval(executeInstruction, executionSpeed);
+                updateButtons();
+            }
+        });
+
+        stepBtn.addEventListener('click', () => {
+            if (!isRunning) {
+                if (instructionPointer >= bfCode.length) {
+                    initialize(); // Re-initialize if already finished
+                }
+                executeInstruction();
+            }
+        });
+
+        resetBtn.addEventListener('click', initialize);
+
+        pauseBtn.addEventListener('click', () => {
+            isRunning = false;
+            clearInterval(executionInterval);
+            executionInterval = null;
+            updateButtons();
+        });
+
+        speedSlider.addEventListener('input', (event) => {
+            executionSpeed = parseInt(event.target.value);
+            speedValueEl.textContent = executionSpeed;
+            if (isRunning) {
+                clearInterval(executionInterval);
+                executionInterval = setInterval(executeInstruction, executionSpeed);
+            }
+        });
+
+        // Initial setup on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            initialize();
+            speedValueEl.textContent = speedSlider.value; // Set initial speed display
+        });
+
+        // Re-initialize if code or input changes
+        brainfuckCodeEl.addEventListener('input', initialize);
+        programInputEl.addEventListener('input', initialize);
+    </script>
+</body>
+</html>
