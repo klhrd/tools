@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XAXB 解答機</title>
+    <!-- 引入 Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 React 和 ReactDOM CDN -->
+    <script crossorigin src="https://unpkg.com/react@17/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+    <!-- 引入 Babel CDN，用於在瀏覽器中轉換 JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        /* 設定 Inter 字體為預設字體 */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-purple-100 to-blue-200">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // React 應用程式的核心組件
+        function App() {
+            // 儲存所有可能的數字答案
+            const [possibleNumbers, setPossibleNumbers] = React.useState([]);
+            // 儲存使用者輸入的猜測數字
+            const [guessInput, setGuessInput] = React.useState('');
+            // 儲存使用者輸入的 A 值
+            const [aInput, setAInput] = React.useState('');
+            // 儲存使用者輸入的 B 值
+            const [bInput, setBInput] = React.useState('');
+            // 儲存顯示給使用者的訊息
+            const [message, setMessage] = React.useState('請輸入一個猜測數字和A/B結果。');
+            // 儲存遊戲狀態 (playing, solved, error)
+            const [gameState, setGameState] = React.useState('playing');
+            // 新增狀態：儲存所有歷史猜測記錄
+            const [pastGuesses, setPastGuesses] = React.useState([]);
+
+            // 使用 React.useEffect 來優化初始數字列表的生成，只在組件首次渲染時執行一次
+            React.useEffect(() => {
+                // 生成所有 0000 到 9999 的數字字串
+                const initialNumbers = Array.from({ length: 10000 }, (_, i) =>
+                    String(i).padStart(4, '0')
+                );
+                setPossibleNumbers(initialNumbers);
+            }, []); // 空依賴陣列表示只執行一次
+
+            /**
+             * 計算兩個四位數字字串的 A (位置和數字都正確) 和 B (數字正確但位置不正確)
+             * @param {string} secret 秘密數字字串
+             * @param {string} guess 猜測數字字串
+             * @returns {{A: number, B: number}} 包含 A 和 B 值的物件
+             */
+            const calculateAB = (secret, guess) => {
+                let a = 0;
+                let b = 0;
+                // 用於儲存秘密數字中不在 A 部分的數字及其出現次數
+                const secretCounts = {};
+                // 用於儲存猜測數字中不在 A 部分的數字及其出現次數
+                const guessCounts = {};
+
+                // 第一次遍歷，計算 A (位置和數字都正確)
+                // 並統計不在 A 部分的數字出現次數，以便後續計算 B
+                for (let i = 0; i < 4; i++) {
+                    if (secret[i] === guess[i]) {
+                        a++;
+                    } else {
+                        // 如果數字不匹配，將其加入計數器
+                        secretCounts[secret[i]] = (secretCounts[secret[i]] || 0) + 1;
+                        guessCounts[guess[i]] = (guessCounts[guess[i]] || 0) + 1;
+                    }
+                }
+
+                // 第二次遍歷，計算 B (數字正確但位置不正確)
+                // 遍歷猜測數字中不在 A 部分的數字
+                for (const digit in guessCounts) {
+                    // 如果秘密數字中也包含這個數字 (且不在 A 部分)
+                    if (secretCounts[digit]) {
+                        // B 的數量是兩者中較小的出現次數，避免重複計算
+                        b += Math.min(guessCounts[digit], secretCounts[digit]);
+                    }
+                }
+
+                return { A: a, B: b };
+            };
+
+            /**
+             * 處理提交猜測和 A/B 結果的事件
+             */
+            const handleSubmit = () => {
+                // 輸入驗證
+                if (!/^\d{4}$/.test(guessInput)) {
+                    setMessage('錯誤：請輸入有效的四位數字猜測。');
+                    setGameState('error');
+                    return;
+                }
+                const currentA = parseInt(aInput, 10);
+                const currentB = parseInt(bInput, 10);
+
+                if (isNaN(currentA) || isNaN(currentB) || currentA < 0 || currentB < 0 || currentA + currentB > 4) {
+                    setMessage('錯誤：請輸入有效的 A 和 B 值 (0-4，且 A+B <= 4)。');
+                    setGameState('error');
+                    return;
+                }
+
+                // 過濾可能的數字
+                const newPossibleNumbers = possibleNumbers.filter(candidate => {
+                    const { A, B } = calculateAB(candidate, guessInput);
+                    return A === currentA && B === currentB;
+                });
+
+                setPossibleNumbers(newPossibleNumbers);
+
+                // 將當前猜測加入歷史記錄
+                setPastGuesses(prevGuesses => [
+                    ...prevGuesses,
+                    { guess: guessInput, A: currentA, B: currentB }
+                ]);
+
+                // 根據過濾結果更新訊息和遊戲狀態
+                if (newPossibleNumbers.length === 1) {
+                    setMessage(`恭喜！答案是：${newPossibleNumbers[0]}！`);
+                    setGameState('solved');
+                } else if (newPossibleNumbers.length === 0) {
+                    setMessage('糟糕！根據您提供的資訊，沒有可能的答案。請檢查您的輸入。');
+                    setGameState('error');
+                } else {
+                    setMessage(`還有 ${newPossibleNumbers.length} 個可能的答案。請繼續！`);
+                    setGameState('playing');
+                }
+
+                // 清空輸入欄位以便下一次猜測
+                setGuessInput('');
+                setAInput('');
+                setBInput('');
+            };
+
+            /**
+             * 重置遊戲狀態和數字列表
+             */
+            const handleReset = () => {
+                const initialNumbers = Array.from({ length: 10000 }, (_, i) =>
+                    String(i).padStart(4, '0')
+                );
+                setPossibleNumbers(initialNumbers);
+                setGuessInput('');
+                setAInput('');
+                setBInput('');
+                setMessage('遊戲已重置。請輸入新的猜測數字和A/B結果。');
+                setGameState('playing');
+                // 清空歷史記錄
+                setPastGuesses([]);
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-purple-100 to-blue-200 flex flex-col p-4 text-gray-800">
+                    <div className="max-w-6xl mx-auto w-full bg-white shadow-xl rounded-xl p-6 space-y-6">
+                        <h1 className="text-3xl font-bold text-center text-purple-700 mb-6">XAXB 解答機</h1>
+
+                        {/* 狀態訊息顯示區 */}
+                        <div className={`p-4 rounded-lg text-center ${
+                            gameState === 'solved' ? 'bg-green-100 text-green-700' :
+                            gameState === 'error' ? 'bg-red-100 text-red-700' :
+                            'bg-blue-100 text-blue-700'
+                        }`}>
+                            <p className="font-semibold">{message}</p>
+                        </div>
+
+                        <div className="flex flex-col md:flex-row gap-6">
+                            {/* 左側：可能的答案清單 */}
+                            <div className="md:w-1/2 bg-gray-50 p-4 rounded-lg shadow-inner flex flex-col">
+                                <h2 className="text-xl font-semibold text-gray-700 mb-3">
+                                    可能的答案 ({possibleNumbers.length} 個)
+                                </h2>
+                                <div className="flex-grow overflow-y-auto max-h-96 md:max-h-[600px] border border-gray-200 rounded-md p-2 bg-white">
+                                    {possibleNumbers.length > 0 ? (
+                                        <ul className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-1 text-sm font-mono text-center">
+                                            {possibleNumbers.map(num => (
+                                                <li key={num} className="p-1 text-gray-600 border border-gray-100 rounded-sm hover:bg-purple-50 transition-colors duration-200">
+                                                    {num}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <p className="text-gray-500 text-center py-4">沒有可能的答案了。請重置遊戲。</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* 右側：輸入和控制區 + 歷史記錄 */}
+                            <div className="md:w-1/2 bg-gray-50 p-4 rounded-lg shadow-inner space-y-5 flex flex-col justify-between">
+                                <div>
+                                    <h2 className="text-xl font-semibold text-gray-700 mb-3">輸入您的猜測和結果</h2>
+
+                                    <div>
+                                        <label htmlFor="guessInput" className="block text-sm font-medium text-gray-700 mb-1">
+                                            隨機給的數字 (您猜的數字)：
+                                        </label>
+                                        <input
+                                            type="text"
+                                            id="guessInput"
+                                            value={guessInput}
+                                            onChange={(e) => setGuessInput(e.target.value)}
+                                            maxLength="4"
+                                            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200 shadow-sm text-lg text-center"
+                                            placeholder="例如: 1234"
+                                        />
+                                    </div>
+
+                                    <div className="flex gap-4 mt-4">
+                                        <div className="w-1/2">
+                                            <label htmlFor="aInput" className="block text-sm font-medium text-gray-700 mb-1">
+                                                A (數字和位置都對)：
+                                            </label>
+                                            <input
+                                                type="number"
+                                                id="aInput"
+                                                value={aInput}
+                                                onChange={(e) => setAInput(e.target.value)}
+                                                min="0"
+                                                max="4"
+                                                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200 shadow-sm text-lg text-center"
+                                                placeholder="例如: 1"
+                                            />
+                                        </div>
+                                        <div className="w-1/2">
+                                            <label htmlFor="bInput" className="block text-sm font-medium text-gray-700 mb-1">
+                                                B (數字對位置不對)：
+                                            </label>
+                                            <input
+                                                type="number"
+                                                id="bInput"
+                                                value={bInput}
+                                                onChange={(e) => setBInput(e.target.value)}
+                                                min="0"
+                                                max="4"
+                                                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200 shadow-sm text-lg text-center"
+                                                placeholder="例如: 2"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-col sm:flex-row gap-4 mt-5">
+                                        <button
+                                            onClick={handleSubmit}
+                                            className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
+                                            disabled={possibleNumbers.length <= 1 && gameState === 'solved'}
+                                        >
+                                            提交結果並排除
+                                        </button>
+                                        <button
+                                            onClick={handleReset}
+                                            className="flex-1 bg-gray-400 hover:bg-gray-500 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2"
+                                        >
+                                            重置遊戲
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* 歷史猜測記錄區 */}
+                                {pastGuesses.length > 0 && (
+                                    <div className="mt-6">
+                                        <h2 className="text-xl font-semibold text-gray-700 mb-3">
+                                            歷史猜測
+                                        </h2>
+                                        <div className="overflow-y-auto max-h-48 border border-gray-200 rounded-md p-2 bg-white text-sm">
+                                            {pastGuesses.map((entry, index) => (
+                                                <p key={index} className="py-1 px-2 border-b border-gray-100 last:border-b-0 text-gray-700 font-mono">
+                                                    猜測: <span className="font-bold">{entry.guess}</span>, 結果: <span className="font-bold">{entry.A}A{entry.B}B</span>
+                                                </p>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // 將 React App 組件渲染到 HTML 中的 'root' 元素
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
