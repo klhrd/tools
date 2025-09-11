@@ -6,3 +6,8 @@
 - [排序演算法模擬器](https://klhrd.github.io/tools/sort/)
 - [Brainfuck 視覺化工具](https://klhrd.github.io/tools/brainfuck/)
 - [XAXB 解答機](https://klhrd.github.io/tools/XAXB/)
+
+## 其他
+
+- [跑馬燈](https://klhrd.github.io/marquee/)
+- [單字卡](https://klhrd.github.io/flashcard/)
