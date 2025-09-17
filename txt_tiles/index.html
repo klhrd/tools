@@ -196,6 +196,10 @@
         #full-screen-display.visible {
             display: flex;
         }
+        #full-screen-display .puzzle-piece-container {
+            width: 100vw;
+            height: 100vh;
+        }
 
         /* Responsive font size */
         @media (orientation: portrait) {
@@ -265,7 +269,14 @@
 
         // Helper functions for data encoding/decoding
         const encodeData = (data) => btoa(encodeURIComponent(JSON.stringify(data)));
-        const decodeData = (str) => JSON.parse(decodeURIComponent(atob(str)));
+        const decodeData = (str) => {
+            try {
+                return JSON.parse(decodeURIComponent(atob(str)));
+            } catch (e) {
+                console.error("Failed to decode URL data:", e);
+                return null;
+            }
+        };
 
         // Split text into chunks
         const splitText = (text, count) => {
@@ -285,20 +296,21 @@
             try {
                 return JSON.parse(localStorage.getItem(key));
             } catch (e) {
+                console.error("Failed to load data from localStorage:", e);
                 return null;
             }
         };
         
         // --- Fullscreen functionality ---
-        fullscreenBtn.addEventListener('click', () => {
+        const toggleFullscreen = () => {
             if (!document.fullscreenElement) {
                 document.documentElement.requestFullscreen();
             } else {
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                }
+                document.exitFullscreen();
             }
-        });
+        };
+
+        fullscreenBtn.addEventListener('click', toggleFullscreen);
 
         // --- Stage 1: Initiator input text and generate link ---
         generateLinkBtn.addEventListener('click', () => {
@@ -340,15 +352,15 @@
                     const myNumber = parseInt(button.dataset.number);
                     saveData('myNumber', myNumber);
 
-                    // Detect screen orientation
                     const isPortrait = window.matchMedia("(orientation: portrait)").matches;
                     const orientation = isPortrait ? 'portrait' : 'landscape';
                     
                     const sharedData = loadData('puzzleData');
-                    sharedData.orientations[myNumber] = orientation;
-                    saveData('puzzleData', sharedData);
+                    if (sharedData) {
+                        sharedData.orientations[myNumber] = orientation;
+                        saveData('puzzleData', sharedData);
+                    }
                     
-                    // Update UI to show selected number
                     document.querySelectorAll('.number-btn').forEach(btn => btn.classList.remove('selected'));
                     button.classList.add('selected');
                     
@@ -362,7 +374,7 @@
         // --- Stage 3: Display the puzzle ---
         viewPuzzleBtn.addEventListener('click', () => {
             const sharedData = loadData('puzzleData');
-            if (!sharedData || !sharedData.text) {
+            if (!sharedData || !sharedData.fullText) {
                 alert('沒有找到拼圖資料，請重新從連結進入！');
                 return;
             }
@@ -371,15 +383,11 @@
             
             const textPieces = sharedData.text;
             const orientations = sharedData.orientations;
-            
-            // Get the full text and calculate total width for perfect alignment
             const fullText = sharedData.fullText;
             const totalTextLength = fullText.length;
             
-            // Sort pieces by their number to ensure correct order
             const sortedNumbers = Object.keys(orientations).sort((a, b) => a - b);
             
-            // Generate puzzle pieces
             sortedNumbers.forEach((numberStr, index) => {
                 const number = parseInt(numberStr);
                 const piece = textPieces[number - 1];
@@ -387,55 +395,43 @@
                 
                 const pieceContainerDiv = document.createElement('div');
                 pieceContainerDiv.className = 'puzzle-piece-container';
-                pieceContainerDiv.classList.add(orientation);
 
                 const pieceDiv = document.createElement('div');
                 pieceDiv.className = 'puzzle-piece';
                 pieceDiv.textContent = fullText;
 
-                // Calculate horizontal offset for the seamless effect
                 const offset = fullText.indexOf(piece);
                 const charWidth = 100 / totalTextLength;
+                const indent = offset * charWidth;
+
+                pieceDiv.style.transform = `translateX(-${indent}vw)`;
                 
-                let indent = 0;
-                if (orientation === 'portrait') {
-                    indent = offset * (100 / (totalTextLength / 2));
-                } else {
-                    indent = offset * (100 / totalTextLength);
-                }
-
-                // Add the text-indent to the piece container to align text correctly
-                pieceDiv.style.textIndent = `-${indent}vw`;
-
                 pieceContainerDiv.appendChild(pieceDiv);
                 puzzleContainer.appendChild(pieceContainerDiv);
 
-                // Add click event for full-screen view
                 pieceContainerDiv.addEventListener('click', () => {
                     fullScreenDisplay.innerHTML = '';
                     const fullScreenPiece = document.createElement('div');
                     fullScreenPiece.className = 'puzzle-piece-container';
-                    fullScreenPiece.classList.add(orientation);
                     
                     const fullScreenText = document.createElement('div');
                     fullScreenText.className = 'puzzle-piece';
                     fullScreenText.textContent = fullText;
-                    fullScreenText.style.textIndent = `-${indent}vw`;
+                    fullScreenText.style.transform = `translateX(-${indent}vw)`;
                     
                     fullScreenPiece.appendChild(fullScreenText);
                     fullScreenDisplay.appendChild(fullScreenPiece);
                     
                     fullScreenDisplay.classList.add('visible');
+                    toggleFullscreen();
                 });
             });
 
-            // Switch to puzzle section
             setupSection.classList.remove('active');
             joinSection.classList.remove('active');
             puzzleSection.classList.add('active');
         });
 
-        // Hide full-screen container on click
         fullScreenDisplay.addEventListener('click', () => {
             fullScreenDisplay.classList.remove('visible');
         });
@@ -445,22 +441,20 @@
         const dataParam = urlParams.get('data');
 
         if (dataParam) {
-            // Participant mode
             const sharedData = decodeData(dataParam);
-            saveData('puzzleData', sharedData);
-            
-            setupSection.classList.remove('active');
-            joinSection.classList.add('active');
-            setupJoinSection(sharedData.text);
-            
-            // Check if a number was previously selected
-            const myNumber = loadData('myNumber');
-            if (myNumber) {
-                viewPuzzleBtn.style.display = 'block';
+            if (sharedData) {
+                saveData('puzzleData', sharedData);
+                setupSection.classList.remove('active');
+                joinSection.classList.add('active');
+                setupJoinSection(sharedData.text);
+                if (loadData('myNumber')) {
+                    viewPuzzleBtn.style.display = 'block';
+                }
+            } else {
+                // Invalid data, redirect to initiator page
+                window.location.href = window.location.origin + window.location.pathname;
             }
-
         } else {
-            // Initiator mode
             setupSection.classList.add('active');
         }
     </script>
