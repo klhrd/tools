@@ -141,23 +141,19 @@
             box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
         }
         
-        .puzzle-piece {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            box-sizing: border-box;
-            background-color: #fff;
-            border: 5px solid #333;
-            margin: 5px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        .puzzle-piece-container {
             overflow: hidden;
-            text-align: center;
-            transition: all 0.5s ease-in-out;
             height: 90vh;
             width: 90vw;
+            box-sizing: border-box;
+        }
+
+        .puzzle-piece {
+            display: inline-block;
             font-weight: bold;
             line-height: 1;
+            /* Using a large font size to ensure text overflows and can be cropped */
+            font-size: 60vw;
         }
         
         /* New styles for full-screen toggle */
@@ -184,8 +180,7 @@
             height: 24px;
         }
 
-        /* New styles for showing personal piece in full screen */
-        #personal-piece-container {
+        #full-screen-display {
             display: none;
             position: fixed;
             top: 0;
@@ -198,25 +193,20 @@
             justify-content: center;
             align-items: center;
         }
-        #personal-piece-container.visible {
+        #full-screen-display.visible {
             display: flex;
         }
 
-        #personal-piece-container .puzzle-piece {
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            border: none;
-            border-radius: 0;
-            box-shadow: none;
-        }
-
         /* Responsive font size */
-        .puzzle-piece.portrait {
-            font-size: 60vh; 
+        @media (orientation: portrait) {
+            .puzzle-piece {
+                font-size: 60vh; 
+            }
         }
-        .puzzle-piece.landscape {
-            font-size: 40vw; 
+        @media (orientation: landscape) {
+            .puzzle-piece {
+                font-size: 40vw; 
+            }
         }
     </style>
 </head>
@@ -246,13 +236,6 @@
             <p>請選擇你要代表的拼圖號碼。選擇後，你的手機方向將會被記錄。</p>
             <div id="number-buttons"></div>
             <button id="view-puzzle-btn" style="display:none; margin-top:20px;">查看拼圖</button>
-
-            <!-- New: Personal piece display -->
-            <div id="personal-piece-display" style="display: none;">
-                <h2>你的拼圖片段</h2>
-                <div class="puzzle-piece" id="personal-piece"></div>
-                <p>點擊上方區塊可放大</p>
-            </div>
         </section>
 
         <!-- Section to display the final puzzle -->
@@ -261,17 +244,14 @@
             <p>將所有手機並排，你將看到完整的句子！</p>
             <div id="puzzle-container"></div>
         </section>
-
-        <!-- New: Full-screen display for personal piece -->
-        <div id="personal-piece-container">
-            <div class="puzzle-piece" id="personal-piece-fullscreen"></div>
-        </div>
+        
+        <!-- Full-screen display container -->
+        <div id="full-screen-display"></div>
     </div>
 
     <script>
         // DOM elements
         const fullscreenBtn = document.getElementById('fullscreen-btn');
-        const app = document.getElementById('app');
         const setupSection = document.getElementById('setup-section');
         const joinSection = document.getElementById('join-section');
         const puzzleSection = document.getElementById('puzzle-section');
@@ -281,10 +261,7 @@
         const numberButtonsContainer = document.getElementById('number-buttons');
         const viewPuzzleBtn = document.getElementById('view-puzzle-btn');
         const puzzleContainer = document.getElementById('puzzle-container');
-        const personalPieceDisplay = document.getElementById('personal-piece-display');
-        const personalPiece = document.getElementById('personal-piece');
-        const personalPieceContainer = document.getElementById('personal-piece-container');
-        const personalPieceFullscreen = document.getElementById('personal-piece-fullscreen');
+        const fullScreenDisplay = document.getElementById('full-screen-display');
 
         // Helper functions for data encoding/decoding
         const encodeData = (data) => btoa(encodeURIComponent(JSON.stringify(data)));
@@ -335,7 +312,7 @@
             // Split text by characters
             const textPieces = splitText(fullText, count);
             
-            const sharedData = { text: textPieces, orientations: {} };
+            const sharedData = { text: textPieces, orientations: {}, fullText: fullText };
             
             const encodedData = encodeData(sharedData);
             const joinUrl = `${window.location.origin}${window.location.pathname}?data=${encodedData}`;
@@ -375,10 +352,7 @@
                     document.querySelectorAll('.number-btn').forEach(btn => btn.classList.remove('selected'));
                     button.classList.add('selected');
                     
-                    personalPieceDisplay.style.display = 'block';
-                    personalPiece.textContent = textPieces[myNumber - 1];
-                    personalPiece.className = 'puzzle-piece ' + orientation;
-                    
+                    alert(`你選擇了 #${myNumber}，手機方向為：${orientation}`);
                     viewPuzzleBtn.style.display = 'block';
                 });
                 numberButtonsContainer.appendChild(button);
@@ -394,28 +368,65 @@
             }
 
             puzzleContainer.innerHTML = '';
+            
             const textPieces = sharedData.text;
             const orientations = sharedData.orientations;
-
+            
+            // Get the full text and calculate total width for perfect alignment
+            const fullText = sharedData.fullText;
+            const totalTextLength = fullText.length;
+            
             // Sort pieces by their number to ensure correct order
             const sortedNumbers = Object.keys(orientations).sort((a, b) => a - b);
             
             // Generate puzzle pieces
-            sortedNumbers.forEach(numberStr => {
+            sortedNumbers.forEach((numberStr, index) => {
                 const number = parseInt(numberStr);
                 const piece = textPieces[number - 1];
                 const orientation = orientations[number];
                 
+                const pieceContainerDiv = document.createElement('div');
+                pieceContainerDiv.className = 'puzzle-piece-container';
+                pieceContainerDiv.classList.add(orientation);
+
                 const pieceDiv = document.createElement('div');
                 pieceDiv.className = 'puzzle-piece';
+                pieceDiv.textContent = fullText;
+
+                // Calculate horizontal offset for the seamless effect
+                const offset = fullText.indexOf(piece);
+                const charWidth = 100 / totalTextLength;
                 
-                const textSpan = document.createElement('span');
-                textSpan.textContent = piece;
-                
-                pieceDiv.appendChild(textSpan);
-                pieceDiv.classList.add(orientation);
-                
-                puzzleContainer.appendChild(pieceDiv);
+                let indent = 0;
+                if (orientation === 'portrait') {
+                    indent = offset * (100 / (totalTextLength / 2));
+                } else {
+                    indent = offset * (100 / totalTextLength);
+                }
+
+                // Add the text-indent to the piece container to align text correctly
+                pieceDiv.style.textIndent = `-${indent}vw`;
+
+                pieceContainerDiv.appendChild(pieceDiv);
+                puzzleContainer.appendChild(pieceContainerDiv);
+
+                // Add click event for full-screen view
+                pieceContainerDiv.addEventListener('click', () => {
+                    fullScreenDisplay.innerHTML = '';
+                    const fullScreenPiece = document.createElement('div');
+                    fullScreenPiece.className = 'puzzle-piece-container';
+                    fullScreenPiece.classList.add(orientation);
+                    
+                    const fullScreenText = document.createElement('div');
+                    fullScreenText.className = 'puzzle-piece';
+                    fullScreenText.textContent = fullText;
+                    fullScreenText.style.textIndent = `-${indent}vw`;
+                    
+                    fullScreenPiece.appendChild(fullScreenText);
+                    fullScreenDisplay.appendChild(fullScreenPiece);
+                    
+                    fullScreenDisplay.classList.add('visible');
+                });
             });
 
             // Switch to puzzle section
@@ -424,23 +435,9 @@
             puzzleSection.classList.add('active');
         });
 
-        // --- Click event to show personal piece in fullscreen ---
-        personalPiece.addEventListener('click', () => {
-            const myNumber = loadData('myNumber');
-            if (myNumber) {
-                const sharedData = loadData('puzzleData');
-                const piece = sharedData.text[myNumber - 1];
-                const orientation = sharedData.orientations[myNumber];
-                
-                personalPieceFullscreen.textContent = piece;
-                personalPieceFullscreen.className = 'puzzle-piece ' + orientation;
-                personalPieceContainer.classList.add('visible');
-            }
-        });
-        
-        // Hide fullscreen container on click
-        personalPieceContainer.addEventListener('click', () => {
-            personalPieceContainer.classList.remove('visible');
+        // Hide full-screen container on click
+        fullScreenDisplay.addEventListener('click', () => {
+            fullScreenDisplay.classList.remove('visible');
         });
 
         // --- Initial App Logic ---
@@ -459,11 +456,6 @@
             // Check if a number was previously selected
             const myNumber = loadData('myNumber');
             if (myNumber) {
-                const sharedData = loadData('puzzleData');
-                personalPieceDisplay.style.display = 'block';
-                personalPiece.textContent = sharedData.text[myNumber - 1];
-                const orientation = sharedData.orientations[myNumber] || (window.matchMedia("(orientation: portrait)").matches ? 'portrait' : 'landscape');
-                personalPiece.className = 'puzzle-piece ' + orientation;
                 viewPuzzleBtn.style.display = 'block';
             }
 
