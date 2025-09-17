@@ -130,7 +130,7 @@
 
         #puzzle-container {
             display: flex;
-            flex-direction: row; /* 改變為橫向排列 */
+            flex-direction: row; 
             align-items: center;
             justify-content: center;
             width: 100%;
@@ -154,15 +154,64 @@
             overflow: hidden;
             text-align: center;
             transition: all 0.5s ease-in-out;
-            
-            /* 新的樣式：讓文字充滿螢幕 */
             height: 90vh;
             width: 90vw;
             font-weight: bold;
             line-height: 1;
         }
+        
+        /* New styles for full-screen toggle */
+        .fullscreen-btn {
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            z-index: 1000;
+            width: 40px;
+            height: 40px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border: none;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+        }
+        .fullscreen-btn svg {
+            fill: white;
+            width: 24px;
+            height: 24px;
+        }
 
-        /* 根據直向或橫向調整字體大小，使其達到最大化 */
+        /* New styles for showing personal piece in full screen */
+        #personal-piece-container {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #fff;
+            z-index: 999;
+            cursor: pointer;
+            justify-content: center;
+            align-items: center;
+        }
+        #personal-piece-container.visible {
+            display: flex;
+        }
+
+        #personal-piece-container .puzzle-piece {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
+        }
+
+        /* Responsive font size */
         .puzzle-piece.portrait {
             font-size: 60vh; 
         }
@@ -173,6 +222,12 @@
 </head>
 <body>
     <div id="app">
+        <button id="fullscreen-btn" class="fullscreen-btn" title="全螢幕模式">
+            <svg viewBox="0 0 24 24">
+                <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+            </svg>
+        </button>
+
         <!-- Section for the initiator to input text and get the link -->
         <section id="setup-section" class="active">
             <h1>文字拼圖</h1>
@@ -191,6 +246,13 @@
             <p>請選擇你要代表的拼圖號碼。選擇後，你的手機方向將會被記錄。</p>
             <div id="number-buttons"></div>
             <button id="view-puzzle-btn" style="display:none; margin-top:20px;">查看拼圖</button>
+
+            <!-- New: Personal piece display -->
+            <div id="personal-piece-display" style="display: none;">
+                <h2>你的拼圖片段</h2>
+                <div class="puzzle-piece" id="personal-piece"></div>
+                <p>點擊上方區塊可放大</p>
+            </div>
         </section>
 
         <!-- Section to display the final puzzle -->
@@ -199,10 +261,17 @@
             <p>將所有手機並排，你將看到完整的句子！</p>
             <div id="puzzle-container"></div>
         </section>
+
+        <!-- New: Full-screen display for personal piece -->
+        <div id="personal-piece-container">
+            <div class="puzzle-piece" id="personal-piece-fullscreen"></div>
+        </div>
     </div>
 
     <script>
         // DOM elements
+        const fullscreenBtn = document.getElementById('fullscreen-btn');
+        const app = document.getElementById('app');
         const setupSection = document.getElementById('setup-section');
         const joinSection = document.getElementById('join-section');
         const puzzleSection = document.getElementById('puzzle-section');
@@ -212,6 +281,10 @@
         const numberButtonsContainer = document.getElementById('number-buttons');
         const viewPuzzleBtn = document.getElementById('view-puzzle-btn');
         const puzzleContainer = document.getElementById('puzzle-container');
+        const personalPieceDisplay = document.getElementById('personal-piece-display');
+        const personalPiece = document.getElementById('personal-piece');
+        const personalPieceContainer = document.getElementById('personal-piece-container');
+        const personalPieceFullscreen = document.getElementById('personal-piece-fullscreen');
 
         // Helper functions for data encoding/decoding
         const encodeData = (data) => btoa(encodeURIComponent(JSON.stringify(data)));
@@ -238,6 +311,17 @@
                 return null;
             }
         };
+        
+        // --- Fullscreen functionality ---
+        fullscreenBtn.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        });
 
         // --- Stage 1: Initiator input text and generate link ---
         generateLinkBtn.addEventListener('click', () => {
@@ -291,7 +375,10 @@
                     document.querySelectorAll('.number-btn').forEach(btn => btn.classList.remove('selected'));
                     button.classList.add('selected');
                     
-                    alert(`你選擇了 #${myNumber}，手機方向為：${orientation}`);
+                    personalPieceDisplay.style.display = 'block';
+                    personalPiece.textContent = textPieces[myNumber - 1];
+                    personalPiece.className = 'puzzle-piece ' + orientation;
+                    
                     viewPuzzleBtn.style.display = 'block';
                 });
                 numberButtonsContainer.appendChild(button);
@@ -337,6 +424,25 @@
             puzzleSection.classList.add('active');
         });
 
+        // --- Click event to show personal piece in fullscreen ---
+        personalPiece.addEventListener('click', () => {
+            const myNumber = loadData('myNumber');
+            if (myNumber) {
+                const sharedData = loadData('puzzleData');
+                const piece = sharedData.text[myNumber - 1];
+                const orientation = sharedData.orientations[myNumber];
+                
+                personalPieceFullscreen.textContent = piece;
+                personalPieceFullscreen.className = 'puzzle-piece ' + orientation;
+                personalPieceContainer.classList.add('visible');
+            }
+        });
+        
+        // Hide fullscreen container on click
+        personalPieceContainer.addEventListener('click', () => {
+            personalPieceContainer.classList.remove('visible');
+        });
+
         // --- Initial App Logic ---
         const urlParams = new URLSearchParams(window.location.search);
         const dataParam = urlParams.get('data');
@@ -351,7 +457,13 @@
             setupJoinSection(sharedData.text);
             
             // Check if a number was previously selected
-            if (loadData('myNumber')) {
+            const myNumber = loadData('myNumber');
+            if (myNumber) {
+                const sharedData = loadData('puzzleData');
+                personalPieceDisplay.style.display = 'block';
+                personalPiece.textContent = sharedData.text[myNumber - 1];
+                const orientation = sharedData.orientations[myNumber] || (window.matchMedia("(orientation: portrait)").matches ? 'portrait' : 'landscape');
+                personalPiece.className = 'puzzle-piece ' + orientation;
                 viewPuzzleBtn.style.display = 'block';
             }
 
