@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rule 細胞自動機生成器</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 jsPDF 庫用於 PDF 匯出 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- Firebase 相關引入，儘管此應用程式未使用 Firestore，但仍按照要求引入 -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        // import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"; // 未使用 Firestore
+
+        let app;
+        let auth;
+        // let db; // 未使用 Firestore
+
+        // Firebase 初始化配置，從環境變數獲取
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; // 應用程式 ID
+
+        // 初始化 Firebase 應用
+        app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        // db = getFirestore(app); // 未使用 Firestore
+
+        // 登入處理
+        async function authenticateFirebase() {
+            try {
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                console.log("Firebase 認證成功！");
+                // 在這裡可以設定 userId 或觸發應用程式其餘部分的加載
+                // const userId = auth.currentUser?.uid || crypto.randomUUID(); // 如果需要 userId
+                // console.log("用戶 ID:", userId);
+            } catch (error) {
+                console.error("Firebase 認證失敗：", error);
+            }
+        }
+
+        // 監聽認證狀態變化
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                console.log("用戶已登入:", user.uid);
+            } else {
+                console.log("用戶已登出或匿名。");
+            }
+        });
+
+        // 頁面載入時嘗試認證
+        window.addEventListener('load', authenticateFirebase);
+    </script>
+    <style>
+        /* 使用 Inter 字體 */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* 淺灰色背景 */
+        }
+        canvas {
+            border: 2px solid #cbd5e1; /* 邊框 */
+            background-color: #ffffff; /* 白色背景 */
+            display: block;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body class="p-4 flex flex-col items-center min-h-screen">
+    <div class="bg-white p-6 rounded-xl shadow-lg mb-8 w-full max-w-lg">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-4">Rule 細胞自動機生成器</h1>
+        <div class="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4 mb-6">
+            <label for="rowsInput" class="text-gray-700 font-medium whitespace-nowrap">階數 (列數):</label>
+            <input type="number" id="rowsInput" value="100" min="10" max="500"
+                   class="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800">
+            <label for="ruleNumberInput" class="text-gray-700 font-medium whitespace-nowrap">Rule 數 (0-255):</label>
+            <input type="number" id="ruleNumberInput" value="30" min="0" max="255"
+                   class="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800">
+            <button id="generateBtn"
+                    class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 w-full sm:w-auto">
+                生成圖案
+            </button>
+        </div>
+        <div class="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+            <button id="exportPngBtn"
+                    class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 w-full sm:w-auto">
+                輸出 PNG
+            </button>
+            <button id="exportPdfBtn"
+                    class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 w-full sm:w-auto">
+                輸出 PDF
+            </button>
+        </div>
+        <div class="text-center text-gray-600 text-sm mt-4">
+            <p>細胞自動機的規則是根據其鄰居的狀態來決定下一個狀態的。您可以探索不同的規則數來觀察它們如何產生不同的圖案。</p>
+        </div>
+        <div id="messageBox" class="hidden bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-lg mt-4" role="alert">
+            <p id="messageText"></p>
+        </div>
+    </div>
+
+    <div class="bg-white p-2 rounded-xl shadow-lg w-full max-w-2xl overflow-hidden">
+        <canvas id="ruleAutomatonCanvas" class="w-full h-auto"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('ruleAutomatonCanvas');
+        const ctx = canvas.getContext('2d');
+        const rowsInput = document.getElementById('rowsInput');
+        const ruleNumberInput = document.getElementById('ruleNumberInput');
+        const generateBtn = document.getElementById('generateBtn');
+        const exportPngBtn = document.getElementById('exportPngBtn');
+        const exportPdfBtn = document.getElementById('exportPdfBtn');
+        const messageBox = document.getElementById('messageBox');
+        const messageText = document.getElementById('messageText');
+
+        const cellSize = 5; // 每個細胞的大小 (像素)
+        let totalRows = parseInt(rowsInput.value);
+        let currentRuleNumber = parseInt(ruleNumberInput.value);
+        let canvasWidth, canvasHeight;
+        let currentRuleTable = {}; // 動態生成的規則表
+
+        // 顯示訊息框
+        function showMessage(message, type = 'info') {
+            messageText.textContent = message;
+            messageBox.className = `bg-${type === 'error' ? 'red' : 'yellow'}-100 border-l-4 border-${type === 'error' ? 'red' : 'yellow'}-500 text-${type === 'error' ? 'red' : 'yellow'}-700 p-4 rounded-lg mt-4`;
+            messageBox.classList.remove('hidden');
+            setTimeout(() => {
+                messageBox.classList.add('hidden');
+            }, 3000); // 訊息顯示 3 秒
+        }
+
+        // 將十進制規則數轉換為二進制規則表
+        function decimalToBinaryRule(decimalRule) {
+            // 將十進制數轉換為 8 位元的二進制字串，不足補零
+            const binaryString = decimalRule.toString(2).padStart(8, '0');
+            // 定義所有可能的 3 位元鄰居模式
+            const patterns = ['111', '110', '101', '100', '011', '010', '001', '000'];
+            const ruleTable = {};
+            // 根據二進制字串的位元來填充規則表
+            for (let i = 0; i < 8; i++) {
+                ruleTable[patterns[i]] = parseInt(binaryString[i]);
+            }
+            return ruleTable;
+        }
+
+        // 根據當前規則計算下一個細胞狀態
+        function applyRule(left, center, right) {
+            const pattern = `${left}${center}${right}`;
+            return currentRuleTable[pattern];
+        }
+
+        // 生成下一行細胞狀態
+        function generateNextRow(prevRow) {
+            const newRow = [];
+            const n = prevRow.length;
+            for (let i = 0; i < n; i++) {
+                // 處理循環邊界條件
+                const left = prevRow[(i - 1 + n) % n];
+                const center = prevRow[i];
+                const right = prevRow[(i + 1) % n];
+                newRow.push(applyRule(left, center, right));
+            }
+            return newRow;
+        }
+
+        // 繪製細胞自動機到畫布
+        function drawAutomaton(automaton) {
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight); // 清除畫布
+
+            // 計算起始 X 座標，使圖案居中
+            const startX = (canvasWidth - automaton[0].length * cellSize) / 2;
+
+            automaton.forEach((row, rowIndex) => {
+                row.forEach((cell, cellIndex) => {
+                    if (cell === 1) { // 如果細胞狀態為 1 (活躍)
+                        ctx.fillRect(startX + cellIndex * cellSize, rowIndex * cellSize, cellSize, cellSize);
+                    }
+                });
+            });
+        }
+
+        // 初始化和重新繪製函數
+        function initializeAndDraw() {
+            totalRows = parseInt(rowsInput.value);
+            currentRuleNumber = parseInt(ruleNumberInput.value);
+
+            // 驗證輸入的列數
+            if (isNaN(totalRows) || totalRows < 10 || totalRows > 500) {
+                showMessage("階數 (列數) 必須在 10 到 500 之間。", 'error');
+                rowsInput.value = 100; // 重置為預設值
+                return;
+            }
+
+            // 驗證輸入的規則數
+            if (isNaN(currentRuleNumber) || currentRuleNumber < 0 || currentRuleNumber > 255) {
+                showMessage("Rule 數必須在 0 到 255 之間。", 'error');
+                ruleNumberInput.value = 30; // 重置為預設值
+                return;
+            }
+
+            // 根據規則數生成規則表
+            currentRuleTable = decimalToBinaryRule(currentRuleNumber);
+
+            // Rule N 的圖案寬度會隨著行數增加而增加，這裡估計最大列數
+            const maxCols = totalRows * 2 + 1;
+            canvasWidth = maxCols * cellSize;
+            canvasHeight = totalRows * cellSize;
+
+            // 設定畫布的實際像素尺寸
+            canvas.width = canvasWidth;
+            canvas.height = canvasHeight;
+
+            // 調整畫布的 CSS 尺寸，使其響應式顯示
+            canvas.style.maxWidth = '100%';
+            canvas.style.height = 'auto'; // 保持寬高比
+
+            ctx.fillStyle = '#1e3a8a'; // 設定繪圖顏色 (深藍色)
+
+            // 初始化第一行，只有中間的細胞是活躍的 (1)
+            const initialRowLength = totalRows * 2 + 1; // 確保初始行足夠長，以觀察圖案演變
+            const firstRow = new Array(initialRowLength).fill(0);
+            firstRow[Math.floor(initialRowLength / 2)] = 1;
+
+            const automaton = [firstRow];
+
+            // 生成後續的行
+            for (let i = 1; i < totalRows; i++) {
+                automaton.push(generateNextRow(automaton[i - 1]));
+            }
+
+            drawAutomaton(automaton); // 繪製圖案
+        }
+
+        // 匯出為 PNG 圖片
+        function exportPng() {
+            const dataURL = canvas.toDataURL('image/png'); // 獲取畫布的數據 URL
+            const a = document.createElement('a');
+            a.href = dataURL;
+            a.download = `rule_${currentRuleNumber}_steps_${totalRows}.png`; // 設定下載檔案名
+            document.body.appendChild(a);
+            a.click(); // 觸發下載
+            document.body.removeChild(a);
+            showMessage("圖案已匯出為 PNG！", 'info');
+        }
+
+        // 匯出為 PDF 文件
+        function exportPdf() {
+            const { jsPDF } = window.jspdf; // 取得 jsPDF 類別
+            const dataURL = canvas.toDataURL('image/png');
+            const doc = new jsPDF('p', 'mm', 'a4'); // 建立 PDF 文件 (直向, 毫米單位, A4 尺寸)
+
+            const imgWidth = canvas.width;
+            const imgHeight = canvas.height;
+
+            const ratio = imgWidth / imgHeight; // 計算圖片的寬高比
+
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+
+            let pdfImgWidth = pageWidth - 20; // 邊距 10mm (左 10 + 右 10)
+            let pdfImgHeight = pdfImgWidth / ratio;
+
+            // 如果高度超出頁面，則根據高度調整寬度
+            if (pdfImgHeight > pageHeight - 20) {
+                pdfImgHeight = pageHeight - 20;
+                pdfImgWidth = pdfImgHeight * ratio;
+            }
+
+            const x = (pageWidth - pdfImgWidth) / 2; // 計算居中的 X 座標
+            const y = (pageHeight - pdfImgHeight) / 2; // 計算居中的 Y 座標
+
+            doc.addImage(dataURL, 'PNG', x, y, pdfImgWidth, pdfImgHeight); // 將圖片新增到 PDF
+            doc.save(`rule_${currentRuleNumber}_steps_${totalRows}.pdf`); // 儲存 PDF 文件
+            showMessage("圖案已匯出為 PDF！", 'info');
+        }
+
+        // 事件監聽器
+        generateBtn.addEventListener('click', initializeAndDraw);
+        exportPngBtn.addEventListener('click', exportPng);
+        exportPdfBtn.addEventListener('click', exportPdf);
+
+        // 響應式調整畫布大小 (重新繪製)
+        window.addEventListener('resize', initializeAndDraw);
+
+        // 頁面載入時執行
+        window.onload = initializeAndDraw;
+    </script>
+</body>
+</html>
