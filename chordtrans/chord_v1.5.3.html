@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>和弦翻譯機 - 美化升級版 v1.5.3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans TC', 'Segoe UI', sans-serif;
+            background: linear-gradient(120deg, #f8fafc 0%, #e0e7ff 100%);
+        }
+        #menu-toggle { display: none; }
+        #menu-toggle:checked ~ #menu-sidebar { transform: translateX(0);}
+        .focus-ring:focus {
+            --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+            box-shadow: var(--tw-ring-shadow);
+        }
+        #menu-sidebar { backdrop-filter: blur(6px); border-right: 1px solid #e0e7ef;}
+        .menu-btn {
+            transition: box-shadow 0.2s;
+            box-shadow: 0 1px 8px 0 rgb(72 99 255 / 8%);
+        }
+        .menu-btn:hover {
+            box-shadow: 0 4px 12px 0 rgb(72 99 255 / 12%);
+            background: linear-gradient(90deg, #f1f5ff 0%, #dbeafe 100%);
+        }
+        /* Modal 優化 */
+        #modal {
+            /* 讓modal本身足夠大且響應式 */
+            display: none;
+        }
+        #modal.flex {
+            display: flex;
+        }
+        .modal-content {
+            font-size: 1rem;
+            position: relative;
+            width: 100%;
+            max-width: 900px;
+            min-width: 350px;
+            background: #fff;
+            border-radius: 1.2rem;
+            box-shadow: 0 10px 32px 0 rgb(72 99 255 / 15%);
+            padding: 2.5rem;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .modal-content h3 { font-size: 1.15em; color: #6366f1; font-weight: 700; margin-top: 1.4em; margin-bottom: 0.6em;}
+        .modal-content table { font-size: 0.95em; }
+        .modal-content th, .modal-content td { padding: 0.3em 0.5em; }
+        .modal-content mark { background: #eef2ff; color: #4338ca; padding: 0.1em 0.3em; border-radius: 3px;}
+        /* Modal 關閉叉叉外部 */
+        #modal-close-outer {
+            position: absolute;
+            top: 1.5rem;
+            left: 50%;
+            transform: translateX(410px); /* modal-content寬度一半+間距 */
+            z-index: 50;
+            font-size: 2.1rem;
+            background: rgba(255,255,255,0.9);
+            color: #6366f1;
+            border-radius: 50%;
+            padding: 0.25em 0.53em;
+            box-shadow: 0 2px 8px 0 rgb(72 99 255 / 12%);
+            border: 1px solid #dbeafe;
+            cursor: pointer;
+            transition: color 0.2s, background 0.2s;
+        }
+        @media (max-width: 950px) {
+            #modal-close-outer {
+                transform: translateX(375px);
+            }
+            .modal-content { max-width: 98vw; }
+        }
+        @media (max-width: 600px) {
+            #modal-close-outer {
+                left: auto;
+                right: 2rem;
+                top: 1rem;
+                transform: none;
+            }
+            .modal-content { max-width: 99vw; min-width: 0; padding: 1.2rem;}
+        }
+        #modal-close-outer:hover { color: #ef4444; background: #e0e7ff; }
+        .nice-scroll::-webkit-scrollbar { height: 8px; background: #e0e7ff;}
+        .nice-scroll::-webkit-scrollbar-thumb { background: #b4c7ff; border-radius: 6px;}
+    </style>
+</head>
+<body class="p-0 sm:p-8">
+
+<input type="checkbox" id="menu-toggle" class="hidden">
+<div id="menu-sidebar" class="fixed top-0 left-0 w-72 h-full bg-white/95 shadow-2xl z-30 transform -translate-x-full transition-transform duration-300 ease-in-out p-7 flex flex-col gap-6 border-r border-indigo-100">
+    <label for="menu-toggle" class="absolute top-5 right-5 text-3xl cursor-pointer text-gray-400 hover:text-red-500 transition-colors">&times;</label>
+    <h2 class="text-2xl font-bold text-indigo-700 border-b pb-3 mb-3 tracking-wide flex gap-2 items-center">
+        <span class="text-indigo-400">🎹</span> 和弦工具箱
+    </h2>
+    <button class="menu-btn w-full py-3 px-4 rounded-xl text-gray-700 hover:bg-indigo-50 text-lg font-medium flex items-center gap-2 transition" onclick="showModal('manual')">
+        <span>📖</span> 說明書
+    </button>
+    <button class="menu-btn w-full py-3 px-4 rounded-xl text-gray-700 hover:bg-indigo-50 text-lg font-medium flex items-center gap-2 transition" onclick="showModal('basicInterval')">
+        <span>🎼</span> 基礎音程名稱與間距對照表
+    </button>
+    <button class="menu-btn w-full py-3 px-4 rounded-xl text-gray-700 hover:bg-indigo-50 text-lg font-medium flex items-center gap-2 transition" onclick="showModal('intervalTable')">
+        <span>🗺️</span> 全音域音程對照表 (12個半音)
+    </button>
+    <button class="menu-btn w-full py-3 px-4 rounded-xl text-gray-700 hover:bg-indigo-50 text-lg font-medium flex items-center gap-2 transition" onclick="showModal('majorScale')">
+        <span>🌞</span> 關於自然大調音階
+    </button>
+    <button class="menu-btn w-full py-3 px-4 rounded-xl text-gray-700 hover:bg-indigo-50 text-lg font-medium flex items-center gap-2 transition" onclick="showModal('minorScale')">
+        <span>🌚</span> 關於自然小調音階
+    </button>
+    <button class="menu-btn w-full py-3 px-4 rounded-xl text-gray-700 hover:bg-indigo-50 text-lg font-medium flex items-center gap-2 transition" onclick="showModal('other')">
+        <span>📦</span> 其他
+    </button>
+</div>
+
+<div class="relative max-w-xl mx-auto bg-white/95 p-6 sm:p-8 rounded-none sm:rounded-2xl shadow-none sm:shadow-2xl border-none sm:border border-indigo-100 min-h-screen sm:min-h-0">
+    <label for="menu-toggle" class="absolute top-5 left-5 text-3xl cursor-pointer text-indigo-400 hover:text-indigo-600 transition-colors sm:top-8 sm:left-8 z-20">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+    </label>
+    <h1 class="text-4xl font-extrabold text-center text-indigo-700 mt-2 sm:mt-0 pt-12 sm:pt-2 tracking-wide drop-shadow mb-1">🎵 和弦翻譯機</h1>
+    <p class="text-center text-gray-500 mb-6 text-base">支援常見三和弦到十三和弦。<span class="text-indigo-400 font-semibold text-xs ml-2">v1.5.3</span></p>
+    <div class="flex flex-col sm:flex-row gap-3 mb-6">
+        <input type="text" id="chordInput" placeholder="輸入和弦名稱，如：C13, F#m11, Ebm7b5" 
+               class="flex-grow p-3 border border-indigo-200 rounded-xl text-lg focus-ring focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition shadow-sm" 
+               onkeyup="if(event.key === 'Enter') translateChord()">
+        <button onclick="translateChord()" 
+                class="w-full sm:w-auto px-7 py-3 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white font-semibold rounded-xl shadow-lg hover:from-indigo-600 hover:to-indigo-700 transition transform hover:scale-[1.04]">
+            解 析
+        </button>
+    </div>
+    <div id="result" class="mt-8 p-5 bg-white border border-indigo-100 rounded-xl text-gray-800 shadow-md transition duration-300">
+        <p class="text-center text-lg text-gray-500">輸入和弦名稱後，結果將顯示在這裡。</p>
+    </div>
+</div>
+
+<!-- Modal -->
+<div id="modal" class="fixed inset-0 bg-gray-900 bg-opacity-70 hidden items-center justify-center p-4 z-40" onclick="closeModal(event)">
+    <!-- 外部叉叉 -->
+    <span id="modal-close-outer" onclick="closeModal(event)" title="關閉">&#10005;</span>
+    <div class="modal-content nice-scroll" onclick="event.stopPropagation()">
+        <div id="modal-body"></div>
+    </div>
+</div>
+
+<script>
+    // 內容資料
+    const modalContent = {
+        manual: `
+        <h2 class="text-2xl font-bold text-indigo-700 mb-5 border-b pb-3 flex gap-2 items-center">
+            <span>📖</span> 使用說明書
+        </h2>
+        <div class="text-gray-700 space-y-4 text-base leading-relaxed">
+            <p><strong>歡迎使用和弦翻譯機！</strong> 這個工具能幫您快速查詢各種和弦的組成音及樂理定義，無論是初學者或進階玩家都適用。</p>
+            <h3>如何輸入和弦？</h3>
+            <p>請依循「<mark>根音 + 和弦品質</mark>」的格式輸入：</p>
+            <ul class="list-disc list-inside ml-4 space-y-1">
+                <li><b>根音:</b> 使用標準字母 <span class="font-mono text-indigo-600">A</span> 到 <span class="font-mono text-indigo-600">G</span>，升記號用 <span class="font-mono text-indigo-600">#</span> (如 <span class="font-mono">F#</span>)，降記號用 <span class="font-mono text-indigo-600">b</span> (如 <span class="font-mono">Eb</span>)。</li>
+                <li><b>品質:</b> 例如：<span class="font-mono">m</span> (小調), <span class="font-mono">maj7</span>, <span class="font-mono">m7</span>, <span class="font-mono">dim</span>, <span class="font-mono">aug</span>, <span class="font-mono">sus4</span>, <span class="font-mono">add9</span> 等。</li>
+            </ul>
+            <h3>支援的類型範例：</h3>
+            <table class="min-w-full divide-y divide-gray-200 border border-indigo-100 rounded-lg shadow-sm text-sm">
+                <thead class="bg-indigo-50">
+                    <tr>
+                        <th>類型</th>
+                        <th>範例</th>
+                        <th>音程數</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-indigo-50">
+                    <tr><td>三和弦</td><td>C, F#m, Cdim, Gaug</td><td>3</td></tr>
+                    <tr><td>七和弦</td><td>A7, Bbmaj7, Dm7b5, Edim7</td><td>4</td></tr>
+                    <tr><td>延伸和弦</td><td>C9, Gm11, Emaj13</td><td>5-7</td></tr>
+                    <tr><td>變化和弦</td><td>D7b9, C#11, Fmaj#11</td><td>4-6</td></tr>
+                    <tr><td>掛留/加音</td><td>Csus4, Asus2, Gadd9</td><td>3-4</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="mt-6 text-xs text-gray-400 text-right border-t pt-3">
+            2025-10-12 08:53:48 v1.5.3
+        </div>
+        `,
+        basicInterval: `
+        <h2 class="text-2xl font-bold text-indigo-700 mb-5 border-b pb-3 flex gap-2 items-center">
+            <span>🎼</span> 基礎音程名稱與間距對照表
+        </h2>
+        <div>
+        <table class="min-w-full border border-indigo-100 rounded-xl text-center text-sm shadow-sm bg-white mb-4">
+        <thead class="bg-indigo-50">
+        <tr>
+            <th>音程名稱</th><th>對應的音程級數</th><th>間距（半音數量）</th><th>舉例 (從 C 開始)</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr><td>純一度 (Perfect Unison)</td><td>1 度</td><td>0</td><td>C 到 C</td></tr>
+        <tr><td>增一度/小二度</td><td>1 度 / 2 度</td><td>1</td><td>C 到 C# / C 到 D♭</td></tr>
+        <tr><td>大二度 (Major Second)</td><td>2 度</td><td>2</td><td>C 到 D</td></tr>
+        <tr><td>小三度 (Minor Third)</td><td>3 度</td><td>3</td><td>C 到 E♭</td></tr>
+        <tr><td>大三度 (Major Third)</td><td>3 度</td><td>4</td><td>C 到 E</td></tr>
+        <tr><td>純四度 (Perfect Fourth)</td><td>4 度</td><td>5</td><td>C 到 F</td></tr>
+        <tr><td>增四度/減五度</td><td>4 度 / 5 度</td><td>6</td><td>C 到 F# / C 到 G♭</td></tr>
+        <tr><td>純五度 (Perfect Fifth)</td><td>5 度</td><td>7</td><td>C 到 G</td></tr>
+        <tr><td>增五度/小六度</td><td>5 度 / 6 度</td><td>8</td><td>C 到 G# / C 到 A♭</td></tr>
+        <tr><td>大六度 (Major Sixth)</td><td>6 度</td><td>9</td><td>C 到 A</td></tr>
+        <tr><td>小七度 (Minor Seventh)</td><td>7 度</td><td>10</td><td>C 到 B♭</td></tr>
+        <tr><td>大七度 (Major Seventh)</td><td>7 度</td><td>11</td><td>C 到 B</td></tr>
+        <tr><td>純八度 (Perfect Octave)</td><td>8 度</td><td>12</td><td>C 到 C (高八度)</td></tr>
+        </tbody>
+        </table>
+        </div>
+        `,
+        intervalTable: `
+        <h2 class="text-2xl font-bold text-indigo-700 mb-5 border-b pb-3 flex gap-2 items-center">
+            <span>🗺️</span> 全音域音程對照表 (12個半音)
+        </h2>
+        <div>
+        <table class="min-w-full border border-indigo-100 rounded-xl text-center text-sm shadow-sm bg-white mb-4">
+        <thead class="bg-indigo-50">
+            <tr>
+            <th>根音 (Root)</th><th>P1 (0)</th><th>m2 (1)</th><th>M2 (2)</th><th>m3 (3)</th><th>M3 (4)</th><th>P4 (5)</th><th>A4/d5 (6)</th><th>P5 (7)</th><th>A5/m6 (8)</th><th>M6 (9)</th><th>m7 (10)</th><th>M7 (11)</th><th>P8 (12)</th>
+            </tr>
+        </thead>
+        <tbody>
+<tr><td>C</td><td>C</td><td>C#/D♭</td><td>D</td><td>D#/E♭</td><td>E</td><td>F</td><td>F#/G♭</td><td>G</td><td>G#/A♭</td><td>A</td><td>A#/B♭</td><td>B</td><td>C</td></tr>
+<tr><td>C#/D♭</td><td>C#/D♭</td><td>D</td><td>D#/E♭</td><td>E</td><td>F</td><td>F#/G♭</td><td>G</td><td>G#/A♭</td><td>A</td><td>A#/B♭</td><td>B</td><td>C</td><td>C#/D♭</td></tr>
+<tr><td>D</td><td>D</td><td>D#/E♭</td><td>E</td><td>F</td><td>F#/G♭</td><td>G</td><td>G#/A♭</td><td>A</td><td>A#/B♭</td><td>B</td><td>C</td><td>C#/D♭</td><td>D</td></tr>
+<tr><td>D#/E♭</td><td>D#/E♭</td><td>E</td><td>F</td><td>F#/G♭</td><td>G</td><td>G#/A♭</td><td>A</td><td>A#/B♭</td><td>B</td><td>C</td><td>C#/D♭</td><td>D</td><td>D#/E♭</td></tr>
+<tr><td>E</td><td>E</td><td>F</td><td>F#/G♭</td><td>G</td><td>G#/A♭</td><td>A</td><td>A#/B♭</td><td>B</td><td>C</td><td>C#/D♭</td><td>D</td><td>D#/E♭</td><td>E</td></tr>
+<tr><td>F</td><td>F</td><td>F#/G♭</td><td>G</td><td>G#/A♭</td><td>A</td><td>A#/B♭</td><td>B</td><td>C</td><td>C#/D♭</td><td>D</td><td>D#/E♭</td><td>E</td><td>F</td></tr>
+<tr><td>F#/G♭</td><td>F#/G♭</td><td>G</td><td>G#/A♭</td><td>A</td><td>A#/B♭</td><td>B</td><td>C</td><td>C#/D♭</td><td>D</td><td>D#/E♭</td><td>E</td><td>F</td><td>F#/G♭</td></tr>
+<tr><td>G</td><td>G</td><td>G#/A♭</td><td>A</td><td>A#/B♭</td><td>B</td><td>C</td><td>C#/D♭</td><td>D</td><td>D#/E♭</td><td>E</td><td>F</td><td>F#/G♭</td><td>G</td></tr>
+<tr><td>G#/A♭</td><td>G#/A♭</td><td>A</td><td>A#/B♭</td><td>B</td><td>C</td><td>C#/D♭</td><td>D</td><td>D#/E♭</td><td>E</td><td>F</td><td>F#/G♭</td><td>G</td><td>G#/A♭</td></tr>
+<tr><td>A</td><td>A</td><td>A#/B♭</td><td>B</td><td>C</td><td>C#/D♭</td><td>D</td><td>D#/E♭</td><td>E</td><td>F</td><td>F#/G♭</td><td>G</td><td>G#/A♭</td><td>A</td></tr>
+<tr><td>A#/B♭</td><td>A#/B♭</td><td>B</td><td>C</td><td>C#/D♭</td><td>D</td><td>D#/E♭</td><td>E</td><td>F</td><td>F#/G♭</td><td>G</td><td>G#/A♭</td><td>A</td><td>A#/B♭</td></tr>
+<tr><td>B</td><td>B</td><td>C</td><td>C#/D♭</td><td>D</td><td>D#/E♭</td><td>E</td><td>F</td><td>F#/G♭</td><td>G</td><td>G#/A♭</td><td>A</td><td>A#/B♭</td><td>B</td></tr>
+        </tbody>
+        </table>
+        </div>
+        `,
+        majorScale: `
+        <h2 class="text-2xl font-bold text-indigo-700 mb-5 border-b pb-3 flex gap-2 items-center">
+            <span>🌞</span> 關於自然大調音階
+        </h2>
+        <div>
+        <h3>構造與音程對照表</h3>
+        <table class="min-w-full border border-indigo-100 rounded-xl text-center text-sm shadow-sm bg-white mb-4">
+        <thead class="bg-indigo-50">
+        <tr><th>音階級數</th><th>音程名稱</th><th>半音數（間距）</th><th>C 大調範例音</th><th>音階角色</th></tr>
+        </thead>
+        <tbody>
+        <tr><td>I (Root)</td><td>純一度 (P1)</td><td>0</td><td>C</td><td>主音 (Tonic)</td></tr>
+        <tr><td>II</td><td>大二度 (M2)</td><td>2</td><td>D</td><td>上主音 (Supertonic)</td></tr>
+        <tr><td>III</td><td>大三度 (M3)</td><td>4</td><td>E</td><td>中音 (Mediant)</td></tr>
+        <tr><td>IV</td><td>純四度 (P4)</td><td>5</td><td>F</td><td>下屬音 (Subdominant)</td></tr>
+        <tr><td>V</td><td>純五度 (P5)</td><td>7</td><td>G</td><td>屬音 (Dominant)</td></tr>
+        <tr><td>VI</td><td>大六度 (M6)</td><td>9</td><td>A</td><td>下中音 (Submediant)</td></tr>
+        <tr><td>VII</td><td>大七度 (M7)</td><td>11</td><td>B</td><td>導音 (Leading Tone)</td></tr>
+        <tr><td>VIII (I)</td><td>純八度 (P8)</td><td>12</td><td>C</td><td>八度 (Octave)</td></tr>
+        </tbody>
+        </table>
+
+        <h3>基礎三和弦類型與功能表</h3>
+        <table class="min-w-full border border-indigo-100 rounded-xl text-center text-sm shadow-sm bg-white mb-4">
+        <thead class="bg-indigo-50">
+        <tr><th>和弦級數</th><th>和弦性質</th><th>和弦範例 (C 大調)</th><th>主要功能</th><th>聽覺感受與情緒</th></tr>
+        </thead>
+        <tbody>
+        <tr><td>I</td><td>Major (大三)</td><td>C</td><td>主功能 (Tonic)</td><td>穩定、終點、明亮、快樂。</td></tr>
+        <tr><td>ii</td><td>minor (小三)</td><td>Dm</td><td>下屬功能 (Subdominant)</td><td>柔和、內斂、為 V 級做準備。</td></tr>
+        <tr><td>iii</td><td>minor (小三)</td><td>Em</td><td>主/屬功能 (次要)</td><td>內省、情緒較為平和。</td></tr>
+        <tr><td>IV</td><td>Major (大三)</td><td>F</td><td>下屬功能 (Subdominant)</td><td>寬廣、穩定，是 I 級和弦的最佳替代。</td></tr>
+        <tr><td>V</td><td>Major (大三)</td><td>G</td><td>屬功能 (Dominant)</td><td>極具張力，要求被解決（導向 I 級）。</td></tr>
+        <tr><td>vi</td><td>minor (小三)</td><td>Am</td><td>主功能 (Tonic) (替代)</td><td>憂鬱、哀傷，是 I 級的同調小調，常用於副歌轉折。</td></tr>
+        <tr><td>vii°</td><td>diminished (減三)</td><td>Bdim</td><td>屬功能 (Dominant) (導音)</td><td>極不和諧，最強烈的導向性，必須解決回 I 級。</td></tr>
+        </tbody>
+        </table>
+        <div class="mb-3"><b>總結公式：</b> <span class="font-mono text-indigo-600">Major - minor - minor - Major - Major - minor - diminished</span></div>
+        </div>
+        `,
+        minorScale: `
+        <h2 class="text-2xl font-bold text-indigo-700 mb-5 border-b pb-3 flex gap-2 items-center">
+            <span>🌚</span> 關於自然小調音階
+        </h2>
+        <div>
+        <h3>構造與音程對照表</h3>
+        <table class="min-w-full border border-indigo-100 rounded-xl text-center text-sm shadow-sm bg-white mb-4">
+        <thead class="bg-indigo-50">
+        <tr><th>音階級數</th><th>音程名稱</th><th>半音數（間距）</th><th>A 自然小調範例音</th><th>音階角色</th></tr>
+        </thead>
+        <tbody>
+        <tr><td>i (Root)</td><td>純一度 (P1)</td><td>0</td><td>A</td><td>主音 (Tonic)</td></tr>
+        <tr><td>ii</td><td>大二度 (M2)</td><td>2</td><td>B</td><td>上主音 (Supertonic)</td></tr>
+        <tr><td>iii</td><td>小三度 (m3)</td><td>3</td><td>C</td><td>中音 (Mediant)</td></tr>
+        <tr><td>iv</td><td>純四度 (P4)</td><td>5</td><td>D</td><td>下屬音 (Subdominant)</td></tr>
+        <tr><td>v</td><td>純五度 (P5)</td><td>7</td><td>E</td><td>屬音 (Dominant)</td></tr>
+        <tr><td>vi</td><td>小六度 (m6)</td><td>8</td><td>F</td><td>下中音 (Submediant)</td></tr>
+        <tr><td>vii</td><td>小七度 (m7)</td><td>10</td><td>G</td><td>次屬音 (Subtonic)</td></tr>
+        <tr><td>viii (i)</td><td>純八度 (P8)</td><td>12</td><td>A</td><td>八度 (Octave)</td></tr>
+        </tbody>
+        </table>
+
+        <h3>基礎三和弦類型與功能表</h3>
+        <table class="min-w-full border border-indigo-100 rounded-xl text-center text-sm shadow-sm bg-white mb-4">
+        <thead class="bg-indigo-50">
+        <tr><th>和弦級數</th><th>和弦性質</th><th>和弦範例 (A 小調)</th><th>主要功能</th><th>聽覺感受與情緒</th></tr>
+        </thead>
+        <tbody>
+        <tr><td>i</td><td>minor (小三)</td><td>Am</td><td>主功能 (Tonic)</td><td>穩定、憂鬱、內省。小調的「家」。</td></tr>
+        <tr><td>ii°</td><td>diminished (減三)</td><td>Bdim</td><td>下屬功能</td><td>不穩定，通常用來導向 v 或 i。</td></tr>
+        <tr><td>III</td><td>Major (大三)</td><td>C</td><td>主功能 (關係大調)</td><td>關係大調，聲音明亮，是 i 級的常用替代。</td></tr>
+        <tr><td>iv</td><td>minor (小三)</td><td>Dm</td><td>下屬功能</td><td>柔和的推進，是小調中最常用的下屬和弦。</td></tr>
+        <tr><td>v</td><td>minor (小三)</td><td>Em</td><td>屬功能 (柔和)</td><td>具有溫和的張力，但缺乏大調 V 級的強烈解決感。</td></tr>
+        <tr><td>VI</td><td>Major (大三)</td><td>F</td><td>下屬功能 (次要)</td><td>飽滿、富有戲劇性，常用於情緒的爆發。</td></tr>
+        <tr><td>VII</td><td>Major (大三)</td><td>G</td><td>次屬功能 (Subtonic)</td><td>柔和、順暢，常用於流行樂，使和聲流動。</td></tr>
+        </tbody>
+        </table>
+        <div class="mb-3"><b>總結公式：</b> <span class="font-mono text-indigo-600">minor - diminished - Major - minor - minor - Major - Major</span></div>
+        </div>
+        `,
+        other: `
+        <h2 class="text-2xl font-bold text-indigo-700 mb-5 border-b pb-3 flex gap-2 items-center">
+            <span>📦</span> 七大調式：結構、特性與和弦公式總覽
+        </h2>
+        <div>
+        <p>調式 (Modes) 是從大調音階上的不同音符開始，以相同的音符組成的音階。每種調式都有其獨特的特性音程，從而產生不同的音樂情感和和聲色彩。</p>
+        <table class="min-w-full border border-indigo-100 rounded-xl text-center text-sm shadow-sm bg-white mb-4">
+        <thead class="bg-indigo-50">
+        <tr>
+            <th>調式名稱</th><th>調性分類</th><th>起始音階級數</th><th>關鍵特性音程</th><th>基礎三和弦級數 (I - VII)</th><th>聽覺感受與用途</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr><td>Ionian (伊奧尼亞)</td><td>大調</td><td>I (1)</td><td>無（即大調本身）</td><td>Major - minor - minor - Major - Major - minor - diminished</td><td>明亮、快樂、穩定。主流流行樂基礎。</td></tr>
+        <tr><td>Lydian (利底亞)</td><td>大調</td><td>IV (4)</td><td>升四度 (A4)</td><td>Major - Major - minor - diminished - Major - minor - minor</td><td>夢幻、空靈、神聖。常用於電影配樂。</td></tr>
+        <tr><td>Mixolydian (混合利底亞)</td><td>大調</td><td>V (5)</td><td>降七度 (m7)</td><td>Major - minor - diminished - Major - minor - minor - Major</td><td>帶有藍調搖滾風格。聲音強勁、有「野性」的屬音。</td></tr>
+        <tr><td>Dorian (多利亞)</td><td>小調</td><td>ii (2)</td><td>升六度 (M6)</td><td>minor - minor - Major - Major - diminished - minor - Major</td><td>柔和、藍調感、爵士味。最常用的小調式。</td></tr>
+        <tr><td>Aeolian (愛奧利亞)</td><td>小調</td><td>vi (6)</td><td>無（即自然小調本身）</td><td>minor - diminished - Major - minor - minor - Major - Major</td><td>憂鬱、內省、悲傷。主流小調音樂基礎。</td></tr>
+        <tr><td>Phrygian (弗里幾亞)</td><td>小調</td><td>iii (3)</td><td>降二度 (m2)</td><td>minor - Major - Major - minor - diminished - Major - minor</td><td>異國情調、西班牙或中東風格。聲音黑暗。</td></tr>
+        <tr><td>Locrian (洛克里安)</td><td>減調</td><td>vii (7)</td><td>降二度 (m2), 減五度 (d5)</td><td>diminished - Major - minor - Major - minor - diminished - minor</td><td>極度不穩定、迴避性。極少單獨用於創作。</td></tr>
+        </tbody>
+        </table>
+        <div class="text-xs text-gray-400">符號說明：Major = 大三和弦, minor = 小三和弦, diminished = 減三和弦</div>
+        </div>
+        `
+    };
+
+    // Modal顯示/關閉
+    function showModal(type) {
+        document.getElementById('menu-toggle').checked = false;
+        document.getElementById('modal').classList.remove('hidden');
+        document.getElementById('modal').classList.add('flex');
+        document.getElementById('modal-body').innerHTML = modalContent[type] || '<p>暫無內容</p>';
+    }
+    function closeModal(event) {
+        // 只允許點擊遮罩或叉叉關閉
+        if (!event || event.target.id === 'modal' || event.target.id === 'modal-close-outer') {
+            document.getElementById('modal').classList.remove('flex');
+            document.getElementById('modal').classList.add('hidden');
+        }
+    }
+
+    // Esc 關閉 Modal
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            document.getElementById('modal').classList.remove('flex');
+            document.getElementById('modal').classList.add('hidden');
+            document.getElementById('menu-toggle').checked = false;
+        }
+    });
+
+    // 原和弦功能（不變）
+    const NOTES_FOR_PARSING = [
+        "C#", "Db", "D#", "Eb", "F#", "Gb", "G#", "Ab", "A#", "Bb", 
+        "C", "D", "E", "F", "G", "A", "B"
+    ];
+    const PITCHES = {
+        "C": 0, "C#": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3, 
+        "E": 4, "F": 5, "F#": 6, "Gb": 6, "G": 7, "G#": 8, 
+        "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B": 11
+    };
+    const OUTPUT_NOTES = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+    const INTERVAL_NAMES = {
+        0: "根音 (R)", 1: "小二度 (b2)", 2: "大二度 (M2)", 3: "小三度 (m3)", 4: "大三度 (M3)", 
+        5: "完全四度 (P4)", 6: "減五度 (b5)/增四度 (#4)", 7: "完全五度 (P5)", 8: "增五度 (#5)", 
+        9: "大六度 (M6)", 10: "小七度 (m7)", 11: "大七度 (M7)", 12: "八度 (8)",
+        14: "大九度 (M9)", 15: "小十度 (m10)", 17: "完全十一度 (P11)", 18: "增十一度 (#11)", 
+        21: "大十三度 (M13)"
+    };
+    const CHORDS = {
+        "":        ["大三和弦", [4, 7], "由根音、大三度、完全五度構成。明亮、穩定。"],
+        "m":       ["小三和弦", [3, 7], "由根音、小三度、完全五度構成。柔和、憂鬱。"],
+        "dim":     ["減三和弦", [3, 6], "由根音、小三度、減五度構成。極度不穩定。"],
+        "aug":     ["增三和弦", [4, 8], "由根音、大三度、增五度構成。不穩定、有擴張感。"],
+        "sus4":    ["掛留四和弦", [5, 7], "四度取代三度。不穩定，傾向解決到大三或小三和弦。"],
+        "sus2":    ["掛留二和弦", [2, 7], "二度取代三度。清新、開放的音響。"],
+        "add9":    ["加九和弦", [4, 7, 14], "大三和弦加上大九度（沒有七度音）。比單純大三更柔和。"],
+        "madd9":   ["小調加九和弦", [3, 7, 14], "小三和弦加上大九度（沒有七度音）。"],
+        "7":       ["屬七和弦", [4, 7, 10], "大三和弦加上小七度。具有強烈傾向解決的屬功能。"],
+        "maj7":    ["大七和弦", [4, 7, 11], "大三和弦加上大七度。柔和、寬廣、帶有爵士色彩。"],
+        "m7":      ["小七和弦", [3, 7, 10], "小三和弦加上小七度。內斂、豐富、常用於爵士和流行。"],
+        "mmaj7":   ["小大七和弦", [3, 7, 11], "小三和弦加上大七度。色彩獨特，常營造神秘或緊張感。"],
+        "m7b5":    ["半減七和弦", [3, 6, 10], "由減三和弦加上小七度構成。常作為小調的二級和弦。"],
+        "dim7":    ["減七和弦", [3, 6, 9], "由減三和弦加上減七度（雙降七度）。高度對稱，極不穩定，常作轉調用。"],
+        "7#5":     ["增屬七和弦", [4, 8, 10], "屬七和弦的五度音升高半音。"],
+        "7b5":     ["減五屬七和弦", [4, 6, 10], "屬七和弦的五度音降低半音。"],
+        "7#9":     ["屬七升九和弦", [4, 7, 10, 15], "屬七和弦加上增九度 (小三度)。強烈的屬功能。"],
+        "7b9":     ["屬七降九和弦", [4, 7, 10, 13], "屬七和弦加上小九度。強烈的解決趨勢。"],
+        "9":       ["屬九和弦", [4, 7, 10, 14], "屬七和弦加上大九度。飽滿、爵士味濃厚。"],
+        "m9":      ["小九和弦", [3, 7, 10, 14], "小七和弦加上大九度。深沉、豐富、常營造冷靜氛圍。"],
+        "maj9":    ["大九和弦", [4, 7, 11, 14], "大七和弦加上大九度。極其柔和、高雅的爵士色彩。"],
+        "11":      ["屬十一和弦", [4, 7, 10, 14, 17], "屬九和弦加上完全十一度。通常省略三度音。"],
+        "m11":     ["小十一和弦", [3, 7, 10, 14, 17], "小九和弦加上完全十一度。常用於爵士樂的二級和弦。"],
+        "maj11":   ["大十一和弦", [4, 7, 11, 14, 17], "大九和弦加上完全十一度。較少見。"],
+        "#11":     ["屬七升十一和弦", [4, 7, 10, 14, 18], "屬九和弦加上增十一度。帶有Lydian色彩。"],
+        "maj#11":  ["大七升十一和弦", [4, 7, 11, 14, 18], "大九和弦加上增十一度。典型的Lydian和弦，明亮而夢幻。"],
+        "13":      ["屬十三和弦", [4, 7, 10, 14, 17, 21], "屬十一和弦加上大十三度。最豐滿的屬功能和弦。"],
+        "m13":     ["小十三和弦", [3, 7, 10, 14, 17, 21], "小十一和弦加上大十三度。溫暖而深邃的爵士色彩。"],
+        "maj13":   ["大十三和弦", [4, 7, 11, 14, 17, 21], "大十一和弦加上大十三度。極其豐富、平靜的和弦。"],
+    };
+
+    function getNoteName(index) { return OUTPUT_NOTES[index % 12]; }
+    function getChordTonesAndIntervals(rootName, intervals) {
+        const rootIndex = PITCHES[rootName];
+        if (rootIndex === undefined) return { tones: [], intervals: [] };
+
+        const tones = [rootName];
+        const intervalNames = [INTERVAL_NAMES[0]];
+
+        for (const interval of intervals) {
+            const toneIndex = (rootIndex + interval) % 12;
+            const noteName = getNoteName(toneIndex);
+            tones.push(noteName);
+            intervalNames.push(INTERVAL_NAMES[interval] || `未知 (${interval} 半音)`);
+        }
+        return { tones, intervals: intervalNames };
+    }
+    function parseChordInput(input) {
+        const upperInput = input.toUpperCase().replace(/\s/g, '');
+        for (const note of NOTES_FOR_PARSING) {
+            if (upperInput.startsWith(note)) {
+                const rootName = note;
+                let quality = upperInput.substring(note.length).toLowerCase();
+                quality = quality.replace(/\(maj7\)/, 'maj7');
+                quality = quality.replace(/(-5|\(b5\))/, 'b5');
+                if (quality.startsWith('add')) quality = 'add' + quality.substring(3);
+                if (quality.startsWith('sus')) quality = 'sus' + quality.substring(3);
+                if (quality === "#5") quality = "aug"; 
+                if (quality === "b5") quality = "dim"; 
+                return { rootName, quality };
+            }
+        }
+        return null;
+    }
+    function translateChord() {
+        const input = document.getElementById('chordInput').value.trim();
+        const resultDiv = document.getElementById('result');
+        resultDiv.className = "mt-8 p-5 bg-white border border-indigo-100 rounded-xl text-gray-800 shadow-md transition duration-300";
+        if (!input) {
+            resultDiv.innerHTML = "<p class='text-center text-lg text-gray-500'>請輸入一個有效的和弦名稱！</p>";
+            return;
+        }
+        let parsed = parseChordInput(input);
+        if (!parsed) {
+             const singleRoot = input.toUpperCase();
+             if (PITCHES.hasOwnProperty(singleRoot) && singleRoot.length <= 2) {
+                 parsed = { rootName: singleRoot, quality: "" };
+             } else {
+                 resultDiv.innerHTML = `<p class='text-center text-lg text-red-500 font-semibold'>無法識別的根音：<strong>${input}</strong></p><p class='text-center text-gray-500'>請使用標準音名 C, D, Eb, F#, Bb, 等。</p>`;
+                 return;
+             }
+        }
+        const { rootName, quality } = parsed;
+        const chordInfo = CHORDS[quality];
+        if (!chordInfo) {
+            resultDiv.innerHTML = `<p class='text-center text-lg text-red-500 font-semibold'>無法識別的和弦類型：<strong>${quality || "（大三和弦除外）"}</strong></p><p class='text-center text-gray-500'>請確認輸入的和弦記號是否標準。</p>`;
+            return;
+        }
+        const [chordName, intervals, definition] = chordInfo;
+        const { tones, intervals: intervalNames } = getChordTonesAndIntervals(rootName, intervals);
+        if (tones.length === 0) {
+             resultDiv.innerHTML = `<p class='text-center text-lg text-red-500'>內部錯誤：無法計算和弦音。</p>`;
+             return;
+        }
+        let output = `
+<div class="space-y-6">
+    <p class="text-2xl font-extrabold text-indigo-700 text-center tracking-wide">
+        ${rootName}${quality} 
+        <span class="block text-base font-medium text-gray-500 mt-1">(${rootName}${chordName})</span>
+    </p>
+    <div class="bg-gradient-to-r from-indigo-50 via-white to-indigo-100 p-4 rounded-xl border border-indigo-50 shadow">
+        <p class="text-xl font-bold text-gray-800 mb-2 border-b border-indigo-100 pb-1">🎵 組成音:</p>
+        <p class="text-4xl font-mono tracking-wider text-red-600 text-center">${tones.join(' - ')}</p>
+    </div>
+    <div class="p-4 rounded-xl border border-indigo-100 bg-white shadow">
+        <p class="text-xl font-bold text-gray-800 mb-3 border-b border-indigo-100 pb-1">🎶 音程關係:</p>
+        <div class="grid grid-cols-2 gap-3 text-sm sm:text-base">
+            ${tones.map((tone, index) => 
+                `<p class="flex items-center"><span class="font-mono bg-indigo-100 text-indigo-700 px-2 py-1 rounded mr-2 w-12 text-center">${tone}</span> <span class="text-gray-600">${intervalNames[index]}</span></p>`
+            ).join('')}
+        </div>
+    </div>
+    <p class="text-base pt-2 border-t border-indigo-100">
+        <span class="font-bold text-indigo-700">✨ 定義與特性：</span> ${definition}
+    </p>
+</div>
+        `;
+        resultDiv.innerHTML = output;
+    }
+</script>
+</body>
+</html>
