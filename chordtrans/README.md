@@ -57,10 +57,10 @@ title: 音程名稱與全音域對照表
 | **IV** | **Major** (大三) | $\text{F}$ | **下屬功能 (Subdominant)** | 寬廣、穩定，是 $\text{I}$ 級和弦的最佳替代。 |
 | **V** | **Major** (大三) | $\text{G}$ | **屬功能 (Dominant)** | **極具張力**，要求被解決（導向 $\text{I}$ 級）。 |
 | **vi** | minor (小三) | $\text{Am}$ | **主功能 (Tonic)** (替代) | 憂鬱、哀傷，是 $\text{I}$ 級的同調小調，常用於副歌轉折。 |
-| **vii$\circ$** | diminished (減三) | $\text{Bdim}$ | **屬功能 (Dominant)** (導音) | **極不和諧**，最強烈的導向性，必須解決回 $\text{I}$ 級。 |
+| **vii $\circ$** | diminished (減三) | $\text{Bdim}$ | **屬功能 (Dominant)** (導音) | **極不和諧**，最強烈的導向性，必須解決回 $\text{I}$ 級。 |
 
 ### **總結公式：**
-$\mathbf{Major}$ - $\text{minor}$ - $\text{minor}$ - $\mathbf{Major}$ - $\mathbf{Major}$ - $\text{minor}$ - $\text{diminished}$
+### $\mathbf{Major}$ - $\text{minor}$ - $\text{minor}$ - $\mathbf{Major}$ - $\mathbf{Major}$ - $\text{minor}$ - $\text{diminished}$
 
 ## 關於自然小調音階
 ### 構造與音程對照表
@@ -79,7 +79,7 @@ $\mathbf{Major}$ - $\text{minor}$ - $\text{minor}$ - $\mathbf{Major}$ - $\mathbf
 | **和弦級數** | **和弦性質** | **和弦範例 (A 小調)** | **主要功能** | **聽覺感受與情緒** | 
 | ----- | ----- | ----- | ----- | ----- | 
 | **i** | minor (小三) | $\text{Am}$ | **主功能 (Tonic)** | 穩定、憂鬱、內省。小調的「家」。 | 
-| **ii$\\circ$** | diminished (減三) | $\text{Bdim}$ | **下屬功能** | 不穩定，通常用來導向 $\text{v}$ 或 $\text{i}$。 | 
+| **ii $\\circ$** | diminished (減三) | $\text{Bdim}$ | **下屬功能** | 不穩定，通常用來導向 $\text{v}$ 或 $\text{i}$。 | 
 | **III** | **Major** (大三) | $\text{C}$ | **主功能** (關係大調) | 關係大調，聲音明亮，是 $\text{i}$ 級的常用替代。 | 
 | **iv** | minor (小三) | $\text{Dm}$ | **下屬功能** | 柔和的推進，是小調中最常用的下屬和弦。 | 
 | **v** | minor (小三) | $\text{Em}$ | **屬功能** (柔和) | 具有溫和的張力，但缺乏大調 $\text{V}$ 級的強烈解決感。 | 
@@ -87,4 +87,4 @@ $\mathbf{Major}$ - $\text{minor}$ - $\text{minor}$ - $\mathbf{Major}$ - $\mathbf
 | **VII** | **Major** (大三) | $\text{G}$ | **次屬功能** (Subtonic) | 柔和、順暢，常用於流行樂，使和聲流動。 | 
 
 ### **總結公式：**
-$$\text{minor} - \text{diminished} - \mathbf{Major} - \text{minor} - \text{minor} - \mathbf{Major} - \mathbf{Major}$$
+### $$\text{minor} - \text{diminished} - \mathbf{Major} - \text{minor} - \text{minor} - \mathbf{Major} - \mathbf{Major}$$
