@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>和弦翻譯機 v2.1.2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vexflow/build/vexflow.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fb;
+        }
+    </style>
+</head>
+<body class="p-8">
+    <div class="max-w-xl mx-auto bg-white p-6 rounded-xl shadow-lg">
+        <h1 class="text-3xl font-extrabold text-indigo-700 text-center">🎵 和弦翻譯機</h1>
+        <p class="text-center text-gray-500 mb-6">依設計規格解析和弦、顯示組成音、音程、五線譜並支援播放。</p>
+
+        <div class="flex flex-col sm:flex-row gap-3 mb-4">
+            <input type="text" id="chordInput" placeholder="例如: Cmaj7, Am/G, Gm7b5" 
+                   class="flex-grow p-3 border border-gray-300 rounded-lg text-lg"
+                   onkeyup="if(event.key === 'Enter') handleTranslate()">
+            <button id="translateButton" 
+                    class="w-full sm:w-auto px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:bg-indigo-700 transition">
+                翻譯和弦
+            </button>
+        </div>
+
+        <div class="flex gap-3 mb-4">
+            <button id="playButton" class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">播放和弦</button>
+            <button id="clearButton" class="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition">清除</button>
+        </div>
+
+        <div id="resultArea" class="mt-2 p-5 bg-gray-50 border border-gray-200 rounded-xl text-gray-800 shadow-md">
+            <h2 class="text-xl font-bold text-gray-800 mb-2">分析結果</h2>
+
+            <div id="summaryOutput" class="text-gray-600 mb-4"></div>
+
+            <div id="componentsOutput" class="mb-4"></div>
+
+            <div id="intervalsOutput" class="mb-4"></div>
+
+            <h2 class="text-xl font-bold text-gray-800 mt-4">五線譜顯示</h2>
+            <div id="staffOutput" class="bg-gray-100 p-2 rounded-lg border border-gray-300 min-h-[150px]">
+                <div id="staffCanvas"></div>
+            </div>
+        </div>
+    </div>
+
+<script>
+/* v2.1.2 更新：支援多和弦序列（分號分隔）、結果卡片列表、五線譜序列顯示、序列播放排程與播放進度回饋 */
+
+/* 音程與資料（不變） */
+const PITCHES = { C:0, 'C#':1, Db:1, D:2, 'D#':3, Eb:3, E:4, F:5, 'F#':6, Gb:6, G:7, 'G#':8, Ab:8, A:9, 'A#':10, Bb:10, B:11 };
+const INTERVAL_SEMITONES = {
+  R:0, m2:1, M2:2, m3:3, M3:4, P4:5, d5:6, P5:7, A5:8, m6:8, M6:9, m7:10, M7:11,
+  M9:14, m9:13, P11:17, '#11':18, M13:21
+};
+const CHORD_FORMULAS = {
+  '': { intervals: [0,4,7], name:'大三和弦' },
+  'maj': { intervals: [0,4,7], name:'大三和弦' },
+  'm': { intervals: [0,3,7], name:'小三和弦' },
+  'dim': { intervals: [0,3,6], name:'減三和弦' },
+  'aug': { intervals: [0,4,8], name:'增三和弦' },
+  'sus2': { intervals: [0,2,7], name:'掛留二' },
+  'sus4': { intervals: [0,5,7], name:'掛留四' },
+  '7': { intervals: [0,4,7,10], name:'屬七' },
+  'maj7': { intervals: [0,4,7,11], name:'大七' },
+  'm7': { intervals: [0,3,7,10], name:'小七' },
+  'mmaj7': { intervals: [0,3,7,11], name:'小大七' },
+  'm7b5': { intervals: [0,3,6,10], name:'半減七' },
+  'dim7': { intervals: [0,3,6,9], name:'減七' },
+  '9': { intervals: [0,4,7,10,14], name:'屬九' },
+  'm9': { intervals: [0,3,7,10,14], name:'小九' },
+  'maj9': { intervals: [0,4,7,11,14], name:'大九' },
+  '11': { intervals: [0,4,7,10,14,17], name:'屬十一' },
+  '13': { intervals: [0,4,7,10,14,17,21], name:'屬十三' },
+  'add9': { intervals: [0,4,7,14], name:'加九' },
+  'madd9': { intervals: [0,3,7,14], name:'小調加九' },
+  '#11': { intervals: [0,4,7,10,14,18], name:'屬七升十一' },
+  'maj#11': { intervals: [0,4,7,11,14,18], name:'大七升十一' },
+  '7#5': { intervals: [0,4,8,10], name:'增屬七' },
+  '7b5': { intervals: [0,4,6,10], name:'減五屬七' },
+  '7#9': { intervals: [0,4,7,10,15], name:'屬七升九' },
+  '7b9': { intervals: [0,4,7,10,13], name:'屬七降九' }
+};
+
+/* VexFlow mapping 優先使用降記號 */
+const SEMITONE_TO_VEX = [
+  { name:'c', acc:'' }, { name:'d', acc:'b' }, { name:'d', acc:'' }, { name:'e', acc:'b' },
+  { name:'e', acc:'' }, { name:'f', acc:'' }, { name:'g', acc:'b' }, { name:'g', acc:'' },
+  { name:'a', acc:'b' }, { name:'a', acc:'' }, { name:'b', acc:'b' }, { name:'b', acc:'' }
+];
+
+/* 解析單一和弦（不變）*/
+function parseChordString(input) {
+  const s = input.trim();
+  const m = s.match(/^([A-Ga-g])([#b♯♭]?)([^\/]*)?(?:\/([A-Ga-g][#b♯♭]?))?$/);
+  if (!m) return null;
+  let root = m[1].toUpperCase() + (m[2] ? (m[2]==='♯' ? '#' : m[2]==='♭' ? 'b' : m[2]) : '');
+  let quality = (m[3] || '').trim();
+  let bass = m[4] ? (m[4][0].toUpperCase() + (m[4][1] ? (m[4][1]==='♯' ? '#' : m[4][1]==='♭' ? 'b' : m[4][1]) : '')) : null;
+  quality = quality.replace(/\s+/g,'').replace(/^maj$/i,'maj').replace(/^m(?=$|[^a-z0-9])/i,'m');
+  return { root, quality, bass };
+}
+
+/* 建立 intervals（不變，複用先前邏輯） */
+function buildIntervals(rootName, qualityStr) {
+  let q = qualityStr || '';
+  let baseKey = '';
+  const keys = Object.keys(CHORD_FORMULAS).sort((a,b)=>b.length-a.length);
+  for (const k of keys) { if (k && q.toLowerCase().startsWith(k.toLowerCase())) { baseKey = k; break; } }
+  if (baseKey === '') {
+    if (q.toLowerCase().startsWith('m')) baseKey = 'm';
+    else if (q.toLowerCase().startsWith('sus2')) baseKey = 'sus2';
+    else if (q.toLowerCase().startsWith('sus4')) baseKey = 'sus4';
+    else baseKey = '';
+  }
+  const baseIntervals = (CHORD_FORMULAS[baseKey] ? CHORD_FORMULAS[baseKey].intervals.slice() : CHORD_FORMULAS[''].intervals.slice());
+  let remaining = q.slice(baseKey.length).toLowerCase();
+
+  if (remaining.startsWith('sus2')) {
+    const without3 = baseIntervals.filter(i=>i!==3 && i!==4);
+    if (!without3.includes(2)) without3.push(2);
+    baseIntervals.length = 0; baseIntervals.push(...without3);
+    remaining = remaining.replace(/^sus2/,'');
+  } else if (remaining.startsWith('sus4')) {
+    const without3 = baseIntervals.filter(i=>i!==3 && i!==4);
+    if (!without3.includes(5)) without3.push(5);
+    baseIntervals.length = 0; baseIntervals.push(...without3);
+    remaining = remaining.replace(/^sus4/,'');
+  }
+
+  if (/\b13\b/.test(q) || remaining.startsWith('13')) {
+    [10,14,17,21].forEach(v=>{ if (!baseIntervals.includes(v)) baseIntervals.push(v); });
+    remaining = remaining.replace(/^13/,'');
+  } else if (/\b11\b/.test(q) || remaining.startsWith('11')) {
+    [10,14,17].forEach(v=>{ if (!baseIntervals.includes(v)) baseIntervals.push(v); });
+    remaining = remaining.replace(/^11/,'');
+  } else if (/\b9\b/.test(q) || remaining.startsWith('9')) {
+    [10,14].forEach(v=>{ if (!baseIntervals.includes(v)) baseIntervals.push(v); });
+    remaining = remaining.replace(/^9/,'');
+  }
+
+  const altMatches = remaining.match(/(#|b)(\d+)/g) || [];
+  altMatches.forEach(token=>{
+    const sign = token[0];
+    const num = parseInt(token.slice(1),10);
+    let target;
+    if (num===5) target = 7;
+    if (num===9) target = 14;
+    if (num===11) target = 17;
+    if (num===13) target = 21;
+    if (target !== undefined) {
+      for (let i=baseIntervals.length-1;i>=0;i--) if (baseIntervals[i]===target) baseIntervals.splice(i,1);
+      if (sign === 'b') baseIntervals.push(target-1); else baseIntervals.push(target+1);
+    }
+  });
+  remaining = remaining.replace(/(#|b)\d+/g,'');
+
+  const addMatches = remaining.match(/add(\d+)/g) || [];
+  addMatches.forEach(token=>{
+    const n = parseInt(token.slice(3),10);
+    if (n===9 && !baseIntervals.includes(14)) baseIntervals.push(14);
+    if (n===11 && !baseIntervals.includes(17)) baseIntervals.push(17);
+    if (n===13 && !baseIntervals.includes(21)) baseIntervals.push(21);
+  });
+  remaining = remaining.replace(/add\d+/g,'');
+
+  const omitMatches = remaining.match(/omit(\d+)/g) || [];
+  omitMatches.forEach(token=>{
+    const n = parseInt(token.slice(4),10);
+    let sem = null;
+    if (n===3) { sem = 3; if (baseIntervals.includes(4)) sem = 4; }
+    if (n===5) sem = 7;
+    if (sem !== null) {
+      for (let i=baseIntervals.length-1;i>=0;i--) if (baseIntervals[i]===sem) baseIntervals.splice(i,1);
+    }
+  });
+  remaining = remaining.replace(/omit\d+/g,'');
+
+  return Array.from(new Set(baseIntervals)).sort((a,b)=>a-b);
+}
+
+/* semitone -> VexFlow key */
+function semitoneToVexKey(rootSemitone, semitoneOffset, baseOctave=4) {
+  const abs = rootSemitone + semitoneOffset;
+  const sem = ((abs % 12) + 12) % 12;
+  const octaveShift = Math.floor((rootSemitone + semitoneOffset) / 12);
+  const octave = baseOctave + octaveShift;
+  const m = SEMITONE_TO_VEX[sem];
+  const vexKey = `${m.name}${m.acc === 'b' ? 'b' : ''}/${octave}`;
+  const noteLetter = m.name.toUpperCase() + (m.acc === 'b' ? 'b' : '');
+  return { vexKey, display: `${noteLetter}${octave}`, semitoneAbs: rootSemitone + semitoneOffset };
+}
+
+/* 計算單一和弦組成音 */
+function calculateChord(rootName, qualityStr) {
+  const rootSemitone = PITCHES[rootName] ?? 0;
+  const intervals = buildIntervals(rootName, qualityStr);
+  const baseOctave = 4;
+  const tones = intervals.map(i => semitoneToVexKey(rootSemitone, i, baseOctave));
+  tones.sort((a,b)=>a.semitoneAbs - b.semitoneAbs);
+  const intervalNames = intervals.map(i => {
+    for (const [k,v] of Object.entries(INTERVAL_SEMITONES)) if (v === i) return k;
+    return `${i}半音`;
+  });
+  return { tones, intervals, intervalNames, rootSemitone };
+}
+
+/* VexFlow: draw multiple chords in sequence (one chord per measure) */
+const { Renderer, Stave, Formatter, Voice, Accidental, StaveNote } = Vex.Flow;
+function drawStaffSequence(chordResults) {
+  const staffCanvas = document.getElementById('staffCanvas');
+  staffCanvas.innerHTML = '';
+  const count = Math.max(1, chordResults.length);
+  const container = document.getElementById('staffOutput');
+  // provide horizontal scroll if too many chords
+  container.style.overflowX = 'auto';
+
+  const baseWidth = Math.max(120, Math.min(280, Math.floor((container.clientWidth - 20) / Math.min(count, 4))));
+  const totalWidth = Math.max(container.clientWidth, baseWidth * count + 40);
+  staffCanvas.style.width = totalWidth + 'px';
+  const height = 140;
+  const renderer = new Renderer(staffCanvas, Renderer.Backends.SVG);
+  renderer.resize(totalWidth, height);
+  const context = renderer.getContext();
+
+  // draw one stave per chord, spaced horizontally
+  const measureWidth = Math.max(120, Math.floor((totalWidth - 20) / count));
+  chordResults.forEach((ch, idx) => {
+    const x = 10 + idx * measureWidth;
+    const stave = new Stave(x, 0, measureWidth - 10);
+    if (idx === 0) stave.addClef("treble");
+    stave.setContext(context).draw();
+
+    const tones = ch.tones.slice().sort((a,b)=>b.semitoneAbs - a.semitoneAbs);
+    const keys = tones.map(t => t.vexKey);
+    const keysWithoutAcc = keys.map(k => k.replace(/([a-gA-G])(b|#)?\/(\d+)/, (m,p1,p2,p3)=> p1.toLowerCase() + '/' + p3));
+    const note = new StaveNote({ keys: keysWithoutAcc, duration: "w" });
+    for (let i=0;i<keys.length;i++) {
+      const match = keys[i].match(/([a-gA-G])(b|#)?\/(\d+)/);
+      if (!match) continue;
+      const acc = match[2];
+      if (acc === 'b') note.addModifier(new Accidental("b"), i);
+      if (acc === '#') note.addModifier(new Accidental("#"), i);
+    }
+    const voice = new Voice({ num_beats: 4, beat_value: 4 }).addTickables([note]);
+    try {
+      new Formatter().joinVoices([voice]).format([voice], measureWidth - 20);
+      voice.draw(context, stave);
+    } catch (e) {
+      console.warn('VexFlow format failed for measure', idx, e);
+    }
+  });
+}
+
+/* Audio: 播放和弦序列（排程） */
+let audioContext = null;
+let isPlaying = false;
+function midiNumberFromSemitone(nameWithOctave) {
+  const m = nameWithOctave.match(/^([A-G])([b#]?)(\d+)$/i);
+  if (!m) return 60;
+  const letter = m[1].toUpperCase();
+  const acc = m[2] || '';
+  const oct = parseInt(m[3],10);
+  let sem = PITCHES[letter] ?? 0;
+  if (acc === '#') sem = (sem + 1) % 12;
+  if (acc === 'b') sem = (sem + 11) % 12;
+  return 12 * (oct + 1) + sem;
+}
+
+function playSequence(chordResults) {
+  if (isPlaying || !chordResults.length) return;
+  if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  audioContext.resume?.();
+
+  const baseDuration = 1.5;
+  const release = 0.5;
+  const playBtn = document.getElementById('playButton');
+  const originalText = playBtn.innerText;
+  playBtn.disabled = true;
+  isPlaying = true;
+
+  // progress display
+  let currentIndex = 0;
+  playBtn.innerText = `播放中：0 / ${chordResults.length}`;
+  const updateProgress = (i) => playBtn.innerText = `播放中：${i+1} / ${chordResults.length}`;
+
+  const scheduleChord = (ch, idx) => {
+    const now = audioContext.currentTime;
+    const start = now + idx * baseDuration;
+    const end = start + baseDuration + release;
+    ch.tones.forEach(td => {
+      const freq = 440 * Math.pow(2, (midiNumberFromSemitone(td.display) - 69)/12);
+      const osc = audioContext.createOscillator();
+      osc.type = 'triangle';
+      const gain = audioContext.createGain();
+      const attack = 0.01, decay = 0.2, sustain = 0.8;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(1.0, start + attack);
+      gain.gain.exponentialRampToValueAtTime(sustain, start + attack + decay);
+      gain.gain.setValueAtTime(sustain, start + baseDuration);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + baseDuration + release);
+
+      osc.frequency.setValueAtTime(freq, start);
+      osc.connect(gain);
+      gain.connect(audioContext.destination);
+      osc.start(start);
+      osc.stop(end + 0.05);
+    });
+
+    // schedule progress update
+    setTimeout(()=> {
+      updateProgress(idx);
+      currentIndex = idx;
+    }, Math.max(0, Math.round((start - audioContext.currentTime) * 1000)));
+  };
+
+  // schedule all chords
+  chordResults.forEach((ch, i) => scheduleChord(ch, i));
+
+  // finalize after last chord
+  const totalMs = Math.ceil((chordResults.length * baseDuration + release) * 1000 + 200);
+  setTimeout(()=> {
+    isPlaying = false;
+    playBtn.disabled = false;
+    playBtn.innerText = originalText;
+  }, totalMs);
+}
+
+/* 轉位判斷（不變） */
+function detectInversion(tones, bassName, rootName) {
+  if (!bassName) return '根位 (root position)';
+  const bassNormalized = bassName.replace(/♯/g,'#').replace(/♭/g,'b');
+  const found = tones.find(t => t.display.startsWith(bassNormalized));
+  if (!found) return '未知';
+  if (bassNormalized === rootName) return '根位 (root position)';
+  const rootSem = PITCHES[rootName];
+  const bassSem = PITCHES[bassNormalized] ?? null;
+  if (bassSem === null) return '未知';
+  const diff = ((bassSem - rootSem) + 12) % 12;
+  if (diff === 4 || diff === 3) return '第一轉位 (3rd in bass)';
+  if (diff === 7 || diff === 6 || diff === 8) return '第二轉位 (5th in bass)';
+  return '轉位';
+}
+
+/* 解析多和弦序列（分號分隔） */
+function parseChordSequence(input) {
+  return input.split(';').map(s => s.trim()).filter(Boolean);
+}
+
+/* 主流程：處理序列、顯示多張卡片、繪製序列、綁定播放 */
+function handleTranslate() {
+  const input = document.getElementById('chordInput').value.trim();
+  const summaryOutput = document.getElementById('summaryOutput');
+  const componentsOutput = document.getElementById('componentsOutput');
+  const intervalsOutput = document.getElementById('intervalsOutput');
+  const staffCanvas = document.getElementById('staffCanvas');
+
+  summaryOutput.innerHTML = '';
+  componentsOutput.innerHTML = '';
+  intervalsOutput.innerHTML = '';
+  staffCanvas.innerHTML = '';
+
+  if (!input) {
+    summaryOutput.innerHTML = `<span class="text-red-600 font-medium">請輸入和弦名稱（支援多和弦，用分號 ; 分隔）！</span>`;
+    return;
+  }
+
+  const chordNames = parseChordSequence(input);
+  if (!chordNames.length) {
+    summaryOutput.innerHTML = `<span class="text-red-600 font-medium">無有效和弦名稱</span>`;
+    return;
+  }
+
+  // build results for each chord
+  const results = chordNames.map(name => {
+    const parsed = parseChordString(name) || { root: 'C', quality: '', bass: null };
+    const calc = calculateChord(parsed.root, parsed.quality);
+    return {
+      input: name,
+      parsed,
+      calc
+    };
+  });
+
+  // render cards (expandable)
+  const cardsHtml = results.map((r, idx) => {
+    const tlist = r.calc.tones.map(t=>t.display).join(' · ');
+    const intervals = r.calc.intervals.map((iv,i)=>`<div class="flex items-center justify-between"><span class="font-mono bg-indigo-50 px-2 py-1 rounded">${r.calc.tones[i]?.display || ''}</span><span class="text-gray-600">${r.calc.intervalNames[i] || iv + '半音'}</span></div>`).join('');
+    const inversion = detectInversion(r.calc.tones, r.parsed.bass, r.parsed.root);
+    return `
+      <div class="border border-gray-200 rounded-lg mb-3 bg-white shadow-sm">
+        <button class="w-full text-left p-3 flex justify-between items-center chord-card-toggle" data-idx="${idx}">
+          <div>
+            <div class="font-medium text-indigo-800">${r.input}</div>
+            <div class="text-sm text-gray-500">根音：${r.parsed.root} · 品質：${r.parsed.quality || '大三'} · 轉位：${inversion}</div>
+          </div>
+          <div class="text-sm text-gray-400">展開</div>
+        </button>
+        <div class="chord-card-body p-3 hidden">
+          <div class="mb-2"><strong>組成音：</strong><div class="mt-1 font-mono text-red-600">${tlist}</div></div>
+          <div><strong>音程關係：</strong><div class="mt-2 grid gap-1">${intervals}</div></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  summaryOutput.innerHTML = `<div class="space-y-2">${cardsHtml}</div>`;
+
+  // attach toggle handlers
+  document.querySelectorAll('.chord-card-toggle').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const b = e.currentTarget;
+      const parent = b.parentElement;
+      const body = parent.querySelector('.chord-card-body');
+      const open = !body.classList.contains('hidden');
+      // collapse others
+      document.querySelectorAll('.chord-card-body').forEach(d=>d.classList.add('hidden'));
+      // toggle this
+      if (!open) body.classList.remove('hidden');
+    });
+  });
+
+  // draw full sequence in staff
+  const chordResults = results.map(r => ({ tones: r.calc.tones }));
+  drawStaffSequence(chordResults);
+
+  // bind play to sequence
+  const playBtn = document.getElementById('playButton');
+  playBtn.onclick = () => playSequence(chordResults);
+}
+
+/* 清除（包含內部快取）*/
+document.getElementById('clearButton').addEventListener('click', () => {
+  document.getElementById('chordInput').value = '';
+  document.getElementById('summaryOutput').innerHTML = '';
+  document.getElementById('componentsOutput').innerHTML = '';
+  document.getElementById('intervalsOutput').innerHTML = '';
+  document.getElementById('staffCanvas').innerHTML = '';
+  // reset VexFlow container scroll and audio state
+  document.getElementById('staffOutput').style.overflowX = '';
+  if (audioContext && audioContext.state !== 'closed') {
+    // do not close context (may be reused) but reset playing flag
+    isPlaying = false;
+    const playBtn = document.getElementById('playButton');
+    playBtn.disabled = false;
+    playBtn.innerText = '播放和弦';
+  }
+});
+
+/* 綁定按鈕與初始事件 */
+document.getElementById('translateButton').addEventListener('click', handleTranslate);
+window.addEventListener('load', () => setTimeout(handleTranslate, 100));
+window.addEventListener('resize', () => {
+  if (document.getElementById('summaryOutput').innerHTML.trim()) handleTranslate();
+});
+</script>
+
+</body>
+</html>
