@@ -1,0 +1,43 @@
+{
+  "name": "日期倒數機",
+  "short_name": "倒數機",
+  "description": "一個清爽簡單的日期倒數計時器。",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#007aff",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "assets/icons/icon-72.png",
+      "sizes": "72x72",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/icons/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/icons/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/icons/icon-144.png",
+      "sizes": "144x144",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
