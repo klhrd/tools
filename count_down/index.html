@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>日期倒數機</title>
+  
+  <link rel="manifest" href="manifest.json">
+  
+  <link rel="stylesheet" href="css/style.css">
+  
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="倒數機">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+  
+  <meta name="theme-color" content="#007aff">
+</head>
+<body>
+
+  <div id="app-container">
+    
+    <main id="main-content">
+      
+      <section id="page-home" class="page active">
+        <h1 class="page-title">首頁精選</h1>
+        <div id="home-list">
+          </div>
+      </section>
+
+      <section id="page-all" class="page">
+        <h1 class="page-title">全部活動</h1>
+        <button id="toggle-archived-btn" class="toggle-archived-btn">顯示已封存 (0)</button>
+        <div id="all-list">
+          </div>
+      </section>
+
+      <section id="page-settings" class="page">
+        <h1 class="page-title">設定</h1>
+        
+        <div class="settings-group">
+          <div class="settings-item">
+            <span class="settings-item-label">標籤管理</span>
+            <span class="settings-item-value">▶</span>
+          </div>
+          <div class="settings-item" id="btn-import-defaults">
+             <button>導入預設活動集</button>
+          </div>
+          <div class="settings-item">
+             <button>匯出所有資料 (JSON)</button>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-item">
+            <span class="settings-item-label">清理所有已封存</span>
+             <button class="danger" id="btn-clear-archived">立即清理</button>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-item">
+            <span class="settings-item-label">版本號</span>
+            <span class="settings-item-value">v1.0.0 (2025-10-29)</span>
+          </div>
+        </div>
+
+      </section>
+      
+    </main>
+
+    <button id="fab-add" class="fab" style="display: none;">+</button>
+
+    <nav class="nav-bar">
+      <button class="nav-tab active" data-page="page-home">
+        <span class="icon">🏠</span>
+        <span class="label">首頁</span>
+      </button>
+      <button class="nav-tab" data-page="page-all">
+        <span class="icon">📋</span>
+        <span class="label">全部</span>
+      </button>
+      <button class="nav-tab" data-page="page-settings">
+        <span class="icon">⚙️</span>
+        <span class="label">設定</span>
+      </button>
+    </nav>
+  </div>
+
+  <div id="modal-add-event" class="modal-form" style="display: none;">
+    <div class="form-content">
+      <h2 id="form-title">新增活動</h2>
+      <input type="hidden" id="event-id">
+      
+      <div class="form-group">
+        <label for="event-title">標題 (必填)</label>
+        <input type="text" id="event-title" placeholder="例如：會考倒數">
+      </div>
+      
+      <div class="form-group">
+        <label for="event-date">目標日期 (必填)</label>
+        <input type="date" id="event-date">
+      </div>
+      
+      <div class="form-group">
+        <label for="event-subtitle">副標題 (選填)</label>
+        <input type="text" id="event-subtitle" placeholder="例如：準備准考證">
+      </div>
+      
+      <div class="form-group">
+        <label for="event-labels">標籤 (選填，用逗號分隔)</label>
+        <input type="text" id="event-labels" placeholder="例如：考試, 重要">
+      </div>
+
+      <div class="form-group">
+        <label for="event-recurrence">重複週期 (選填)</label>
+        <select id="event-recurrence">
+          <option value="None">永不</option>
+          <option value="Yearly">每年</option>
+          <option value="Monthly">每月</option>
+          <option value="Weekly">每週</option>
+        </select>
+      </div>
+
+      <div class="form-group-inline">
+        <label for="event-pinned">定選至首頁</label>
+        <input type="checkbox" id="event-pinned" class="form-toggle">
+      </div>
+
+      <div class="form-buttons">
+        <button id="btn-cancel" class="form-btn btn-secondary">取消</button>
+        <button id="btn-save" class="form-btn btn-primary">儲存</button>
+      </div>
+      
+      <div class="form-buttons" style="margin-top: 0;">
+         <button id="btn-delete" class="form-btn danger" style="width: 100%; display: none;">刪除活動</button>
+      </div>
+    </div>
+  </div>
+
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+      // --- 1. 狀態與常數 ---
+      const STORAGE_KEY = 'countdownEvents_v1';
+      let events = []; // 主資料陣列
+      let showArchived = false; // "全部" 頁面是否顯示已封存
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // 標準化 "今天" 的開始
+
+      // --- 2. DOM 元素 ---
+      const pages = document.querySelectorAll('.page');
+      const navTabs = document.querySelectorAll('.nav-tab');
+      const fab = document.getElementById('fab-add');
+      
+      const homeList = document.getElementById('home-list');
+      const allList = document.getElementById('all-list');
+      const toggleArchivedBtn = document.getElementById('toggle-archived-btn');
+
+      // 表單 Modal
+      const modal = document.getElementById('modal-add-event');
+      const formTitle = document.getElementById('form-title');
+      const formEventId = document.getElementById('event-id');
+      const formTitleInput = document.getElementById('event-title');
+      const formDateInput = document.getElementById('event-date');
+      const formSubtitleInput = document.getElementById('event-subtitle');
+      const formLabelsInput = document.getElementById('event-labels');
+      const formRecurrenceInput = document.getElementById('event-recurrence');
+      const formPinnedInput = document.getElementById('event-pinned');
+      const btnCancel = document.getElementById('btn-cancel');
+      const btnSave = document.getElementById('btn-save');
+      const btnDelete = document.getElementById('btn-delete');
+      const btnClearArchived = document.getElementById('btn-clear-archived');
+      const btnImportDefaults = document.getElementById('btn-import-defaults');
+
+      
+      // --- 3. 核心邏輯 (日期計算與資料) ---
+
+      /** 載入資料 */
+      function loadData() {
+        const data = localStorage.getItem(STORAGE_KEY);
+        events = data ? JSON.parse(data) : [];
+      }
+
+      /** 儲存資料 */
+      function saveData() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+      }
+
+      /** 產生唯一 ID */
+      function generateID() {
+        return '_' + Math.random().toString(36).substr(2, 9);
+      }
+
+      /**
+       * 計算倒數天數
+       * @param {string} dateStr - 日期字串 (YYYY-MM-DD)
+       * @returns {object} { days: number, unit: string, status: 'pending'|'today'|'expired' }
+       */
+      function calculateCountdown(dateStr) {
+        // 確保日期被解析為本地時區的午夜
+        const targetDate = new Date(dateStr + 'T00:00:00');
+        
+        const diffTime = targetDate - today;
+        // 向上取整，確保 23:59 也是 1 天
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 0) {
+          return { days: '今', unit: '天', status: 'today' };
+        } else if (diffDays < 0) {
+          return { days: Math.abs(diffDays), unit: '天前', status: 'expired' };
+        } else {
+          return { days: diffDays, unit: '天', status: 'pending' };
+        }
+      }
+
+      /** 檢查並自動封存過期活動 (核心！) */
+      function checkAndArchiveEvents() {
+        let needsSave = false;
+        
+        events.forEach(event => {
+          if (event.status !== 'Active') return; // 只處理活動中
+
+          const countdown = calculateCountdown(event.date);
+
+          if (countdown.status === 'expired') {
+            // 檢查週期性
+            if (event.recurrence === 'None') {
+              // 1. 永久過期 -> 封存
+              event.status = 'Archived';
+              event.is_pinned = false; // 自動取消定選
+              console.log(`Archiving: ${event.title}`);
+              needsSave = true;
+            } else {
+              // 2. 週期性活動 -> 更新日期
+              let newDate = new Date(event.date + 'T00:00:00');
+              while (newDate <= today) { // 確保新日期在未來
+                if (event.recurrence === 'Yearly') {
+                  newDate.setFullYear(newDate.getFullYear() + 1);
+                } else if (event.recurrence === 'Monthly') {
+                  newDate.setMonth(newDate.getMonth() + 1);
+                } else if (event.recurrence === 'Weekly') {
+                  newDate.setDate(newDate.getDate() + 7);
+                }
+              }
+              event.date = newDate.toISOString().split('T')[0];
+              console.log(`Recycling: ${event.title} to ${event.date}`);
+              needsSave = true;
+            }
+          }
+        });
+
+        if (needsSave) {
+          saveData();
+        }
+      }
+
+      // --- 4. 渲染邏輯 (UI) ---
+
+      /** 渲染所有頁面 (主函數) */
+      function renderAllPages() {
+        renderHomePage();
+        renderAllPage();
+        renderSettingsPage(); // 更新封存計數
+      }
+
+      /** 產生單個卡片的 HTML */
+      function createEventCardHTML(event) {
+        const countdown = calculateCountdown(event.date);
+        
+        const labelsHTML = (event.labels || [])
+          .map(label => `<span class="card-label">${label}</span>`)
+          .join('');
+        
+        let countdownHTML;
+        if (event.status === 'Archived') {
+          countdownHTML = `<span class="countdown-expired">已封存</span>`;
+        } else if (countdown.status === 'today') {
+          countdownHTML = `<div class="countdown-days">${countdown.days}</div>
+                           <div class="countdown-unit">${countdown.unit}</div>`;
+        } else if (countdown.status === 'expired') {
+          // 理論上會被 'Archived' 捕捉到，但作為保險
+           countdownHTML = `<div class="countdown-days">${countdown.days}</div>
+                           <div class="countdown-unit">${countdown.unit}</div>`;
+        } else {
+           countdownHTML = `<div class="countdown-days">${countdown.days}</div>
+                           <div class="countdown-unit">${countdown.unit}</div>`;
+        }
+
+        return `
+          <div class="event-card ${event.status === 'Archived' ? 'archived' : ''}" data-id="${event.id}">
+            <div class="card-details">
+              ${labelsHTML ? `<div class="card-labels">${labelsHTML}</div>` : ''}
+              <div class="card-title">${event.title}</div>
+              ${event.subtitle ? `<div class="card-subtitle">${event.subtitle}</div>` : ''}
+              <div class="card-date">${event.date}</div>
+            </div>
+            <div class="card-countdown">
+              ${countdownHTML}
+            </div>
+          </div>
+        `;
+      }
+
+      /** 渲染首頁 */
+      function renderHomePage() {
+        const pinnedEvents = events
+          .filter(e => e.is_pinned && e.status === 'Active')
+          .sort((a, b) => new Date(a.date) - new Date(b.date)); // 日期近的在上面
+          
+        if (pinnedEvents.length === 0) {
+          homeList.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-state-icon">📌</div>
+              <p>尚無定選活動</p>
+              <p>請至「全部」頁面點擊活動卡片來定選</p>
+            </div>`;
+        } else {
+          homeList.innerHTML = pinnedEvents.map(createEventCardHTML).join('');
+        }
+      }
+
+      /** 渲染全部頁面 */
+      function renderAllPage() {
+        const targetStatus = showArchived ? 'Archived' : 'Active';
+        
+        const filteredEvents = events
+          .filter(e => e.status === targetStatus)
+          .sort((a, b) => {
+            // 活動中：日期近的在上面； 已封存：日期近的(剛過期)在上面
+             return new Date(a.date) - new Date(b.date);
+          });
+
+        if (filteredEvents.length === 0) {
+          allList.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-state-icon">${showArchived ? '🗄️' : '🎉'}</div>
+              <p>${showArchived ? '封存區是空的' : '目前沒有活動'}</p>
+              ${!showArchived ? '<p>點擊右下角 + 開始新增</p>' : ''}
+            </div>`;
+        } else {
+          allList.innerHTML = filteredEvents.map(createEventCardHTML).join('');
+        }
+        
+        // 更新按鈕文字
+        const archivedCount = events.filter(e => e.status === 'Archived').length;
+        toggleArchivedBtn.textContent = `${showArchived ? '隱藏' : '顯示'}已封存 (${archivedCount})`;
+      }
+
+      /** 渲染設定頁面 */
+      function renderSettingsPage() {
+        // (未來可擴展標籤管理等)
+        // 目前主要用於更新封存計數
+      }
+
+
+      // --- 5. 表單 Modal 邏輯 ---
+      
+      function showModal(event = null) {
+        if (event) {
+          // 編輯模式
+          formTitle.textContent = '編輯活動';
+          formEventId.value = event.id;
+          formTitleInput.value = event.title;
+          formDateInput.value = event.date;
+          formSubtitleInput.value = event.subtitle || '';
+          formLabelsInput.value = (event.labels || []).join(', ');
+          formRecurrenceInput.value = event.recurrence || 'None';
+          formPinnedInput.checked = event.is_pinned;
+          btnDelete.style.display = 'block';
+        } else {
+          // 新增模式
+          formTitle.textContent = '新增活動';
+          formEventId.value = '';
+          formTitleInput.value = '';
+          formDateInput.value = '';
+          formSubtitleInput.value = '';
+          formLabelsInput.value = '';
+          formRecurrenceInput.value = 'None';
+          formPinnedInput.checked = false;
+          btnDelete.style.display = 'none';
+        }
+        modal.style.display = 'flex';
+      }
+
+      function hideModal() {
+        modal.style.display = 'none';
+      }
+
+      function handleFormSubmit() {
+        const id = formEventId.value;
+        const title = formTitleInput.value.trim();
+        const date = formDateInput.value;
+
+        if (!title || !date) {
+          alert('請輸入標題和日期！');
+          return;
+        }
+
+        const eventData = {
+          id: id || generateID(),
+          title: title,
+          subtitle: formSubtitleInput.value.trim() || '',
+          date: date,
+          labels: formLabelsInput.value.split(',').map(s => s.trim()).filter(Boolean),
+          recurrence: formRecurrenceInput.value,
+          is_pinned: formPinnedInput.checked,
+          status: 'Active' // 新增或編輯時一律設為 Active
+        };
+
+        if (id) {
+          // 編輯
+          const index = events.findIndex(e => e.id === id);
+          if (index > -1) {
+            events[index] = eventData;
+          }
+        } else {
+          // 新增
+          events.push(eventData);
+        }
+
+        saveData();
+        renderAllPages();
+        hideModal();
+      }
+      
+      function handleDelete() {
+        const id = formEventId.value;
+        if (!id || !confirm('確定要永久刪除這個活動嗎？')) {
+          return;
+        }
+        
+        events = events.filter(e => e.id !== id);
+        saveData();
+        renderAllPages();
+        hideModal();
+      }
+
+
+      // --- 6. 事件監聽器 (Event Listeners) ---
+
+      /** 導覽列切換 */
+      navTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          // 移除所有 active
+          navTabs.forEach(t => t.classList.remove('active'));
+          pages.forEach(p => p.classList.remove('active'));
+          
+          // 新增 active
+          tab.classList.add('active');
+          const pageId = tab.dataset.page;
+          document.getElementById(pageId).classList.add('active');
+
+          // 控制 FAB 顯示
+          fab.style.display = (pageId === 'page-all') ? 'block' : 'none';
+        });
+      });
+
+      /** 懸浮按鈕 */
+      fab.addEventListener('click', () => showModal(null));
+
+      /** 表單按鈕 */
+      btnCancel.addEventListener('click', hideModal);
+      btnSave.addEventListener('click', handleFormSubmit);
+      btnDelete.addEventListener('click', handleDelete);
+
+      /** "全部" 頁面切換封存 */
+      toggleArchivedBtn.addEventListener('click', () => {
+        showArchived = !showArchived;
+        renderAllPage();
+      });
+
+      /** 卡片點擊 (事件委派) - 用於編輯 */
+      document.getElementById('main-content').addEventListener('click', (e) => {
+        const card = e.target.closest('.event-card');
+        if (!card) return;
+        
+        const id = card.dataset.id;
+        const event = events.find(e => e.id === id);
+        
+        if (event) {
+          showModal(event);
+        }
+      });
+      
+      /** 設定頁面按鈕 */
+      btnClearArchived.addEventListener('click', () => {
+        if (confirm('確定要永久刪除所有已封存的活動嗎？此操作無法復原。')) {
+          events = events.filter(e => e.status !== 'Archived');
+          saveData();
+          renderAllPages(); // 重新渲染所有頁面 (更新計數)
+        }
+      });
+      
+      btnImportDefaults.addEventListener('click', async () => {
+        // 簡易導入範例 (僅導入國定假日)
+        try {
+          // 假設您已將 JSON 放在指定路徑
+          const response = await fetch('assets/default_data/national_holidays.json');
+          if (!response.ok) throw new Error('無法載入預設資料');
+          
+          const defaultEvents = await response.json();
+          
+          defaultEvents.forEach(event => {
+            // 檢查是否已存在 (簡易檢查標題)
+            if (!events.some(e => e.title === event.title && e.date === event.date)) {
+              events.push({
+                ...event,
+                id: generateID(),
+                status: 'Active' // 確保狀態正確
+              });
+            }
+          });
+          
+          saveData();
+          checkAndArchiveEvents(); // 導入後立即檢查
+          renderAllPages();
+          alert(`成功導入 ${defaultEvents.length} 個預設活動！`);
+          
+        } catch (error) {
+          console.error('導入失敗:', error);
+          alert('導入預設活動失敗。');
+        }
+      });
+      
+      // --- 7. PWA Service Worker 註冊 ---
+      function registerServiceWorker() {
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js')
+              .then(registration => {
+                console.log('ServiceWorker 註冊成功, scope: ', registration.scope);
+              })
+              .catch(err => {
+                console.log('ServiceWorker 註冊失敗: ', err);
+              });
+          });
+        }
+      }
+      
+      // --- 8. 應用程式啟動 (Init) ---
+      function init() {
+        loadData();
+        checkAndArchiveEvents(); // 每次啟動時檢查過期
+        renderAllPages();
+        
+        // 預設顯示 "全部" 頁面的 FAB
+        fab.style.display = 'none'; // 預設隱藏，由導覽切換控制
+        document.querySelector('.nav-tab[data-page="page-home"]').click(); // 手動觸發點擊首頁
+        
+        registerServiceWorker();
+      }
+
+      // 啟動！
+      init();
+    });
+  </script>
+
+</body>
+</html>
