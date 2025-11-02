@@ -2,12 +2,12 @@
   "name": "日期倒數機",
   "short_name": "倒數機",
   "description": "一個清爽簡單的日期倒數計時器。",
-  "start_url": "/index.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#007aff",
   "orientation": "portrait-primary",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "icons": [
     {
       "src": "assets/icons/icon-72.png",
