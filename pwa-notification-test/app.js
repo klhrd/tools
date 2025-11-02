@@ -1,12 +1,11 @@
+// app.js
 const enableButton = document.getElementById('enable-notifications');
+const testButton = document.getElementById('test-local-notification'); // 獲取新按鈕
 const statusElement = document.getElementById('status');
 
-// 1. 檢查瀏覽器是否支援 Service Worker 和 Notifications
+// 1. 註冊 Service Worker (保持不變)
 if ('serviceWorker' in navigator && 'Notification' in window) {
-    // 註冊 Service Worker
-    // 嘗試使用相對路徑
-    navigator.serviceWorker.register('./sw.js') 
-    // 或者，如果您的 PWA 部署在子目錄下，但 Service Worker 放在根目錄，請確保 scope 正確。
+    navigator.serviceWorker.register('/sw.js')
         .then(registration => {
             console.log('Service Worker 註冊成功:', registration);
             statusElement.textContent = 'Service Worker 已註冊。';
@@ -16,7 +15,7 @@ if ('serviceWorker' in navigator && 'Notification' in window) {
             statusElement.textContent = 'Service Worker 註冊失敗。';
         });
 
-    // 點擊按鈕後請求通知權限
+    // 2. 啟用通知權限 (保持不變)
     enableButton.addEventListener('click', () => {
         Notification.requestPermission().then(permission => {
             if (permission === 'granted') {
@@ -27,6 +26,23 @@ if ('serviceWorker' in navigator && 'Notification' in window) {
                 console.log('通知權限: 拒絕或預設');
             }
         });
+    });
+    
+    // 3. 實作本地通知測試
+    testButton.addEventListener('click', () => {
+        if (Notification.permission === 'granted') {
+            const title = '即時通知測試';
+            const options = {
+                body: '這是一個由網頁頁面直接發送的通知。',
+                // 這裡可以選擇加上 icon
+            };
+            
+            // 使用瀏覽器的 Notification API 直接彈出通知
+            new Notification(title, options);
+            console.log('即時通知已發送。');
+        } else {
+            alert('請先點擊「啟用通知」按鈕並允許權限。');
+        }
     });
 
 } else {
