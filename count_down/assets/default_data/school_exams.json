@@ -1,0 +1,66 @@
+[
+  {
+    "title": "第一次模擬考",
+    "subtitle": "9/9, 9/10",
+    "date": "2025-09-09",
+    "labels": ["考試", "模擬考"],
+    "recurrence": "None",
+    "is_pinned": false
+  },
+  {
+    "title": "第一次段考",
+    "subtitle": "10/15, 10/16",
+    "date": "2025-10-15",
+    "labels": ["考試", "段考"],
+    "recurrence": "None",
+    "is_pinned": false
+  },
+  {
+    "title": "第二次段考",
+    "subtitle": "12/2, 12/3",
+    "date": "2025-12-02",
+    "labels": ["考試", "段考"],
+    "recurrence": "None",
+    "is_pinned": false
+  },
+  {
+    "title": "第二次模擬考",
+    "subtitle": "12/23, 12/24",
+    "date": "2025-12-23",
+    "labels": ["考試", "模擬考"],
+    "recurrence": "None",
+    "is_pinned": false
+  },
+  {
+    "title": "第三次段考",
+    "subtitle": "1/16, 1/19",
+    "date": "2026-01-16",
+    "labels": ["考試", "段考"],
+    "recurrence": "None",
+    "is_pinned": false
+  },
+  {
+    "title": "第三次模擬考",
+    "subtitle": "3/3, 3/4",
+    "date": "2026-03-03",
+    "labels": ["考試", "模擬考"],
+    "recurrence": "None",
+    "is_pinned": false
+  },
+  {
+    "title": "第四次模擬考",
+    "subtitle": "4/21, 4/22",
+    "date": "2026-04-21",
+    "labels": ["考試", "模擬考"],
+    "recurrence": "None",
+    "is_pinned": false
+  },
+  {
+    "title": "國中教育會考",
+    "subtitle": "5/18, 5/19",
+    "date": "2026-05-18",
+    "labels": ["考試"],
+    "recurrence": "None",
+    "is_pinned": false
+  }
+]
