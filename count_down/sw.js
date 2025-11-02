@@ -1,4 +1,4 @@
-const CACHE_NAME = 'countdown-pwa-v1.3.0'; // 更新版本
+const CACHE_NAME = 'countdown-pwa-v1.3.1'; // *** v1.3.1 修正 ***
 const urlsToCache = [
   // 核心檔案 (使用相對路徑)
   './',
@@ -24,7 +24,7 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log('Opened cache and caching core files (v1.3.0)');
+        console.log('Opened cache and caching core files (v1.3.1)');
         return cache.addAll(urlsToCache);
       })
       .then(() => self.skipWaiting()) // 強制新的 SW 立即啟動
@@ -40,7 +40,7 @@ self.addEventListener('fetch', event => {
         if (response) {
           return response;
         }
-        // f
+        // 否則，從網路請求
         return fetch(event.request);
       }
     )
