@@ -10,11 +10,10 @@
   --color-danger: #ff3b30;
   --color-label-bg: #eef5ff;
   --color-label-text: #007aff;
-  /* 新增：預設陰影顏色 */
   --default-shadow-color: rgba(0, 0, 0, 0.1); 
 }
 
-/* 支援深色模式 (可選) */
+/* 支援深色模式 */
 @media (prefers-color-scheme: dark) {
   :root {
     --color-primary: #0a84ff;
@@ -42,7 +41,6 @@ body {
   background-color: var(--color-bg);
   color: var(--color-text);
   line-height: 1.5;
-  /* 為底部導覽保留空間 */
   padding-bottom: 70px; 
 }
 
@@ -89,11 +87,11 @@ main {
 }
 
 .page {
-  display: none; /* 預設隱藏 */
+  display: none; 
 }
 
 .page.active {
-  display: block; /* 只顯示當前頁面 */
+  display: block; 
 }
 
 .page-title {
@@ -109,7 +107,7 @@ main {
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 12px;
-  box-shadow: 0 0 0 2px var(--shadow-color, transparent), 0 2px 8px rgba(0, 0, 0, 0.05); /* 新增: --shadow-color */
+  box-shadow: 0 0 0 2px var(--shadow-color, transparent), 0 2px 8px rgba(0, 0, 0, 0.05); 
   border: 1px solid var(--color-border);
   display: flex;
   justify-content: space-between;
@@ -129,6 +127,14 @@ main {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  align-items: center; /* v1.3.0: 對齊圖示 */
+}
+
+/* v1.3.0: 通知圖示 */
+.notification-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+  vertical-align: middle;
 }
 
 .card-label {
@@ -157,7 +163,6 @@ main {
   color: var(--color-text-secondary);
 }
 
-/* 卡片右側 - 倒數天數 */
 .card-countdown {
   display: flex;
   flex-direction: column;
@@ -188,7 +193,6 @@ main {
   color: var(--color-text-secondary);
 }
 
-/* 已封存卡片樣式 */
 .event-card.archived {
   opacity: 0.6;
   background-color: var(--color-bg);
@@ -204,19 +208,18 @@ main {
 .filter-bar {
   display: flex;
   gap: 8px;
-  overflow-x: scroll; /* 允許橫向滾動 */
+  overflow-x: scroll; 
   padding-bottom: 10px;
   margin-bottom: 16px;
-  /* 隱藏滾動條 */
-  -ms-overflow-style: none; /* IE and Edge */
-  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; 
+  scrollbar-width: none; 
 }
 .filter-bar::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, Opera*/
+  display: none; 
 }
 
 .filter-chip {
-  flex-shrink: 0; /* 確保 Chip 不被壓縮 */
+  flex-shrink: 0; 
   padding: 8px 12px;
   border-radius: 20px;
   background-color: var(--color-border);
@@ -224,6 +227,7 @@ main {
   font-size: 0.9rem;
   cursor: pointer;
   transition: background-color 0.2s;
+  user-select: none; /* v1.3.0: 避免選取文字 */
 }
 
 .filter-chip.selected {
@@ -292,7 +296,6 @@ main {
   gap: 16px;
 }
 
-/* 確保 modal 內容可滾動 (重要) */
 .modal-detail-content, 
 .modal-form-content {
   max-height: 90vh; 
@@ -324,7 +327,6 @@ main {
   font-size: 1rem;
   background-color: var(--color-bg);
   color: var(--color-text);
-  /* 鎖定欄位顏色提示 */
   transition: background-color 0.2s;
 }
 .form-group input:disabled,
@@ -343,7 +345,6 @@ main {
   flex-grow: 1;
 }
 
-/* 簡易的 toggle 開關 */
 .form-toggle {
   appearance: none;
   width: 50px;
@@ -427,15 +428,16 @@ main {
 
 .detail-actions {
   display: flex;
-  gap: 12px;
+  gap: 8px; /* 縮小間距以容納 4 個按鈕 */
   margin-top: 16px;
 }
 .detail-actions .form-btn {
     flex-grow: 1;
+    font-size: 0.85rem; /* 縮小字體 */
+    padding: 10px 5px; /* 減少 padding */
 }
 .detail-actions #btn-detail-edit {
-    flex-grow: 0;
-    padding: 12px 16px; /* 調整編輯按鈕寬度 */
+    flex-grow: 0.8; /* 編輯按鈕小一點 */
 }
 
 
@@ -463,7 +465,7 @@ main {
 .settings-item-label {
   font-size: 1rem;
   font-weight: 500;
-  flex-grow: 1; /* 讓標籤佔滿左側空間 */
+  flex-grow: 1;
 }
 
 .settings-item-value {
@@ -471,7 +473,6 @@ main {
   color: var(--color-text-secondary);
 }
 
-/* 設定頁面中的按鈕樣式 */
 .settings-item button {
   width: 100%;
   padding: 12px;
@@ -487,7 +488,17 @@ main {
   text-align: center;
 }
 
-/* 預設集顏色管理 (子頁面) (更新) */
+/* v1.3.0: 通知時間輸入 */
+.settings-input-time {
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 5px 8px;
+    font-size: 1rem;
+    background-color: var(--color-bg);
+    color: var(--color-text);
+}
+
+/* 預設集顏色管理 (子頁面) */
 .preset-item {
     padding: 12px 16px;
     display: flex;
@@ -499,12 +510,12 @@ main {
 .preset-name {
     font-weight: 600;
     flex-grow: 1;
-    margin-right: 16px; /* 與控制項保持距離 */
+    margin-right: 16px;
 }
 .preset-controls {
     display: flex;
     align-items: center;
-    gap: 16px; /* 控制項之間的距離 */
+    gap: 16px;
 }
 
 .preset-color-picker {
@@ -536,8 +547,46 @@ main {
     border-radius: 50%;
 }
 
+/* --- 10. v1.3.0 新表單元素 --- */
 
-/* --- 10. 空狀態與輔助 --- */
+/* 標籤勾選 (Feature 6) */
+.form-labels-container {
+    max-height: 150px;
+    overflow-y: auto;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 10px;
+    background-color: var(--color-bg);
+}
+.label-checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+}
+.label-checkbox-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+}
+.label-checkbox-item label {
+    font-weight: normal;
+}
+
+/* 進階週期 (Feature 4) */
+.form-recurrence-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.form-recurrence-container input[type="number"] {
+    width: 80px; /* 限制數字輸入框寬度 */
+    flex-grow: 0;
+}
+.form-recurrence-container select {
+    flex-grow: 1; /* 下拉選單佔滿剩餘空間 */
+}
+
+/* --- 11. 空狀態與輔助 --- */
 .empty-state {
   text-align: center;
   padding: 40px 20px;
