@@ -1,29 +1,40 @@
-// 監聽 'push' 事件，這是後端/模擬推播發送時觸發的事件
+// sw.js 內容
+
 self.addEventListener('push', function(event) {
-    console.log('[Service Worker] 收到推播通知！');
-    
-    // 嘗試解析推播數據，如果沒有數據則使用預設
-    const data = event.data ? event.data.json() : { title: '預設通知標題', body: '這是一個模擬推播訊息。' };
+    console.log('[Service Worker] 收到推播通知！開始嘗試顯示通知。');
 
-    const title = data.title;
+    // 嘗試解析資料。如果解析失敗或資料不存在，使用預設值
+    let data;
+    try {
+        data = event.data ? event.data.json() : {};
+    } catch (e) {
+        // 如果 event.data 存在但不是 JSON 格式，會在這裡被捕獲
+        console.error('解析推播資料失敗:', e);
+        data = {}; 
+    }
+
+    const title = data.title || 'PWA 測試通知';
     const options = {
-        body: data.body,
-        icon: '/icon-192.png', // 理想情況下，應該提供一個應用程式圖示
-        badge: '/badge-72.png' // 可選，用於行動裝置的徽章
+        body: data.body || '這是一個從 Service Worker 發送的訊息。',
+        // 建議您暫時移除 icon 和 badge 選項，直到您確認它們的路徑在 GitHub Pages 上是可訪問的（以排除路徑問題）。
+        // icon: '/icon-192.png', 
+        // badge: '/badge-72.png'
     };
+    
+    // 必須使用 event.waitUntil 來保證通知顯示
+    const notificationPromise = self.registration.showNotification(title, options)
+        .catch(error => {
+            // 捕獲 showNotification 執行時可能發生的錯誤
+            console.error('showNotification 執行失敗:', error);
+        });
 
-    // 使用 event.waitUntil 確保通知在 Service Worker 終止前顯示
-    event.waitUntil(
-        self.registration.showNotification(title, options)
-    );
+    event.waitUntil(notificationPromise);
 });
 
-// 可選：處理通知點擊事件
+// 處理通知點擊事件 (可選)
 self.addEventListener('notificationclick', function(event) {
-    console.log('[Service Worker] 通知被點擊', event.notification);
-    event.notification.close(); // 關閉通知
-    
-    // 點擊後打開一個新視窗
+    console.log('[Service Worker] 通知被點擊');
+    event.notification.close();
     event.waitUntil(
         clients.openWindow('/')
     );
