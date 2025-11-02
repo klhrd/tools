@@ -8,6 +8,7 @@
 - [XAXB 解答機](https://klhrd.github.io/tools/XAXB/)
 - [Rule 細胞自動機生成器](https://klhrd.github.io/tools/rule30/)
 - [和弦翻譯機](https://klhrd.github.io/tools/chordtrans/chord_v2.1.2.html)
+- [日期倒數機](https://klhrd.github.io/tools/count_down)
 
 ## 來自其他我做的
 - [跑馬燈](https://klhrd.github.io/marquee/)
