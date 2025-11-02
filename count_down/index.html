@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="css/style.css">
   
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="倒數機">
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
@@ -44,11 +45,8 @@
             <span class="settings-item-value">▶</span>
           </div>
           <div class="settings-item" id="btn-manage-presets">
-            <span class="settings-item-label">管理載入的預設集</span>
+            <span class="settings-item-label">管理預設活動集</span>
             <span class="settings-item-value">▶</span>
-          </div>
-          <div class="settings-item" id="btn-import-defaults">
-             <button>導入新的預設活動集</button>
           </div>
         </div>
 
@@ -65,7 +63,7 @@
         <div class="settings-group">
           <div class="settings-item">
             <span class="settings-item-label">版本號</span>
-            <span class="settings-item-value">v1.1.0 (2025-11-02)</span>
+            <span class="settings-item-value">v1.2.0 (2025-11-02)</span>
           </div>
         </div>
 
@@ -82,27 +80,16 @@
             <button id="btn-add-label" class="form-btn btn-primary">新增</button>
         </div>
         <div class="form-buttons" style="margin-top: 16px;">
-            <button id="btn-back-settings" class="form-btn btn-secondary">返回設定</button>
-        </div>
-      </section>
-      
-      <section id="page-import-defaults" class="page">
-        <h1 class="page-title">導入預設集</h1>
-        <p style="margin-bottom: 16px; color: var(--color-text-secondary);">選擇要加入到您的活動清單中的預設活動集：</p>
-        <div id="preset-import-list" class="settings-group">
-            </div>
-        <div class="form-buttons">
-            <button id="btn-confirm-import" class="form-btn btn-primary">確認導入</button>
-        </div>
-        <div class="form-buttons" style="margin-top: 16px;">
             <button data-back-target="page-settings" class="form-btn btn-secondary btn-back">返回設定</button>
         </div>
       </section>
 
       <section id="page-manage-presets" class="page">
-        <h1 class="page-title">預設集顏色管理</h1>
-        <p style="margin-bottom: 16px; color: var(--color-text-secondary);">設定已載入的預設集陰影顏色。活動將套用其所屬預設集的顏色。</p>
-        <div id="preset-color-list" class="settings-group">
+        <h1 class="page-title">預設集管理</h1>
+        <p style="margin-bottom: 16px; color: var(--color-text-secondary);">
+          開啟開關可將預設活動載入到您的「全部」頁面，並可隨時關閉隱藏。
+        </p>
+        <div id="preset-management-list" class="settings-group">
             </div>
         <div class="form-buttons">
             <button data-back-target="page-settings" class="form-btn btn-secondary btn-back">返回設定</button>
@@ -202,22 +189,25 @@
     document.addEventListener('DOMContentLoaded', () => {
 
       // --- 1. 狀態與常數 ---
-      const STORAGE_KEY = 'countdownEvents_v1.1';
-      const CONFIG_KEY = 'countdownConfig_v1.1';
+      const STORAGE_KEY = 'countdownEvents_v1.2';
+      const CONFIG_KEY = 'countdownConfig_v1.2';
       const DEFAULT_COLOR = '#007aff';
       
       let events = []; // 主資料陣列
       let config = {
-          presets: {}, // 預設集配置：{ id: { name: '...', color: '...' } }
+          // 預設集配置：{ id: { name: '...', color: '...', isVisible: true/false } }
+          presets: {}, 
           labels: ['考試', '工作', '生日', '旅行'], // 自定義標籤
       }; 
-      let currentFilter = { home: '全部', all: '全部' }; // 當前篩選的標籤
-      let showArchived = false; // "全部" 頁面是否顯示已封存
       
-      // 模擬預設集資料 (實際應該放在 assets/default_data/)
+      // 篩選器改為陣列 (支援多選)
+      let currentFilter = { home: ['全部'], all: ['全部'] }; 
+      let showArchived = false;
+      
+      // 可用的預設集清單 (路徑必須相對於 index.html)
       const availablePresets = [
-        { id: 'holidays', name: '國定節日與紀念日', path: 'tools/count_down/assets/default_data/national_holidays.json' },
-        { id: 'exams', name: '學科考試', path: 'tools/count_down/assets/default_data/school_exams.json' },
+        { id: 'holidays', name: '國定節日與紀念日', path: './assets/default_data/national_holidays.json' },
+        { id: 'exams', name: '學科考試', path: './assets/default_data/school_exams.json' },
       ];
 
 
@@ -258,19 +248,15 @@
       // 設定頁面
       const btnManageLabels = document.getElementById('btn-manage-labels');
       const btnManagePresets = document.getElementById('btn-manage-presets');
-      const btnImportDefaults = document.getElementById('btn-import-defaults');
       const btnClearArchived = document.getElementById('btn-clear-archived');
 
       // 標籤管理子頁面
       const labelsList = document.getElementById('labels-list');
       const newLabelInput = document.getElementById('new-label-input');
       const btnAddLabel = document.getElementById('btn-add-label');
-      const btnBackSettings = document.getElementById('btn-back-settings');
       
-      // 預設集導入子頁面
-      const presetImportList = document.getElementById('preset-import-list');
-      const btnConfirmImport = document.getElementById('btn-confirm-import');
-      const presetColorList = document.getElementById('preset-color-list');
+      // 預設集管理子頁面
+      const presetManagementList = document.getElementById('preset-management-list');
       
       // --- 3. 核心邏輯 (日期計算與資料) ---
 
@@ -281,7 +267,11 @@
         events = eventData ? JSON.parse(eventData) : [];
         
         if (configData) {
-            Object.assign(config, JSON.parse(configData));
+            // 合併儲存的 config，確保新加入的預設 config 結構也存在
+            const savedConfig = JSON.parse(configData);
+            config = { ...config, ...savedConfig };
+            // 確保 presets 結構完整
+            if (!config.presets) config.presets = {}; 
         }
       }
 
@@ -354,7 +344,7 @@
 
       // --- 4. 渲染邏輯 (UI) ---
 
-      /** 取得事件的顏色 (手動設定 > 預設集設定 > 預設顏色) */
+      /** 取得事件的顏色 */
       function getEventColor(event) {
           if (event.color) return event.color;
           if (event.presetId && config.presets[event.presetId] && config.presets[event.presetId].color) {
@@ -376,7 +366,7 @@
         if (event.status === 'Archived') {
           countdownHTML = `<span class="countdown-expired">已封存</span>`;
         } else if (countdown.status === 'expired') {
-            countdownHTML = `<div class="countdown-days">${countdown.days}</div><div class="countdown-unit">${countdown.unit}天前</div>`;
+            countdownHTML = `<div class="countdown-days">${countdown.days}</div><div class="countdown-unit">${countdown.unit}</div>`;
         } else {
            countdownHTML = `<div class="countdown-days">${countdown.days}</div><div class="countdown-unit">${countdown.unit}</div>`;
         }
@@ -400,14 +390,14 @@
         `;
       }
       
-      /** 渲染篩選器 */
+      /** 渲染篩選器 (支援多選) */
       function renderFilterBar(page, container) {
           const isHome = page === 'home';
-          const current = currentFilter[page];
+          const current = currentFilter[page]; // 現在是陣列
           
           // 取得所有可用標籤 (僅限當前頁面列表中的活動標籤)
           const allLabels = events
-            .filter(e => isHome ? e.is_pinned && e.status === 'Active' : true)
+            .filter(e => isHome ? e.is_pinned && e.status === 'Active' : e.status === 'Active') // 篩選器只看 Active 的
             .reduce((acc, e) => {
                 (e.labels || []).forEach(label => acc.add(label));
                 return acc;
@@ -417,7 +407,7 @@
           
           container.innerHTML = availableLabels.map(label => `
               <div 
-                  class="filter-chip ${current === label ? 'selected' : ''}" 
+                  class="filter-chip ${current.includes(label) ? 'selected' : ''}" 
                   data-label="${label}"
                   data-page="${page}"
               >
@@ -426,18 +416,46 @@
           `).join('');
       }
 
+      /** 取得過濾後的活動 */
+      function getFilteredEvents(page) {
+        const isHome = page === 'home';
+        const filterLabels = currentFilter[page];
+        const statusToShow = (page === 'all' && showArchived) ? 'Archived' : 'Active';
+
+        let filtered = events
+          // 1. 基礎過濾 (定選/狀態)
+          .filter(e => {
+            if (isHome) {
+              return e.is_pinned && e.status === 'Active';
+            }
+            return e.status === statusToShow;
+          })
+          // 2. 預設集可見性過濾
+          .filter(e => {
+            if (e.presetId && config.presets[e.presetId]) {
+              return config.presets[e.presetId].isVisible;
+            }
+            return true; // 非預設集活動永遠可見
+          });
+
+        // 3. 標籤過濾 (多選)
+        if (!filterLabels.includes('全部')) {
+          filtered = filtered.filter(e => {
+            if (!e.labels || e.labels.length === 0) return false;
+            // 檢查 e.labels 中是否至少有一個標籤存在於 filterLabels 中
+            return e.labels.some(label => filterLabels.includes(label));
+          });
+        }
+        
+        // 4. 排序
+        return filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
+      }
+
 
       /** 渲染首頁 */
       function renderHomePage() {
         renderFilterBar('home', homeFilter);
-
-        let filteredEvents = events
-          .filter(e => e.is_pinned && e.status === 'Active')
-          .sort((a, b) => new Date(a.date) - new Date(b.date)); 
-
-        if (currentFilter.home !== '全部') {
-            filteredEvents = filteredEvents.filter(e => e.labels && e.labels.includes(currentFilter.home));
-        }
+        const filteredEvents = getFilteredEvents('home');
 
         if (filteredEvents.length === 0) {
           homeList.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📌</div><p>尚無定選活動或篩選結果為空</p><p>請至「全部」頁面新增或定選活動</p></div>`;
@@ -449,16 +467,7 @@
       /** 渲染全部頁面 */
       function renderAllPage() {
         renderFilterBar('all', allFilter);
-        
-        const targetStatus = showArchived ? 'Archived' : 'Active';
-        
-        let filteredEvents = events
-          .filter(e => showArchived ? e.status === 'Archived' : e.status === 'Active') // 修正邏輯：只顯示 Active 或只顯示 Archived
-          .sort((a, b) => new Date(a.date) - new Date(b.date));
-          
-        if (currentFilter.all !== '全部') {
-            filteredEvents = filteredEvents.filter(e => e.labels && e.labels.includes(currentFilter.all));
-        }
+        const filteredEvents = getFilteredEvents('all');
 
         if (filteredEvents.length === 0) {
           allList.innerHTML = `<div class="empty-state"><div class="empty-state-icon">${showArchived ? '🗄️' : '🎉'}</div><p>${showArchived ? '封存區是空的' : '目前沒有活動或篩選結果為空'}</p>${!showArchived ? '<p>點擊右下角 + 開始新增</p>' : ''}</div>`;
@@ -472,7 +481,7 @@
       
       /** 渲染標籤管理頁面 */
       function renderLabelManagement() {
-          labelsList.innerHTML = config.labels.map(label => `
+          labelsList.innerHTML = (config.labels || []).map(label => `
               <div class="settings-item">
                   <span class="settings-item-label">${label}</span>
                   <button data-label="${label}" class="danger" style="width: auto;">刪除</button>
@@ -486,32 +495,32 @@
                       config.labels = config.labels.filter(l => l !== labelToDelete);
                       saveData();
                       renderLabelManagement();
-                      renderAllPages(); // 標籤變動可能影響篩選器
+                      renderAllPages(); 
                   }
               });
           });
       }
       
-      /** 渲染預設集顏色管理頁面 */
-      function renderPresetColorManagement() {
-          const loadedPresetKeys = Object.keys(config.presets);
-          if (loadedPresetKeys.length === 0) {
-              presetColorList.innerHTML = `<div class="empty-state"><p>尚未導入任何預設集</p></div>`;
-              return;
-          }
-          
-          presetColorList.innerHTML = loadedPresetKeys.map(key => {
-              const preset = config.presets[key];
-              const color = preset.color || DEFAULT_COLOR;
+      /** 渲染預設集管理頁面 (新) */
+      function renderPresetManagementPage() {
+          presetManagementList.innerHTML = availablePresets.map(preset => {
+              const presetConfig = config.presets[preset.id] || {};
+              const isVisible = presetConfig.isVisible || false; // 預設為未載入 (不可見)
+              const color = presetConfig.color || DEFAULT_COLOR;
+
               return `
-                  <div class="preset-item" data-id="${key}">
+                  <div class="preset-item" data-id="${preset.id}">
                       <span class="preset-name">${preset.name}</span>
-                      <input type="color" value="${color}" class="preset-color-picker" data-id="${key}">
+                      <div class="preset-controls">
+                          <input type="color" value="${color}" class="preset-color-picker" data-id="${preset.id}" ${!isVisible ? 'disabled' : ''}>
+                          <input type="checkbox" ${isVisible ? 'checked' : ''} class="form-toggle preset-toggle" data-id="${preset.id}">
+                      </div>
                   </div>
               `;
           }).join('');
           
-          presetColorList.querySelectorAll('.preset-color-picker').forEach(input => {
+          // 綁定事件
+          presetManagementList.querySelectorAll('.preset-color-picker').forEach(input => {
               input.addEventListener('change', (e) => {
                   const presetId = e.target.dataset.id;
                   config.presets[presetId].color = e.target.value;
@@ -519,14 +528,22 @@
                   renderAllPages(); // 顏色改變，需要重繪卡片
               });
           });
-      }
 
+          presetManagementList.querySelectorAll('.preset-toggle').forEach(toggle => {
+              toggle.addEventListener('click', (e) => {
+                  const presetId = e.target.dataset.id;
+                  const isVisible = e.target.checked;
+                  handlePresetToggle(presetId, isVisible);
+                  // 切換時，啟用/禁用顏色選擇器
+                  e.target.closest('.preset-item').querySelector('.preset-color-picker').disabled = !isVisible;
+              });
+          });
+      }
 
       /** 渲染所有頁面 (主函數) */
       function renderAllPages() {
         renderHomePage();
         renderAllPage();
-        // 設定頁面的子頁面，僅在切換到時渲染
       }
 
 
@@ -601,7 +618,7 @@
           formTitleInput.value = '';
           formDateInput.value = '';
           formSubtitleInput.value = '';
-          formLabelsInput.value = config.labels.join(', '); // 預設帶入所有標籤供參考
+          formLabelsInput.value = ''; // 新增時預設為空
           formRecurrenceInput.value = 'None';
           formPinnedInput.checked = false;
           formColorInput.value = DEFAULT_COLOR;
@@ -641,17 +658,19 @@
           alert('請輸入標題和日期！');
           return;
         }
+        
+        const labels = formLabelsInput.value.split(',').map(s => s.trim()).filter(Boolean);
 
         const eventData = {
           id: id || generateID(),
           title: title,
           subtitle: formSubtitleInput.value.trim() || '',
           date: date,
-          labels: formLabelsInput.value.split(',').map(s => s.trim()).filter(Boolean),
+          labels: labels,
           recurrence: formRecurrenceInput.value,
           is_pinned: formPinnedInput.checked,
-          color: formColorInput.value !== DEFAULT_COLOR ? formColorInput.value : undefined, // 只有非預設顏色才儲存
-          presetId: formPresetId.value || undefined, // 保持預設集 ID
+          color: formColorInput.value !== DEFAULT_COLOR ? formColorInput.value : undefined,
+          presetId: formPresetId.value || undefined, 
           status: 'Active' 
         };
         
@@ -659,14 +678,12 @@
         if (eventData.presetId) {
             const originalEvent = events.find(e => e.id === id);
             if(originalEvent) {
-                // 標題、日期、週期、顏色使用原始值，因為表單是 disabled 的
                 eventData.title = originalEvent.title;
                 eventData.date = originalEvent.date;
                 eventData.recurrence = originalEvent.recurrence;
                 eventData.color = originalEvent.color; 
-                // 只允許修改 subtitle, labels, is_pinned
                 eventData.subtitle = formSubtitleInput.value.trim() || ''; 
-                eventData.labels = formLabelsInput.value.split(',').map(s => s.trim()).filter(Boolean);
+                eventData.labels = labels;
                 eventData.is_pinned = formPinnedInput.checked;
             }
         }
@@ -685,69 +702,96 @@
         hideFormModal();
       }
       
-      /** 處理預設集導入 */
-      async function handleImportPresets() {
-          const selectedPresets = Array.from(presetImportList.querySelectorAll('input[type="checkbox"]:checked'))
-                                      .map(cb => availablePresets.find(p => p.id === cb.dataset.id));
+      /** 處理預設集顯示/隱藏切換 (新) */
+      async function handlePresetToggle(presetId, isVisible) {
+          const preset = availablePresets.find(p => p.id === presetId);
+          if (!preset) return;
 
-          if (selectedPresets.length === 0) {
-              alert('請至少選擇一個預設集。');
-              return;
+          // 1. 更新 Config 狀態
+          if (!config.presets[presetId]) {
+              config.presets[presetId] = { name: preset.name, color: DEFAULT_COLOR, isVisible: false };
           }
+          config.presets[presetId].isVisible = isVisible;
           
-          let importedCount = 0;
+          let needsDataFetch = false;
+          
+          // 2. 檢查是否需要載入資料
+          // 如果切換為 "開啟" 且資料尚未載入 (以 presetId 檢查 events)
+          if (isVisible && !events.some(e => e.presetId === presetId)) {
+              needsDataFetch = true;
+          }
 
-          for (const preset of selectedPresets) {
+          if (needsDataFetch) {
+              console.log(`Fetching preset: ${preset.name}`);
               try {
-                  // 這裡應該使用相對路徑，確保檔案可以被 Service Worker 抓取
-                  const path = preset.path.startsWith('/') ? preset.path : '/' + preset.path;
-                  const response = await fetch(path); 
-                  if (!response.ok) throw new Error(`無法載入 ${preset.name} (路徑: ${path})`);
+                  const response = await fetch(preset.path); // 使用相對路徑
+                  if (!response.ok) throw new Error(`無法載入 ${preset.name}`);
                   
                   const defaultEvents = await response.json();
                   
                   defaultEvents.forEach(event => {
-                      // 檢查是否已存在 (以防重複導入)
-                      if (!events.some(e => e.title === event.title && e.date === event.date && e.presetId === preset.id)) {
+                      if (!events.some(e => e.title === event.title && e.presetId === preset.id)) {
                           events.push({
                               ...event,
                               id: generateID(),
                               status: 'Active',
-                              presetId: preset.id, // 標記來源預設集
-                              color: undefined, // 由預設集配置管理
+                              presetId: preset.id,
                           });
-                          importedCount++;
                       }
                   });
-                  
-                  // 儲存到配置中，標記為已載入
-                  if (!config.presets[preset.id]) {
-                       config.presets[preset.id] = { name: preset.name, color: DEFAULT_COLOR };
-                  }
+                  checkAndArchiveEvents(); // 導入後立即檢查
                   
               } catch (error) {
                   console.error('導入失敗:', error);
-                  alert(`導入預設集 ${preset.name} 失敗。請檢查檔案路徑。`);
-                  return; // 導入失敗則退出
+                  alert(`導入預設集 ${preset.name} 失敗。`);
+                  // 導入失敗，恢復切換
+                  config.presets[presetId].isVisible = false;
+                  e.target.checked = false; 
               }
           }
-          
+
+          // 3. 儲存並重繪
           saveData();
-          checkAndArchiveEvents();
           renderAllPages();
-          alert(`成功導入 ${importedCount} 個活動！`);
-          // 導入完成後切回設定頁
-          document.querySelector('.nav-tab[data-page="page-settings"]').click();
       }
 
       // --- 6. 事件監聽器 ---
 
-      /** 篩選器事件委派 */
+      /** 篩選器事件委派 (多選) */
       document.getElementById('main-content').addEventListener('click', (e) => {
           if (e.target.classList.contains('filter-chip')) {
               const page = e.target.dataset.page;
               const label = e.target.dataset.label;
-              currentFilter[page] = label;
+              
+              let current = currentFilter[page]; // [ '全部' ]
+
+              if (label === '全部') {
+                  current = ['全部'];
+              } else {
+                  // 如果 "全部" 在裡面，先移除
+                  const allIndex = current.indexOf('全部');
+                  if (allIndex > -1) {
+                      current.splice(allIndex, 1);
+                  }
+                  
+                  // 檢查標籤是否已存在
+                  const labelIndex = current.indexOf(label);
+                  if (labelIndex > -1) {
+                      // 存在 -> 移除
+                      current.splice(labelIndex, 1);
+                  } else {
+                      // 不存在 -> 加入
+                      current.push(label);
+                  }
+                  
+                  // 如果陣列空了，改回 "全部"
+                  if (current.length === 0) {
+                      current = ['全部'];
+                  }
+              }
+              
+              currentFilter[page] = current;
+              
               if (page === 'home') renderHomePage();
               if (page === 'all') renderAllPage();
           }
@@ -763,12 +807,10 @@
 
       /** 模態視窗操作 */
       btnDetailClose.addEventListener('click', hideDetailModal);
-      
       btnDetailEdit.addEventListener('click', () => {
           const event = events.find(e => e.id === currentEventId);
           if (event) showFormModal(event);
       });
-      
       btnDetailTogglePin.addEventListener('click', () => {
           const event = events.find(e => e.id === currentEventId);
           if (event) {
@@ -781,13 +823,12 @@
       
       btnFormCancel.addEventListener('click', hideFormModal);
       btnFormSave.addEventListener('click', handleFormSubmit);
-      btnFormDelete.addEventListener('click', handleDelete); // 修正：現在 handleDelete 已定義
+      btnFormDelete.addEventListener('click', handleDelete);
       fab.addEventListener('click', () => showFormModal(null));
       
       /** 頁面切換 */
       navTabs.forEach(tab => {
         tab.addEventListener('click', () => {
-          // ... (保留導覽列切換邏輯) ...
           navTabs.forEach(t => t.classList.remove('active'));
           pages.forEach(p => p.classList.remove('active'));
           
@@ -799,10 +840,8 @@
           
           // 進入設定子頁面的渲染
           if (pageId === 'page-manage-labels') renderLabelManagement();
-          if (pageId === 'page-manage-presets') renderPresetColorManagement();
-          if (pageId === 'page-import-defaults') renderImportPresetsPage();
-          if (pageId === 'page-settings') renderAllPages(); // 確保回到主設定頁面時更新數據
-
+          if (pageId === 'page-manage-presets') renderPresetManagementPage();
+          if (pageId === 'page-settings') renderAllPages(); 
         });
       });
       
@@ -828,12 +867,11 @@
               renderAllPages();
           }
       });
-      btnBackSettings.addEventListener('click', () => navigateToPage('page-settings'));
       
-      // 預設集管理事件
+      // 預設集管理事件 (新)
       btnManagePresets.addEventListener('click', () => navigateToPage('page-manage-presets'));
-      btnImportDefaults.addEventListener('click', () => navigateToPage('page-import-defaults'));
-      btnConfirmImport.addEventListener('click', handleImportPresets);
+      
+      // 返回按鈕
       document.querySelectorAll('.btn-back').forEach(btn => {
           btn.addEventListener('click', (e) => navigateToPage(e.target.dataset.backTarget));
       });
@@ -846,30 +884,18 @@
           fab.style.display = 'none';
           
           if (pageId === 'page-manage-labels') renderLabelManagement();
-          if (pageId === 'page-manage-presets') renderPresetColorManagement();
-          if (pageId === 'page-import-defaults') renderImportPresetsPage();
+          if (pageId === 'page-manage-presets') renderPresetManagementPage();
       }
 
-      function renderImportPresetsPage() {
-          presetImportList.innerHTML = availablePresets.map(preset => {
-              const isLoaded = !!config.presets[preset.id];
-              return `
-                  <div class="settings-item">
-                      <span class="settings-item-label">${preset.name} ${isLoaded ? '(已載入)' : ''}</span>
-                      <input type="checkbox" data-id="${preset.id}" ${isLoaded ? 'disabled' : ''} class="form-toggle">
-                  </div>
-              `;
-          }).join('');
-      }
-
-
-      // --- 7. PWA Service Worker 註冊 (保留) ---
+      // --- 7. PWA Service Worker 註冊 (修正) ---
       function registerServiceWorker() {
         if ('serviceWorker' in navigator) {
           window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/tools/count_down/sw.js')
+            // *** 關鍵修正: 改為使用相對路徑 "./sw.js" ***
+            // 解決了 /sw.js 的 404 錯誤
+            navigator.serviceWorker.register('./sw.js') 
               .then(registration => {
-                console.log('ServiceWorker 註冊成功');
+                console.log('ServiceWorker 註冊成功, scope: ', registration.scope);
               })
               .catch(err => {
                 console.log('ServiceWorker 註冊失敗: ', err);
@@ -893,7 +919,7 @@
       // 啟動！
       init();
     });
-</script>
+  </script>
 
 </body>
 </html>
