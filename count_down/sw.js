@@ -1,11 +1,22 @@
-const CACHE_NAME = 'countdown-pwa-v1.1.0';
+const CACHE_NAME = 'countdown-pwa-v1.2.0';
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/css/style.css',
-  '/manifest.json',
-  '/assets/icons/icon-192.png',
-  '/assets/icons/icon-512.png'
+  // 核心檔案 (使用相對路徑)
+  './',
+  './index.html',
+  './css/style.css',
+  './manifest.json',
+  
+  // 圖標 (確保這些檔案確實存在於您的 assets/icons/ 資料夾中)
+  './assets/icons/icon-72.png',
+  './assets/icons/icon-96.png',
+  './assets/icons/icon-128.png',
+  './assets/icons/icon-144.png',
+  './assets/icons/icon-192.png',
+  './assets/icons/icon-512.png',
+  
+  // 預設集資料 (確保這些檔案存在)
+  './assets/default_data/national_holidays.json',
+  './assets/default_data/school_exams.json'
 ];
 
 // 1. Install 事件：快取核心檔案
@@ -13,9 +24,10 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log('Opened cache');
+        console.log('Opened cache and caching core files');
         return cache.addAll(urlsToCache);
       })
+      .then(() => self.skipWaiting()) // 強制新的 SW 立即啟動
   );
 });
 
@@ -43,10 +55,11 @@ self.addEventListener('activate', event => {
       return Promise.all(
         cacheNames.map(cacheName => {
           if (cacheWhitelist.indexOf(cacheName) === -1) {
+            console.log('Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
-    })
+    }).then(() => self.clients.claim()) // 立即控制所有頁面
   );
 });
