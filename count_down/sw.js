@@ -1,4 +1,4 @@
-const CACHE_NAME = 'countdown-pwa-v1.2.0';
+const CACHE_NAME = 'countdown-pwa-v1.3.0'; // 更新版本
 const urlsToCache = [
   // 核心檔案 (使用相對路徑)
   './',
@@ -6,7 +6,7 @@ const urlsToCache = [
   './css/style.css',
   './manifest.json',
   
-  // 圖標 (確保這些檔案確實存在於您的 assets/icons/ 資料夾中)
+  // 圖標
   './assets/icons/icon-72.png',
   './assets/icons/icon-96.png',
   './assets/icons/icon-128.png',
@@ -14,7 +14,7 @@ const urlsToCache = [
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
   
-  // 預設集資料 (確保這些檔案存在)
+  // 預設集資料
   './assets/default_data/national_holidays.json',
   './assets/default_data/school_exams.json'
 ];
@@ -24,7 +24,7 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log('Opened cache and caching core files');
+        console.log('Opened cache and caching core files (v1.3.0)');
         return cache.addAll(urlsToCache);
       })
       .then(() => self.skipWaiting()) // 強制新的 SW 立即啟動
@@ -40,7 +40,7 @@ self.addEventListener('fetch', event => {
         if (response) {
           return response;
         }
-        // 否則，從網路請求
+        // f
         return fetch(event.request);
       }
     )
