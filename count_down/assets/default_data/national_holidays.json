@@ -1,0 +1,352 @@
+[
+  {
+    "title": "中華民國開國紀念日",
+    "subtitle": "依規定放假一日",
+    "date": "2026-01-01",
+    "labels": ["紀念日", "放假"],
+    "is_pinned": false
+  },
+  {
+    "title": "消防節",
+    "subtitle": "依主管機關規定放假",
+    "date": "2026-01-19",
+    "labels": ["節日"],
+    "is_pinned": false
+  },
+  {
+    "title": "農民節",
+    "subtitle": "定於立春日",
+    "date": "2026-02-04",
+    "labels": ["節日"],
+    "is_pinned": false
+  },
+  {
+    "title": "除夕",
+    "subtitle": "農曆十二月之末日，放假五日連假開始",
+    "date": "2026-02-16",
+    "labels": ["節日", "放假"],
+    "is_pinned": false
+  },
+  {
+    "title": "春節",
+    "subtitle": "農曆一月一日，連假期間",
+    "date": "2026-02-17",
+    "labels": ["節日", "放假"],
+    "is_pinned": false
+  },
+  {
+    "title": "道教節",
+    "subtitle": "農曆一月一日",
+    "date": "2026-02-17",
+    "labels": ["節日"],
+    "is_pinned": false
+  },
+  {
+    "title": "元宵節",
+    "subtitle": "農曆一月十五日",
+    "date": "2026-03-03",
+    "labels": ["節日"],
+    "is_pinned": false
+  },
+  {
+    "title": "和平紀念日",
+    "subtitle": "依規定放假一日",
+    "date": "2026-02-28",
+    "labels": ["紀念日", "放假"],
+    "is_pinned": false
+  },
+  {
+    "title": "婦女節",
+    "subtitle": "不放假",
+    "date": "2026-03-08",
+    "labels": ["節日"],
+    "is_pinned": false
+  },
+  {
+    "title": "國父逝世紀念日 / 植樹節",
+    "subtitle": "不放假",
+    "date": "2026-03-12",
+    "labels": ["紀念日"],
+    "is_pinned": false
+  },
+  {
+    "title": "反侵略日",
+    "subtitle": "不放假",
+    "date": "2026-03-14",
+    "labels": ["紀念日"],
+    "is_pinned": false
+  },
+  {
+    "title": "民族平等紀念日",
+    "subtitle": "不放假",
+    "date": "2026-03-21",
+    "labels": ["紀念日"],
+    "is_pinned": false
+  },
+  {
+    "title": "革命先烈紀念日 / 青年節",
+    "subtitle": "不放假",
+    "date": "2026-03-29",
+    "labels": ["紀念日"],
+    "is_pinned": false
+  },
+  {
+    "title": "國際醫師節",
+    "subtitle": "不放假",
+    "date": "2026-03-30",
+    "labels": ["節日"],
+    "is_pinned": false
+  },
+  {
+    "title": "兒童節",
+    "subtitle": "放假一日 (若與清明節同日則補假)",
+    "date": "2026-04-04",
+    "labels": ["節日", "放假"],
+    "is_pinned": false
+  },
+  {
+    "title": "清明節",
+    "subtitle": "定於清明日，放假一日",
+    "date": "2026-04-04",
+    "labels": ["節日", "放假"],
+    "is_pinned": false
+  },
+  {
+    "title": "言論自由日",
+    "subtitle": "不放假",
+    "date": "2026-04-07",
+    "labels": ["紀念日"],
+    "is_pinned": false
+  },
+  {
+    "title": "佛陀誕辰日",
+    "subtitle": "農曆四月八日",
+    "date": "2026-05-04",
+    "labels": ["節日"],
+    "is_pinned": false
+  },
+  {
+    "title": "勞動節",
+    "subtitle": "放假一日",
+    "date": "2026-05-01",
+    "labels": ["節日", "放假"],
+    "is_pinned": false
+  },
+  {
+    "title": "國際護理師節",
+    "subtitle": "不放假",
+    "date": "2026-05-12",
+    "labels": ["節日"],
+    "is_pinned": false
+  },
+  {
+    "title": "母親節",
+    "subtitle": "五月第二個星期日，不放假",
+    "date": "2026-05-10",
+    "labels": ["節日"],
+    "is_pinned": false
+  },
+  {
+    "title": "環境日",
+    "subtitle": "不放假",
+    "date": "2026-06-05",
+    "labels": ["節日"],
+    "is_pinned": false
+  },
+  {
+    "title": "國家海洋日",
+    "subtitle": "不放假",
+    "date": "2026-06-08",
+    "labels": ["節日"],
+    "is_pinned": false
+  },
+  {
+    "title": "警察節",
+    "subtitle": "依主管機關規定放假",
+    "date": "2026-06-15",
+    "labels": ["節日"],
+    "is_pinned": false
+  },
+  {
+    "title": "端午節",
+    "subtitle": "農曆五月五日，放假一日",
+    "date": "2026-06-19",
+    "labels": ["節日", "放假"],
+    "is_pinned": false
+  },
+  {
+    "title": "原住民族抵抗日",
+    "subtitle": "不放假",
+    "date": "2026-06-26",
+    "labels": ["紀念日"],
+    "is_pinned": false
+  },
+  {
+    "title": "漁民節",
+    "subtitle": "不放假",
+    "date": "2026-07-01",
+    "labels": ["節日"],
+    "is_pinned": false
+  },
+  {
+    "title": "解嚴紀念日",
+    "subtitle": "不放假",
+    "date": "2026-07-15",
+    "labels": ["紀念日"],
+    "is_pinned": false
+  },
+  {
+    "title": "原住民族日",
+    "subtitle": "不放假",
+    "date": "2026-08-01",
+    "labels": ["紀念日"],
+    "is_pinned": false
+  },
+  {
+    "title": "父親節",
+    "subtitle": "不放假",
+    "date": "2026-08-08",
+    "labels": ["節日"],
+    "is_pinned": false
+  },
+  {
+    "title": "終戰紀念日",
+    "subtitle": "不放假",
+    "date": "2026-08-15",
+    "labels": ["紀念日"],
+    "is_pinned": false
+  },
+  {
+    "title": "八二三紀念日",
+    "subtitle": "不放假",
+    "date": "2026-08-23",
+    "labels": ["紀念日"],
+    "is_pinned": false
+  },
+  {
+    "title": "中元節",
+    "subtitle": "農曆七月十五日，不放假",
+    "date": "2026-08-28",
+    "labels": ["節日"],
+    "is_pinned": false
+  },
+  {
+    "title": "祖父母節",
+    "subtitle": "八月第四個星期日，不放假",
+    "date": "2026-08-23",
+    "labels": ["節日"],
+    "is_pinned": false
+  },
+  {
+    "title": "軍人節",
+    "subtitle": "依國防部規定放假",
+    "date": "2026-09-03",
+    "labels": ["節日"],
+    "is_pinned": false
+  },
+  {
+    "title": "國民體育日",
+    "subtitle": "不放假",
+    "date": "2026-09-09",
+    "labels": ["節日"],
+    "is_pinned": false
+  },
+  {
+    "title": "國家防災日",
+    "subtitle": "不放假",
+    "date": "2026-09-21",
+    "labels": ["紀念日"],
+    "is_pinned": false
+  },
+  {
+    "title": "孔子誕辰紀念日 / 教師節",
+    "subtitle": "依規定放假一日",
+    "date": "2026-09-28",
+    "labels": ["紀念日", "放假"],
+    "is_pinned": false
+  },
+  {
+    "title": "國慶日",
+    "subtitle": "依規定放假一日",
+    "date": "2026-10-10",
+    "labels": ["紀念日", "放假"],
+    "is_pinned": false
+  },
+  {
+    "title": "中秋節",
+    "subtitle": "農曆八月十五日，放假一日",
+    "date": "2026-10-06",
+    "labels": ["節日", "放假"],
+    "is_pinned": false
+  },
+  {
+    "title": "臺灣聯合國日",
+    "subtitle": "不放假",
+    "date": "2026-10-24",
+    "labels": ["紀念日"],
+    "is_pinned": false
+  },
+  {
+    "title": "臺灣光復暨金門古寧頭大捷紀念日",
+    "subtitle": "依規定放假一日",
+    "date": "2026-10-25",
+    "labels": ["紀念日", "放假"],
+    "is_pinned": false
+  },
+  {
+    "title": "重陽節",
+    "subtitle": "農曆九月九日，不放假",
+    "date": "2026-10-29",
+    "labels": ["節日"],
+    "is_pinned": false
+  },
+  {
+    "title": "海巡節",
+    "subtitle": "依海洋委員會規定放假",
+    "date": "2026-11-08",
+    "labels": ["節日"],
+    "is_pinned": false
+  },
+  {
+    "title": "國父誕辰紀念日 / 中華文化復興節",
+    "subtitle": "不放假",
+    "date": "2026-11-12",
+    "labels": ["紀念日"],
+    "is_pinned": false
+  },
+  {
+    "title": "身心障礙者日",
+    "subtitle": "不放假",
+    "date": "2026-12-03",
+    "labels": ["節日"],
+    "is_pinned": false
+  },
+  {
+    "title": "人權日",
+    "subtitle": "不放假",
+    "date": "2026-12-10",
+    "labels": ["節日"],
+    "is_pinned": false
+  },
+  {
+    "title": "移民日",
+    "subtitle": "不放假",
+    "date": "2026-12-18",
+    "labels": ["節日"],
+    "is_pinned": false
+  },
+  {
+    "title": "行憲紀念日",
+    "subtitle": "依規定放假一日",
+    "date": "2026-12-25",
+    "labels": ["紀念日", "放假"],
+    "is_pinned": false
+  },
+  {
+    "title": "全國客家日",
+    "subtitle": "不放假",
+    "date": "2026-12-28",
+    "labels": ["紀念日"],
+    "is_pinned": false
+  }
+]
