@@ -24,34 +24,38 @@
       
       <section id="page-home" class="page active">
         <h1 class="page-title">首頁精選</h1>
-        <div id="home-list">
-          </div>
+        <div id="home-filter" class="filter-bar"></div>
+        <div id="home-list"></div>
       </section>
 
       <section id="page-all" class="page">
         <h1 class="page-title">全部活動</h1>
-        <button id="toggle-archived-btn" class="toggle-archived-btn">顯示已封存 (0)</button>
-        <div id="all-list">
-          </div>
+        <div id="all-filter" class="filter-bar"></div>
+        <button id="toggle-archived-btn" class="toggle-archived-btn"></button>
+        <div id="all-list"></div>
       </section>
 
       <section id="page-settings" class="page">
         <h1 class="page-title">設定</h1>
         
         <div class="settings-group">
-          <div class="settings-item">
+          <div class="settings-item" id="btn-manage-labels">
             <span class="settings-item-label">標籤管理</span>
             <span class="settings-item-value">▶</span>
           </div>
-          <div class="settings-item" id="btn-import-defaults">
-             <button>導入預設活動集</button>
+          <div class="settings-item" id="btn-manage-presets">
+            <span class="settings-item-label">管理載入的預設集</span>
+            <span class="settings-item-value">▶</span>
           </div>
-          <div class="settings-item">
-             <button>匯出所有資料 (JSON)</button>
+          <div class="settings-item" id="btn-import-defaults">
+             <button>導入新的預設活動集</button>
           </div>
         </div>
 
         <div class="settings-group">
+          <div class="settings-item">
+             <button>匯出所有資料 (JSON)</button>
+          </div>
           <div class="settings-item">
             <span class="settings-item-label">清理所有已封存</span>
              <button class="danger" id="btn-clear-archived">立即清理</button>
@@ -61,10 +65,48 @@
         <div class="settings-group">
           <div class="settings-item">
             <span class="settings-item-label">版本號</span>
-            <span class="settings-item-value">v1.0.0 (2025-10-29)</span>
+            <span class="settings-item-value">v1.1.0 (2025-11-02)</span>
           </div>
         </div>
 
+      </section>
+      
+      <section id="page-manage-labels" class="page">
+        <h1 class="page-title">標籤管理</h1>
+        <div id="labels-list"></div>
+        <div class="form-group" style="padding-top: 16px;">
+            <label>新增標籤</label>
+            <input type="text" id="new-label-input" placeholder="標籤名稱">
+        </div>
+        <div class="form-buttons">
+            <button id="btn-add-label" class="form-btn btn-primary">新增</button>
+        </div>
+        <div class="form-buttons" style="margin-top: 16px;">
+            <button id="btn-back-settings" class="form-btn btn-secondary">返回設定</button>
+        </div>
+      </section>
+      
+      <section id="page-import-defaults" class="page">
+        <h1 class="page-title">導入預設集</h1>
+        <p style="margin-bottom: 16px; color: var(--color-text-secondary);">選擇要加入到您的活動清單中的預設活動集：</p>
+        <div id="preset-import-list" class="settings-group">
+            </div>
+        <div class="form-buttons">
+            <button id="btn-confirm-import" class="form-btn btn-primary">確認導入</button>
+        </div>
+        <div class="form-buttons" style="margin-top: 16px;">
+            <button data-back-target="page-settings" class="form-btn btn-secondary btn-back">返回設定</button>
+        </div>
+      </section>
+
+      <section id="page-manage-presets" class="page">
+        <h1 class="page-title">預設集顏色管理</h1>
+        <p style="margin-bottom: 16px; color: var(--color-text-secondary);">設定已載入的預設集陰影顏色。活動將套用其所屬預設集的顏色。</p>
+        <div id="preset-color-list" class="settings-group">
+            </div>
+        <div class="form-buttons">
+            <button data-back-target="page-settings" class="form-btn btn-secondary btn-back">返回設定</button>
+        </div>
       </section>
       
     </main>
@@ -87,12 +129,25 @@
     </nav>
   </div>
 
+  <div id="modal-detail-view" class="modal-form" style="display: none;">
+    <div id="modal-detail-content" class="form-content modal-detail-content">
+      <h2 id="detail-title"></h2>
+      <div id="event-detail-window">
+        </div>
+      <div class="detail-actions">
+          <button id="btn-detail-close" class="form-btn btn-secondary">關閉</button>
+          <button id="btn-detail-toggle-pin" class="form-btn btn-primary" data-pinned="false"></button>
+          <button id="btn-detail-edit" class="form-btn btn-primary">編輯</button>
+      </div>
+    </div>
+  </div>
+
+
   <div id="modal-add-event" class="modal-form" style="display: none;">
-    <div class="form-content">
+    <div class="form-content modal-form-content">
       <h2 id="form-title">新增活動</h2>
       <input type="hidden" id="event-id">
-      
-      <div class="form-group">
+      <input type="hidden" id="event-preset-id"> <div class="form-group">
         <label for="event-title">標題 (必填)</label>
         <input type="text" id="event-title" placeholder="例如：會考倒數">
       </div>
@@ -122,32 +177,49 @@
         </select>
       </div>
 
+      <div class="form-group">
+        <label for="event-color">事件陰影顏色 (選填)</label>
+        <input type="color" id="event-color" value="#007aff" style="width: 100px;">
+      </div>
+
       <div class="form-group-inline">
         <label for="event-pinned">定選至首頁</label>
         <input type="checkbox" id="event-pinned" class="form-toggle">
       </div>
 
       <div class="form-buttons">
-        <button id="btn-cancel" class="form-btn btn-secondary">取消</button>
-        <button id="btn-save" class="form-btn btn-primary">儲存</button>
+        <button id="btn-form-cancel" class="form-btn btn-secondary">取消</button>
+        <button id="btn-form-save" class="form-btn btn-primary">儲存</button>
       </div>
       
       <div class="form-buttons" style="margin-top: 0;">
-         <button id="btn-delete" class="form-btn danger" style="width: 100%; display: none;">刪除活動</button>
+         <button id="btn-form-delete" class="form-btn danger" style="width: 100%; display: none;">刪除活動</button>
       </div>
     </div>
   </div>
-
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
 
       // --- 1. 狀態與常數 ---
-      const STORAGE_KEY = 'countdownEvents_v1';
+      const STORAGE_KEY = 'countdownEvents_v1.1';
+      const CONFIG_KEY = 'countdownConfig_v1.1';
+      const DEFAULT_COLOR = '#007aff';
+      
       let events = []; // 主資料陣列
+      let config = {
+          presets: {}, // 預設集配置：{ id: { name: '...', color: '...' } }
+          labels: ['考試', '工作', '生日', '旅行'], // 自定義標籤
+      }; 
+      let currentFilter = { home: '全部', all: '全部' }; // 當前篩選的標籤
       let showArchived = false; // "全部" 頁面是否顯示已封存
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // 標準化 "今天" 的開始
+      
+      // 模擬預設集資料 (實際應該放在 assets/default_data/)
+      const availablePresets = [
+        { id: 'holidays', name: '國定節日與紀念日', path: 'assets/default_data/national_holidays.json' },
+        { id: 'exams', name: '學科考試', path: 'assets/default_data/school_exams.json' },
+      ];
+
 
       // --- 2. DOM 元素 ---
       const pages = document.querySelectorAll('.page');
@@ -156,118 +228,145 @@
       
       const homeList = document.getElementById('home-list');
       const allList = document.getElementById('all-list');
+      const homeFilter = document.getElementById('home-filter');
+      const allFilter = document.getElementById('all-filter');
       const toggleArchivedBtn = document.getElementById('toggle-archived-btn');
 
-      // 表單 Modal
-      const modal = document.getElementById('modal-add-event');
+      // Modals
+      const modalDetail = document.getElementById('modal-detail-view');
+      const detailTitle = document.getElementById('detail-title');
+      const detailWindow = document.getElementById('event-detail-window');
+      const btnDetailClose = document.getElementById('btn-detail-close');
+      const btnDetailTogglePin = document.getElementById('btn-detail-toggle-pin');
+      const btnDetailEdit = document.getElementById('btn-detail-edit');
+      
+      const modalForm = document.getElementById('modal-add-event');
       const formTitle = document.getElementById('form-title');
       const formEventId = document.getElementById('event-id');
+      const formPresetId = document.getElementById('event-preset-id');
       const formTitleInput = document.getElementById('event-title');
       const formDateInput = document.getElementById('event-date');
       const formSubtitleInput = document.getElementById('event-subtitle');
       const formLabelsInput = document.getElementById('event-labels');
       const formRecurrenceInput = document.getElementById('event-recurrence');
       const formPinnedInput = document.getElementById('event-pinned');
-      const btnCancel = document.getElementById('btn-cancel');
-      const btnSave = document.getElementById('btn-save');
-      const btnDelete = document.getElementById('btn-delete');
-      const btnClearArchived = document.getElementById('btn-clear-archived');
+      const formColorInput = document.getElementById('event-color');
+      const btnFormCancel = document.getElementById('btn-form-cancel');
+      const btnFormSave = document.getElementById('btn-form-save');
+      const btnFormDelete = document.getElementById('btn-form-delete');
+      
+      // 設定頁面
+      const btnManageLabels = document.getElementById('btn-manage-labels');
+      const btnManagePresets = document.getElementById('btn-manage-presets');
       const btnImportDefaults = document.getElementById('btn-import-defaults');
+      const btnClearArchived = document.getElementById('btn-clear-archived');
 
+      // 標籤管理子頁面
+      const labelsList = document.getElementById('labels-list');
+      const newLabelInput = document.getElementById('new-label-input');
+      const btnAddLabel = document.getElementById('btn-add-label');
+      const btnBackSettings = document.getElementById('btn-back-settings');
+      
+      // 預設集導入子頁面
+      const presetImportList = document.getElementById('preset-import-list');
+      const btnConfirmImport = document.getElementById('btn-confirm-import');
+      const presetColorList = document.getElementById('preset-color-list');
       
       // --- 3. 核心邏輯 (日期計算與資料) ---
 
       /** 載入資料 */
       function loadData() {
-        const data = localStorage.getItem(STORAGE_KEY);
-        events = data ? JSON.parse(data) : [];
+        const eventData = localStorage.getItem(STORAGE_KEY);
+        const configData = localStorage.getItem(CONFIG_KEY);
+        events = eventData ? JSON.parse(eventData) : [];
+        
+        if (configData) {
+            Object.assign(config, JSON.parse(configData));
+        }
       }
 
       /** 儲存資料 */
       function saveData() {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+        localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
       }
 
       /** 產生唯一 ID */
       function generateID() {
-        return '_' + Math.random().toString(36).substr(2, 9);
+        return 'id_' + Math.random().toString(36).substr(2, 9);
       }
-
-      /**
-       * 計算倒數天數
-       * @param {string} dateStr - 日期字串 (YYYY-MM-DD)
-       * @returns {object} { days: number, unit: string, status: 'pending'|'today'|'expired' }
-       */
-      function calculateCountdown(dateStr) {
-        // 確保日期被解析為本地時區的午夜
-        const targetDate = new Date(dateStr + 'T00:00:00');
-        
-        const diffTime = targetDate - today;
-        // 向上取整，確保 23:59 也是 1 天
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-        if (diffDays === 0) {
-          return { days: '今', unit: '天', status: 'today' };
-        } else if (diffDays < 0) {
-          return { days: Math.abs(diffDays), unit: '天前', status: 'expired' };
-        } else {
-          return { days: diffDays, unit: '天', status: 'pending' };
-        }
-      }
-
-      /** 檢查並自動封存過期活動 (核心！) */
+      
+      /** 檢查並自動封存過期活動 */
       function checkAndArchiveEvents() {
         let needsSave = false;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); 
         
         events.forEach(event => {
-          if (event.status !== 'Active') return; // 只處理活動中
+          if (event.status !== 'Active') return;
+          
+          const targetDate = new Date(event.date + 'T00:00:00');
+          const diffDays = Math.ceil((targetDate - today) / (1000 * 60 * 60 * 24));
 
-          const countdown = calculateCountdown(event.date);
-
-          if (countdown.status === 'expired') {
-            // 檢查週期性
-            if (event.recurrence === 'None') {
-              // 1. 永久過期 -> 封存
-              event.status = 'Archived';
-              event.is_pinned = false; // 自動取消定選
-              console.log(`Archiving: ${event.title}`);
-              needsSave = true;
-            } else {
-              // 2. 週期性活動 -> 更新日期
-              let newDate = new Date(event.date + 'T00:00:00');
-              while (newDate <= today) { // 確保新日期在未來
+          if (diffDays < 0) { // 已過期
+            
+            // 處理週期性
+            if (event.recurrence !== 'None') {
+              let newDate = targetDate;
+              // 循環推進到未來
+              while (newDate < today) {
                 if (event.recurrence === 'Yearly') {
                   newDate.setFullYear(newDate.getFullYear() + 1);
                 } else if (event.recurrence === 'Monthly') {
                   newDate.setMonth(newDate.getMonth() + 1);
                 } else if (event.recurrence === 'Weekly') {
                   newDate.setDate(newDate.getDate() + 7);
+                } else {
+                    break; // 無效週期則跳出
                 }
               }
               event.date = newDate.toISOString().split('T')[0];
-              console.log(`Recycling: ${event.title} to ${event.date}`);
+              needsSave = true;
+            } else {
+              // 永久過期 -> 封存
+              event.status = 'Archived';
+              event.is_pinned = false;
               needsSave = true;
             }
           }
         });
 
-        if (needsSave) {
-          saveData();
-        }
+        if (needsSave) saveData();
       }
+
+      /** 計算倒數天數 */
+      function calculateCountdown(dateStr) {
+        const targetDate = new Date(dateStr + 'T00:00:00');
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); 
+        const diffDays = Math.ceil((targetDate - today) / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 0) return { days: '今', unit: '天', status: 'today' };
+        if (diffDays < 0) return { days: Math.abs(diffDays), unit: '天前', status: 'expired' };
+        return { days: diffDays, unit: '天', status: 'pending' };
+      }
+
 
       // --- 4. 渲染邏輯 (UI) ---
 
-      /** 渲染所有頁面 (主函數) */
-      function renderAllPages() {
-        renderHomePage();
-        renderAllPage();
-        renderSettingsPage(); // 更新封存計數
+      /** 取得事件的顏色 (手動設定 > 預設集設定 > 預設顏色) */
+      function getEventColor(event) {
+          if (event.color) return event.color;
+          if (event.presetId && config.presets[event.presetId] && config.presets[event.presetId].color) {
+              return config.presets[event.presetId].color;
+          }
+          return DEFAULT_COLOR; 
       }
 
       /** 產生單個卡片的 HTML */
       function createEventCardHTML(event) {
         const countdown = calculateCountdown(event.date);
+        const eventColor = getEventColor(event);
         
         const labelsHTML = (event.labels || [])
           .map(label => `<span class="card-label">${label}</span>`)
@@ -276,20 +375,18 @@
         let countdownHTML;
         if (event.status === 'Archived') {
           countdownHTML = `<span class="countdown-expired">已封存</span>`;
-        } else if (countdown.status === 'today') {
-          countdownHTML = `<div class="countdown-days">${countdown.days}</div>
-                           <div class="countdown-unit">${countdown.unit}</div>`;
         } else if (countdown.status === 'expired') {
-          // 理論上會被 'Archived' 捕捉到，但作為保險
-           countdownHTML = `<div class="countdown-days">${countdown.days}</div>
-                           <div class="countdown-unit">${countdown.unit}</div>`;
+            countdownHTML = `<div class="countdown-days">${countdown.days}</div><div class="countdown-unit">${countdown.unit}</div>`;
         } else {
-           countdownHTML = `<div class="countdown-days">${countdown.days}</div>
-                           <div class="countdown-unit">${countdown.unit}</div>`;
+           countdownHTML = `<div class="countdown-days">${countdown.days}</div><div class="countdown-unit">${countdown.unit}</div>`;
         }
 
         return `
-          <div class="event-card ${event.status === 'Archived' ? 'archived' : ''}" data-id="${event.id}">
+          <div 
+            class="event-card ${event.status === 'Archived' ? 'archived' : ''}" 
+            data-id="${event.id}"
+            style="--shadow-color: ${eventColor};"
+          >
             <div class="card-details">
               ${labelsHTML ? `<div class="card-labels">${labelsHTML}</div>` : ''}
               <div class="card-title">${event.title}</div>
@@ -302,91 +399,225 @@
           </div>
         `;
       }
+      
+      /** 渲染篩選器 */
+      function renderFilterBar(page, container) {
+          const isHome = page === 'home';
+          const current = currentFilter[page];
+          
+          // 取得所有可用標籤 (僅限當前頁面列表中的活動標籤)
+          const allLabels = events
+            .filter(e => isHome ? e.is_pinned && e.status === 'Active' : true)
+            .reduce((acc, e) => {
+                (e.labels || []).forEach(label => acc.add(label));
+                return acc;
+            }, new Set());
+
+          const availableLabels = ['全部', ...Array.from(allLabels)].sort();
+          
+          container.innerHTML = availableLabels.map(label => `
+              <div 
+                  class="filter-chip ${current === label ? 'selected' : ''}" 
+                  data-label="${label}"
+                  data-page="${page}"
+              >
+                  ${label}
+              </div>
+          `).join('');
+      }
+
 
       /** 渲染首頁 */
       function renderHomePage() {
-        const pinnedEvents = events
+        renderFilterBar('home', homeFilter);
+
+        let filteredEvents = events
           .filter(e => e.is_pinned && e.status === 'Active')
-          .sort((a, b) => new Date(a.date) - new Date(b.date)); // 日期近的在上面
-          
-        if (pinnedEvents.length === 0) {
-          homeList.innerHTML = `
-            <div class="empty-state">
-              <div class="empty-state-icon">📌</div>
-              <p>尚無定選活動</p>
-              <p>請至「全部」頁面點擊活動卡片來定選</p>
-            </div>`;
+          .sort((a, b) => new Date(a.date) - new Date(b.date)); 
+
+        if (currentFilter.home !== '全部') {
+            filteredEvents = filteredEvents.filter(e => e.labels && e.labels.includes(currentFilter.home));
+        }
+
+        if (filteredEvents.length === 0) {
+          homeList.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📌</div><p>尚無定選活動或篩選結果為空</p><p>請至「全部」頁面新增或定選活動</p></div>`;
         } else {
-          homeList.innerHTML = pinnedEvents.map(createEventCardHTML).join('');
+          homeList.innerHTML = filteredEvents.map(createEventCardHTML).join('');
         }
       }
 
       /** 渲染全部頁面 */
       function renderAllPage() {
+        renderFilterBar('all', allFilter);
+        
         const targetStatus = showArchived ? 'Archived' : 'Active';
         
-        const filteredEvents = events
+        let filteredEvents = events
           .filter(e => e.status === targetStatus)
-          .sort((a, b) => {
-            // 活動中：日期近的在上面； 已封存：日期近的(剛過期)在上面
-             return new Date(a.date) - new Date(b.date);
-          });
+          .sort((a, b) => new Date(a.date) - new Date(b.date));
+          
+        if (currentFilter.all !== '全部') {
+            filteredEvents = filteredEvents.filter(e => e.labels && e.labels.includes(currentFilter.all));
+        }
 
         if (filteredEvents.length === 0) {
-          allList.innerHTML = `
-            <div class="empty-state">
-              <div class="empty-state-icon">${showArchived ? '🗄️' : '🎉'}</div>
-              <p>${showArchived ? '封存區是空的' : '目前沒有活動'}</p>
-              ${!showArchived ? '<p>點擊右下角 + 開始新增</p>' : ''}
-            </div>`;
+          allList.innerHTML = `<div class="empty-state"><div class="empty-state-icon">${showArchived ? '🗄️' : '🎉'}</div><p>${showArchived ? '封存區是空的' : '目前沒有活動或篩選結果為空'}</p>${!showArchived ? '<p>點擊右下角 + 開始新增</p>' : ''}</div>`;
         } else {
           allList.innerHTML = filteredEvents.map(createEventCardHTML).join('');
         }
         
-        // 更新按鈕文字
         const archivedCount = events.filter(e => e.status === 'Archived').length;
         toggleArchivedBtn.textContent = `${showArchived ? '隱藏' : '顯示'}已封存 (${archivedCount})`;
       }
-
-      /** 渲染設定頁面 */
-      function renderSettingsPage() {
-        // (未來可擴展標籤管理等)
-        // 目前主要用於更新封存計數
+      
+      /** 渲染標籤管理頁面 */
+      function renderLabelManagement() {
+          labelsList.innerHTML = config.labels.map(label => `
+              <div class="settings-item">
+                  <span class="settings-item-label">${label}</span>
+                  <button data-label="${label}" class="danger" style="width: auto;">刪除</button>
+              </div>
+          `).join('');
+          
+          labelsList.querySelectorAll('button.danger').forEach(btn => {
+              btn.addEventListener('click', (e) => {
+                  const labelToDelete = e.target.dataset.label;
+                  if (confirm(`確定要刪除標籤 "${labelToDelete}" 嗎？`)) {
+                      config.labels = config.labels.filter(l => l !== labelToDelete);
+                      saveData();
+                      renderLabelManagement();
+                      renderAllPages(); // 標籤變動可能影響篩選器
+                  }
+              });
+          });
+      }
+      
+      /** 渲染預設集顏色管理頁面 */
+      function renderPresetColorManagement() {
+          const loadedPresetKeys = Object.keys(config.presets);
+          if (loadedPresetKeys.length === 0) {
+              presetColorList.innerHTML = `<div class="empty-state"><p>尚未導入任何預設集</p></div>`;
+              return;
+          }
+          
+          presetColorList.innerHTML = loadedPresetKeys.map(key => {
+              const preset = config.presets[key];
+              const color = preset.color || DEFAULT_COLOR;
+              return `
+                  <div class="preset-item" data-id="${key}">
+                      <span class="preset-name">${preset.name}</span>
+                      <input type="color" value="${color}" class="preset-color-picker" data-id="${key}">
+                  </div>
+              `;
+          }).join('');
+          
+          presetColorList.querySelectorAll('.preset-color-picker').forEach(input => {
+              input.addEventListener('change', (e) => {
+                  const presetId = e.target.dataset.id;
+                  config.presets[presetId].color = e.target.value;
+                  saveData();
+                  renderAllPages(); // 顏色改變，需要重繪卡片
+              });
+          });
       }
 
 
-      // --- 5. 表單 Modal 邏輯 ---
+      /** 渲染所有頁面 (主函數) */
+      function renderAllPages() {
+        renderHomePage();
+        renderAllPage();
+        // 設定頁面的子頁面，僅在切換到時渲染
+      }
+
+
+      // --- 5. 模態視窗與表單邏輯 ---
       
-      function showModal(event = null) {
+      let currentEventId = null;
+
+      /** 顯示詳細資料視窗 */
+      function showDetailModal(event) {
+          currentEventId = event.id;
+          detailTitle.textContent = event.title;
+          btnDetailTogglePin.textContent = event.is_pinned ? '取消定選' : '定選到首頁';
+          btnDetailTogglePin.dataset.pinned = event.is_pinned;
+
+          const eventColor = getEventColor(event);
+          
+          // 內容
+          const content = `
+              <div class="detail-item">
+                  <span class="detail-item-label">倒數</span>
+                  <span class="detail-item-value">${calculateCountdown(event.date).days} ${calculateCountdown(event.date).unit}</span>
+              </div>
+              <div class="detail-item">
+                  <span class="detail-item-label">目標日期</span>
+                  <span class="detail-item-value">${event.date}</span>
+              </div>
+              ${event.subtitle ? `<div class="detail-item"><span class="detail-item-label">副標題</span><span class="detail-item-value">${event.subtitle}</span></div>` : ''}
+              ${(event.labels && event.labels.length > 0) ? `<div class="detail-item"><span class="detail-item-label">標籤</span><span class="detail-item-value">${event.labels.join(', ')}</span></div>` : ''}
+              ${event.recurrence !== 'None' ? `<div class="detail-item"><span class="detail-item-label">重複週期</span><span class="detail-item-value">${event.recurrence}</span></div>` : ''}
+              ${event.presetId ? `<div class="detail-item"><span class="detail-item-label">所屬預設集</span><span class="detail-item-value">${config.presets[event.presetId]?.name || '未知'}</span></div>` : ''}
+              <div class="detail-item">
+                  <span class="detail-item-label">狀態</span>
+                  <span class="detail-item-value">${event.status === 'Active' ? '活動中' : '已封存'}</span>
+              </div>
+              <div class="detail-item">
+                  <span class="detail-item-label">陰影顏色</span>
+                  <span class="detail-item-value" style="color: ${eventColor};">${eventColor}</span>
+              </div>
+          `;
+          detailWindow.innerHTML = content;
+          modalDetail.style.display = 'flex';
+      }
+
+      /** 顯示新增/編輯視窗 */
+      function showFormModal(event = null) {
         if (event) {
           // 編輯模式
           formTitle.textContent = '編輯活動';
           formEventId.value = event.id;
+          formPresetId.value = event.presetId || '';
           formTitleInput.value = event.title;
           formDateInput.value = event.date;
           formSubtitleInput.value = event.subtitle || '';
           formLabelsInput.value = (event.labels || []).join(', ');
           formRecurrenceInput.value = event.recurrence || 'None';
           formPinnedInput.checked = event.is_pinned;
-          btnDelete.style.display = 'block';
+          formColorInput.value = event.color || getEventColor(event);
+          btnFormDelete.style.display = 'block';
+
+          // 預設集導入的活動，標題/日期/週期鎖定
+          const isPresetEvent = !!event.presetId;
+          formTitleInput.disabled = isPresetEvent;
+          formDateInput.disabled = isPresetEvent;
+          formRecurrenceInput.disabled = isPresetEvent;
+          formColorInput.disabled = isPresetEvent; // 顏色由預設集管理
+          
         } else {
           // 新增模式
           formTitle.textContent = '新增活動';
           formEventId.value = '';
+          formPresetId.value = '';
           formTitleInput.value = '';
           formDateInput.value = '';
           formSubtitleInput.value = '';
-          formLabelsInput.value = '';
+          formLabelsInput.value = config.labels.join(', '); // 預設帶入所有標籤供參考
           formRecurrenceInput.value = 'None';
           formPinnedInput.checked = false;
-          btnDelete.style.display = 'none';
+          formColorInput.value = DEFAULT_COLOR;
+          btnFormDelete.style.display = 'none';
+          
+          formTitleInput.disabled = false;
+          formDateInput.disabled = false;
+          formRecurrenceInput.disabled = false;
+          formColorInput.disabled = false;
         }
-        modal.style.display = 'flex';
+        hideDetailModal(); // 確保不會同時開啟
+        modalForm.style.display = 'flex';
       }
-
-      function hideModal() {
-        modal.style.display = 'none';
-      }
+      
+      function hideDetailModal() { modalDetail.style.display = 'none'; currentEventId = null; }
+      function hideFormModal() { modalForm.style.display = 'none'; }
 
       function handleFormSubmit() {
         const id = formEventId.value;
@@ -406,131 +637,218 @@
           labels: formLabelsInput.value.split(',').map(s => s.trim()).filter(Boolean),
           recurrence: formRecurrenceInput.value,
           is_pinned: formPinnedInput.checked,
-          status: 'Active' // 新增或編輯時一律設為 Active
+          color: formColorInput.value !== DEFAULT_COLOR ? formColorInput.value : undefined, // 只有非預設顏色才儲存
+          presetId: formPresetId.value || undefined, // 保持預設集 ID
+          status: 'Active' 
         };
+        
+        // 如果是預設集事件，則只更新可修改欄位
+        if (eventData.presetId) {
+            const originalEvent = events.find(e => e.id === id);
+            if(originalEvent) {
+                eventData.title = originalEvent.title;
+                eventData.date = originalEvent.date;
+                eventData.recurrence = originalEvent.recurrence;
+                eventData.color = originalEvent.color; // 預設集事件顏色由 preset config 管理
+            }
+        }
 
         if (id) {
-          // 編輯
           const index = events.findIndex(e => e.id === id);
           if (index > -1) {
-            events[index] = eventData;
+            events[index] = { ...events[index], ...eventData };
           }
         } else {
-          // 新增
           events.push(eventData);
         }
 
         saveData();
         renderAllPages();
-        hideModal();
+        hideFormModal();
       }
       
-      function handleDelete() {
-        const id = formEventId.value;
-        if (!id || !confirm('確定要永久刪除這個活動嗎？')) {
-          return;
-        }
-        
-        events = events.filter(e => e.id !== id);
-        saveData();
-        renderAllPages();
-        hideModal();
+      /** 處理預設集導入 */
+      async function handleImportPresets() {
+          const selectedPresets = Array.from(presetImportList.querySelectorAll('input[type="checkbox"]:checked'))
+                                      .map(cb => availablePresets.find(p => p.id === cb.dataset.id));
+
+          if (selectedPresets.length === 0) {
+              alert('請至少選擇一個預設集。');
+              return;
+          }
+          
+          let importedCount = 0;
+
+          for (const preset of selectedPresets) {
+              try {
+                  const response = await fetch(preset.path);
+                  if (!response.ok) throw new Error(`無法載入 ${preset.name}`);
+                  
+                  const defaultEvents = await response.json();
+                  
+                  defaultEvents.forEach(event => {
+                      // 檢查是否已存在 (以防重複導入)
+                      if (!events.some(e => e.title === event.title && e.date === event.date && e.presetId === preset.id)) {
+                          events.push({
+                              ...event,
+                              id: generateID(),
+                              status: 'Active',
+                              presetId: preset.id, // 標記來源預設集
+                              color: undefined, // 由預設集配置管理
+                          });
+                          importedCount++;
+                      }
+                  });
+                  
+                  // 儲存到配置中，標記為已載入
+                  if (!config.presets[preset.id]) {
+                       config.presets[preset.id] = { name: preset.name, color: DEFAULT_COLOR };
+                  }
+                  
+              } catch (error) {
+                  console.error('導入失敗:', error);
+                  alert(`導入預設集 ${preset.name} 失敗。`);
+              }
+          }
+          
+          saveData();
+          checkAndArchiveEvents();
+          renderAllPages();
+          alert(`成功導入 ${importedCount} 個活動！`);
+          // 導入完成後切回設定頁
+          document.querySelector('[data-page="page-settings"]').click();
       }
 
+      // --- 6. 事件監聽器 ---
 
-      // --- 6. 事件監聽器 (Event Listeners) ---
+      /** 篩選器事件委派 */
+      document.getElementById('main-content').addEventListener('click', (e) => {
+          if (e.target.classList.contains('filter-chip')) {
+              const page = e.target.dataset.page;
+              const label = e.target.dataset.label;
+              currentFilter[page] = label;
+              if (page === 'home') renderHomePage();
+              if (page === 'all') renderAllPage();
+          }
+          
+          // 卡片點擊 -> 顯示詳細資料
+          const card = e.target.closest('.event-card');
+          if (card) {
+              const id = card.dataset.id;
+              const event = events.find(e => e.id === id);
+              if (event) showDetailModal(event);
+          }
+      });
 
-      /** 導覽列切換 */
+      /** 模態視窗操作 */
+      btnDetailClose.addEventListener('click', hideDetailModal);
+      
+      btnDetailEdit.addEventListener('click', () => {
+          const event = events.find(e => e.id === currentEventId);
+          if (event) showFormModal(event);
+      });
+      
+      btnDetailTogglePin.addEventListener('click', () => {
+          const event = events.find(e => e.id === currentEventId);
+          if (event) {
+              event.is_pinned = !event.is_pinned;
+              saveData();
+              renderAllPages();
+              hideDetailModal();
+          }
+      });
+      
+      btnFormCancel.addEventListener('click', hideFormModal);
+      btnFormSave.addEventListener('click', handleFormSubmit);
+      btnFormDelete.addEventListener('click', handleDelete);
+      fab.addEventListener('click', () => showFormModal(null));
+      
+      /** 頁面切換 */
       navTabs.forEach(tab => {
         tab.addEventListener('click', () => {
-          // 移除所有 active
+          // ... (保留導覽列切換邏輯) ...
           navTabs.forEach(t => t.classList.remove('active'));
           pages.forEach(p => p.classList.remove('active'));
           
-          // 新增 active
           tab.classList.add('active');
           const pageId = tab.dataset.page;
           document.getElementById(pageId).classList.add('active');
 
-          // 控制 FAB 顯示
           fab.style.display = (pageId === 'page-all') ? 'block' : 'none';
+          
+          // 進入設定子頁面的渲染
+          if (pageId === 'page-manage-labels') renderLabelManagement();
+          if (pageId === 'page-manage-presets') renderPresetColorManagement();
+          if (pageId === 'page-import-defaults') renderImportPresetsPage();
+          if (pageId === 'page-settings') renderAllPages(); // 確保回到主設定頁面時更新數據
+
         });
       });
-
-      /** 懸浮按鈕 */
-      fab.addEventListener('click', () => showModal(null));
-
-      /** 表單按鈕 */
-      btnCancel.addEventListener('click', hideModal);
-      btnSave.addEventListener('click', handleFormSubmit);
-      btnDelete.addEventListener('click', handleDelete);
-
-      /** "全部" 頁面切換封存 */
-      toggleArchivedBtn.addEventListener('click', () => {
-        showArchived = !showArchived;
-        renderAllPage();
-      });
-
-      /** 卡片點擊 (事件委派) - 用於編輯 */
-      document.getElementById('main-content').addEventListener('click', (e) => {
-        const card = e.target.closest('.event-card');
-        if (!card) return;
-        
-        const id = card.dataset.id;
-        const event = events.find(e => e.id === id);
-        
-        if (event) {
-          showModal(event);
-        }
-      });
       
-      /** 設定頁面按鈕 */
+      /** 設置頁面按鈕 */
+      toggleArchivedBtn.addEventListener('click', () => { showArchived = !showArchived; renderAllPage(); });
       btnClearArchived.addEventListener('click', () => {
-        if (confirm('確定要永久刪除所有已封存的活動嗎？此操作無法復原。')) {
-          events = events.filter(e => e.status !== 'Archived');
-          saveData();
-          renderAllPages(); // 重新渲染所有頁面 (更新計數)
-        }
+          if (confirm('確定要永久刪除所有已封存的活動嗎？此操作無法復原。')) {
+              events = events.filter(e => e.status !== 'Archived');
+              saveData();
+              renderAllPages();
+          }
+      });
+
+      // 標籤管理事件
+      btnManageLabels.addEventListener('click', () => navigateToPage('page-manage-labels'));
+      btnAddLabel.addEventListener('click', () => {
+          const newLabel = newLabelInput.value.trim();
+          if (newLabel && !config.labels.includes(newLabel)) {
+              config.labels.push(newLabel);
+              saveData();
+              newLabelInput.value = '';
+              renderLabelManagement();
+              renderAllPages();
+          }
+      });
+      btnBackSettings.addEventListener('click', () => navigateToPage('page-settings'));
+      
+      // 預設集管理事件
+      btnManagePresets.addEventListener('click', () => navigateToPage('page-manage-presets'));
+      btnImportDefaults.addEventListener('click', () => navigateToPage('page-import-defaults'));
+      btnConfirmImport.addEventListener('click', handleImportPresets);
+      document.querySelectorAll('.btn-back').forEach(btn => {
+          btn.addEventListener('click', (e) => navigateToPage(e.target.dataset.backTarget));
       });
       
-      btnImportDefaults.addEventListener('click', async () => {
-        // 簡易導入範例 (僅導入國定假日)
-        try {
-          // 假設您已將 JSON 放在指定路徑
-          const response = await fetch('assets/default_data/national_holidays.json');
-          if (!response.ok) throw new Error('無法載入預設資料');
+      // 導航函數 (用於子頁面切換)
+      function navigateToPage(pageId) {
+          navTabs.forEach(t => t.classList.remove('active'));
+          pages.forEach(p => p.classList.remove('active'));
+          document.getElementById(pageId).classList.add('active');
+          fab.style.display = 'none';
           
-          const defaultEvents = await response.json();
-          
-          defaultEvents.forEach(event => {
-            // 檢查是否已存在 (簡易檢查標題)
-            if (!events.some(e => e.title === event.title && e.date === event.date)) {
-              events.push({
-                ...event,
-                id: generateID(),
-                status: 'Active' // 確保狀態正確
-              });
-            }
-          });
-          
-          saveData();
-          checkAndArchiveEvents(); // 導入後立即檢查
-          renderAllPages();
-          alert(`成功導入 ${defaultEvents.length} 個預設活動！`);
-          
-        } catch (error) {
-          console.error('導入失敗:', error);
-          alert('導入預設活動失敗。');
-        }
-      });
-      
-      // --- 7. PWA Service Worker 註冊 ---
+          if (pageId === 'page-manage-labels') renderLabelManagement();
+          if (pageId === 'page-manage-presets') renderPresetColorManagement();
+          if (pageId === 'page-import-defaults') renderImportPresetsPage();
+      }
+
+      function renderImportPresetsPage() {
+          presetImportList.innerHTML = availablePresets.map(preset => {
+              const isLoaded = !!config.presets[preset.id];
+              return `
+                  <div class="settings-item">
+                      <span class="settings-item-label">${preset.name} ${isLoaded ? '(已載入)' : ''}</span>
+                      <input type="checkbox" data-id="${preset.id}" ${isLoaded ? 'disabled' : ''} class="form-toggle">
+                  </div>
+              `;
+          }).join('');
+      }
+
+
+      // --- 7. PWA Service Worker 註冊 (保留) ---
       function registerServiceWorker() {
         if ('serviceWorker' in navigator) {
           window.addEventListener('load', () => {
             navigator.serviceWorker.register('/sw.js')
               .then(registration => {
-                console.log('ServiceWorker 註冊成功, scope: ', registration.scope);
+                console.log('ServiceWorker 註冊成功');
               })
               .catch(err => {
                 console.log('ServiceWorker 註冊失敗: ', err);
@@ -542,12 +860,11 @@
       // --- 8. 應用程式啟動 (Init) ---
       function init() {
         loadData();
-        checkAndArchiveEvents(); // 每次啟動時檢查過期
+        checkAndArchiveEvents();
         renderAllPages();
         
-        // 預設顯示 "全部" 頁面的 FAB
-        fab.style.display = 'none'; // 預設隱藏，由導覽切換控制
-        document.querySelector('.nav-tab[data-page="page-home"]').click(); // 手動觸發點擊首頁
+        // 確保初始頁面是首頁
+        document.querySelector('.nav-tab[data-page="page-home"]').click(); 
         
         registerServiceWorker();
       }
