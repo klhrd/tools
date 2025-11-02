@@ -10,6 +10,8 @@
   --color-danger: #ff3b30;
   --color-label-bg: #eef5ff;
   --color-label-text: #007aff;
+  /* 新增：預設陰影顏色 */
+  --default-shadow-color: rgba(0, 0, 0, 0.1); 
 }
 
 /* 支援深色模式 (可選) */
@@ -22,8 +24,10 @@
     --color-bg: #000000;
     --color-card-bg: #1c1c1e;
     --color-border: #38383a;
+    --color-danger: #ff453a;
     --color-label-bg: #32254c;
     --color-label-text: #c08fff;
+    --default-shadow-color: rgba(255, 255, 255, 0.1);
   }
 }
 
@@ -105,19 +109,18 @@ main {
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 0 0 2px var(--shadow-color, transparent), 0 2px 8px rgba(0, 0, 0, 0.05); /* 新增: --shadow-color */
+  border: 1px solid var(--color-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border: 1px solid var(--color-border);
-  transition: opacity 0.3s ease;
+  transition: box-shadow 0.3s ease, opacity 0.3s ease;
 }
 
 .card-details {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  /* 確保左側不會被右側擠壓 */
   flex-grow: 1;
   width: 70%;
 }
@@ -154,7 +157,7 @@ main {
   color: var(--color-text-secondary);
 }
 
-/* 卡片右側 - 倒數天數 (最重要) */
+/* 卡片右側 - 倒數天數 */
 .card-countdown {
   display: flex;
   flex-direction: column;
@@ -162,12 +165,12 @@ main {
   justify-content: center;
   text-align: center;
   padding-left: 10px;
-  flex-shrink: 0; /* 防止被壓縮 */
+  flex-shrink: 0; 
   width: 30%;
 }
 
 .countdown-days {
-  font-size: 2.8rem; /* 最大的字體 */
+  font-size: 2.8rem;
   font-weight: bold;
   color: var(--color-text-countdown);
   line-height: 1;
@@ -197,10 +200,43 @@ main {
   text-decoration: line-through;
 }
 
-/* --- 5. 懸浮按鈕 (FAB) --- */
+/* --- 5. 篩選器 (Filter Bar) --- */
+.filter-bar {
+  display: flex;
+  gap: 8px;
+  overflow-x: scroll; /* 允許橫向滾動 */
+  padding-bottom: 10px;
+  margin-bottom: 16px;
+  /* 隱藏滾動條 */
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.filter-bar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera*/
+}
+
+.filter-chip {
+  flex-shrink: 0; /* 確保 Chip 不被壓縮 */
+  padding: 8px 12px;
+  border-radius: 20px;
+  background-color: var(--color-border);
+  color: var(--color-text);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.filter-chip.selected {
+  background-color: var(--color-primary);
+  color: white;
+  font-weight: 600;
+}
+
+
+/* --- 6. 懸浮按鈕 (FAB) & 狀態按鈕 --- */
 .fab {
   position: fixed;
-  bottom: 80px; /* 避免擋到導覽列 */
+  bottom: 80px; 
   right: 20px;
   width: 56px;
   height: 56px;
@@ -209,7 +245,7 @@ main {
   color: white;
   font-size: 32px;
   font-weight: lighter;
-  line-height: 56px; /* 垂直置中 */
+  line-height: 56px; 
   text-align: center;
   border: none;
   cursor: pointer;
@@ -217,7 +253,20 @@ main {
   z-index: 999;
 }
 
-/* --- 6. 新增/編輯表單 (Modal) --- */
+.toggle-archived-btn {
+  width: 100%;
+  padding: 12px;
+  background-color: var(--color-card-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-primary);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  margin-bottom: 16px;
+}
+
+/* --- 7. 模態視窗 (Modal) 基礎 --- */
 .modal-form {
   position: fixed;
   top: 0;
@@ -243,6 +292,13 @@ main {
   gap: 16px;
 }
 
+/* 確保 modal 內容可滾動 (重要) */
+.modal-detail-content, 
+.modal-form-content {
+  max-height: 90vh; 
+  overflow-y: auto;
+}
+
 .form-content h2 {
   font-size: 1.5rem;
   margin-bottom: 8px;
@@ -259,8 +315,7 @@ main {
   font-size: 0.9rem;
 }
 
-.form-group input[type="text"],
-.form-group input[type="date"],
+.form-group input:not([type="checkbox"]),
 .form-group select {
   width: 100%;
   padding: 12px;
@@ -269,6 +324,13 @@ main {
   font-size: 1rem;
   background-color: var(--color-bg);
   color: var(--color-text);
+  /* 鎖定欄位顏色提示 */
+  transition: background-color 0.2s;
+}
+.form-group input:disabled,
+.form-group select:disabled {
+    background-color: var(--color-border);
+    color: var(--color-text-secondary);
 }
 
 .form-group-inline {
@@ -281,8 +343,8 @@ main {
   flex-grow: 1;
 }
 
+/* 簡易的 toggle 開關 */
 .form-toggle {
-  /* 簡易的 toggle 開關 */
   appearance: none;
   width: 50px;
   height: 28px;
@@ -334,8 +396,50 @@ main {
   background-color: var(--color-primary);
   color: white;
 }
+.form-btn.danger {
+  background-color: var(--color-danger);
+  color: white;
+}
 
-/* --- 7. 設定頁面 --- */
+/* --- 8. 詳細資料視窗 (Detail Modal) --- */
+#event-detail-window {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.detail-item {
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--color-border);
+}
+.detail-item:last-child {
+    border-bottom: none;
+}
+.detail-item-label {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  display: block;
+}
+.detail-item-value {
+  font-size: 1rem;
+  font-weight: 500;
+  overflow-wrap: break-word;
+}
+
+.detail-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+.detail-actions .form-btn {
+    flex-grow: 1;
+}
+.detail-actions #btn-detail-edit {
+    flex-grow: 0;
+    padding: 12px 16px; /* 調整編輯按鈕寬度 */
+}
+
+
+/* --- 9. 設定頁面與管理子頁面 --- */
 .settings-group {
   background-color: var(--color-card-bg);
   border-radius: 12px;
@@ -358,6 +462,7 @@ main {
 
 .settings-item-label {
   font-size: 1rem;
+  font-weight: 500;
 }
 
 .settings-item-value {
@@ -365,6 +470,7 @@ main {
   color: var(--color-text-secondary);
 }
 
+/* 設定頁面中的按鈕樣式 */
 .settings-item button {
   width: 100%;
   padding: 12px;
@@ -380,7 +486,47 @@ main {
   text-align: center;
 }
 
-/* --- 8. 空狀態與輔助 --- */
+/* 預設集顏色管理 (子頁面) */
+.preset-item {
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--color-border);
+    cursor: default; /* 取消 settings-item 的預設 cursor */
+}
+
+.preset-color-picker {
+    /* 隱藏原生顏色選擇器，只顯示顏色塊 */
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 50%;
+    overflow: hidden;
+    position: relative;
+    /* 增加邊框讓顏色更突出 */
+    border: 2px solid var(--color-text-secondary);
+    box-shadow: 0 0 0 2px var(--color-card-bg); /* 白邊 */
+}
+.preset-color-picker::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+.preset-color-picker::-webkit-color-swatch {
+    border: none;
+    border-radius: 50%;
+}
+.preset-name {
+    font-weight: 600;
+    flex-grow: 1;
+}
+
+/* --- 10. 空狀態與輔助 --- */
 .empty-state {
   text-align: center;
   padding: 40px 20px;
@@ -388,18 +534,5 @@ main {
 }
 .empty-state-icon {
   font-size: 40px;
-  margin-bottom: 16px;
-}
-
-.toggle-archived-btn {
-  width: 100%;
-  padding: 12px;
-  background-color: var(--color-card-bg);
-  border: 1px solid var(--color-border);
-  color: var(--color-primary);
-  border-radius: 8px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
   margin-bottom: 16px;
 }
