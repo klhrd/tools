@@ -4,7 +4,9 @@ const statusElement = document.getElementById('status');
 // 1. 檢查瀏覽器是否支援 Service Worker 和 Notifications
 if ('serviceWorker' in navigator && 'Notification' in window) {
     // 註冊 Service Worker
-    navigator.serviceWorker.register('/sw.js')
+    // 嘗試使用相對路徑
+    navigator.serviceWorker.register('./sw.js') 
+    // 或者，如果您的 PWA 部署在子目錄下，但 Service Worker 放在根目錄，請確保 scope 正確。
         .then(registration => {
             console.log('Service Worker 註冊成功:', registration);
             statusElement.textContent = 'Service Worker 已註冊。';
