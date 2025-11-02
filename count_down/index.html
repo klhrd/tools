@@ -6,7 +6,6 @@
   <title>日期倒數機</title>
   
   <link rel="manifest" href="manifest.json">
-  
   <link rel="stylesheet" href="css/style.css">
   
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -14,7 +13,6 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="倒數機">
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
-  
   <meta name="theme-color" content="#007aff">
 </head>
 <body>
@@ -38,6 +36,16 @@
 
       <section id="page-settings" class="page">
         <h1 class="page-title">設定</h1>
+        
+        <div class="settings-group" id="notification-settings-group">
+          <div class="settings-item">
+            <span class="settings-item-label">每日通知時間</span>
+            <input type="time" id="notify-time-input" class="settings-input-time" value="08:00">
+          </div>
+          <div class="settings-item">
+            <button id="btn-test-notification">測試發送通知</button>
+          </div>
+        </div>
         
         <div class="settings-group">
           <div class="settings-item" id="btn-manage-labels">
@@ -63,7 +71,7 @@
         <div class="settings-group">
           <div class="settings-item">
             <span class="settings-item-label">版本號</span>
-            <span class="settings-item-value">v1.2.0 (2025-11-02)</span>
+            <span class="settings-item-value">v1.3.0 (2025-11-02)</span>
           </div>
         </div>
 
@@ -124,6 +132,7 @@
       <div class="detail-actions">
           <button id="btn-detail-close" class="form-btn btn-secondary">關閉</button>
           <button id="btn-detail-toggle-pin" class="form-btn btn-primary" data-pinned="false"></button>
+          <button id="btn-detail-notify" class="form-btn btn-secondary">🔔 通知</button>
           <button id="btn-detail-edit" class="form-btn btn-primary">編輯</button>
       </div>
     </div>
@@ -134,7 +143,9 @@
     <div class="form-content modal-form-content">
       <h2 id="form-title">新增活動</h2>
       <input type="hidden" id="event-id">
-      <input type="hidden" id="event-preset-id"> <div class="form-group">
+      <input type="hidden" id="event-preset-id"> 
+      
+      <div class="form-group">
         <label for="event-title">標題 (必填)</label>
         <input type="text" id="event-title" placeholder="例如：會考倒數">
       </div>
@@ -150,18 +161,23 @@
       </div>
       
       <div class="form-group">
-        <label for="event-labels">標籤 (選填，用逗號分隔)</label>
-        <input type="text" id="event-labels" placeholder="例如：考試, 重要">
+        <label>標籤 (可多選)</label>
+        <div id="form-labels-container" class="form-labels-container">
+          </div>
       </div>
 
       <div class="form-group">
-        <label for="event-recurrence">重複週期 (選填)</label>
-        <select id="event-recurrence">
-          <option value="None">永不</option>
-          <option value="Yearly">每年</option>
-          <option value="Monthly">每月</option>
-          <option value="Weekly">每週</option>
-        </select>
+        <label>重複週期 (選填)</label>
+        <div class="form-recurrence-container">
+          <span style="font-size: 0.9rem; margin-right: 5px;">每</span>
+          <input type="number" id="event-recurrence-interval" value="1" min="1">
+          <select id="event-recurrence-unit">
+            <option value="None">永不</option>
+            <option value="Weekly">週</option>
+            <option value="Monthly">月</option>
+            <option value="Yearly">年</option>
+          </select>
+        </div>
       </div>
 
       <div class="form-group">
@@ -184,27 +200,45 @@
       </div>
     </div>
   </div>
+  
+  <div id="modal-notification" class="modal-form" style="display: none;">
+    <div class="form-content">
+      <h2 id="notify-form-title"></h2>
+      <div class="form-group-inline">
+        <label for="notify-daily">每日通知</label>
+        <input type="checkbox" id="notify-daily" class="form-toggle">
+      </div>
+      <div class="form-group">
+        <label for="notify-specific">特定倒數天數通知 (用逗號分隔)</label>
+        <input type="text" id="notify-specific" placeholder="例如: 30, 7, 1">
+      </div>
+      <div class="form-buttons">
+        <button id="btn-notify-cancel" class="form-btn btn-secondary">取消</button>
+        <button id="btn-notify-save" class="form-btn btn-primary">儲存</button>
+      </div>
+    </div>
+  </div>
+
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
 
       // --- 1. 狀態與常數 ---
-      const STORAGE_KEY = 'countdownEvents_v1.2';
-      const CONFIG_KEY = 'countdownConfig_v1.2';
+      const STORAGE_KEY = 'countdownEvents_v1.3';
+      const CONFIG_KEY = 'countdownConfig_v1.3';
       const DEFAULT_COLOR = '#007aff';
       
       let events = []; // 主資料陣列
       let config = {
-          // 預設集配置：{ id: { name: '...', color: '...', isVisible: true/false } }
           presets: {}, 
-          labels: ['考試', '工作', '生日', '旅行'], // 自定義標籤
+          labels: ['考試', '工作', '生日', '旅行'], 
+          notificationTime: '08:00', // v1.3.0 新增
       }; 
       
-      // 篩選器改為陣列 (支援多選)
       let currentFilter = { home: ['全部'], all: ['全部'] }; 
       let showArchived = false;
+      let currentEventId = null; // 用於詳細/通知/編輯視窗
       
-      // 可用的預設集清單 (路徑必須相對於 index.html)
       const availablePresets = [
         { id: 'holidays', name: '國定節日與紀念日', path: './assets/default_data/national_holidays.json' },
         { id: 'exams', name: '學科考試', path: './assets/default_data/school_exams.json' },
@@ -222,14 +256,16 @@
       const allFilter = document.getElementById('all-filter');
       const toggleArchivedBtn = document.getElementById('toggle-archived-btn');
 
-      // Modals
+      // Modal: 詳細資料
       const modalDetail = document.getElementById('modal-detail-view');
       const detailTitle = document.getElementById('detail-title');
       const detailWindow = document.getElementById('event-detail-window');
       const btnDetailClose = document.getElementById('btn-detail-close');
       const btnDetailTogglePin = document.getElementById('btn-detail-toggle-pin');
       const btnDetailEdit = document.getElementById('btn-detail-edit');
+      const btnDetailNotify = document.getElementById('btn-detail-notify'); // v1.3.0
       
+      // Modal: 新增/編輯
       const modalForm = document.getElementById('modal-add-event');
       const formTitle = document.getElementById('form-title');
       const formEventId = document.getElementById('event-id');
@@ -237,18 +273,29 @@
       const formTitleInput = document.getElementById('event-title');
       const formDateInput = document.getElementById('event-date');
       const formSubtitleInput = document.getElementById('event-subtitle');
-      const formLabelsInput = document.getElementById('event-labels');
-      const formRecurrenceInput = document.getElementById('event-recurrence');
+      const formLabelsContainer = document.getElementById('form-labels-container'); // v1.3.0
+      const formRecurrenceIntervalInput = document.getElementById('event-recurrence-interval'); // v1.3.0
+      const formRecurrenceUnitInput = document.getElementById('event-recurrence-unit'); // v1.3.0
       const formPinnedInput = document.getElementById('event-pinned');
       const formColorInput = document.getElementById('event-color');
       const btnFormCancel = document.getElementById('btn-form-cancel');
       const btnFormSave = document.getElementById('btn-form-save');
       const btnFormDelete = document.getElementById('btn-form-delete');
       
+      // Modal: 通知 (v1.3.0)
+      const modalNotification = document.getElementById('modal-notification');
+      const notifyFormTitle = document.getElementById('notify-form-title');
+      const notifyDaily = document.getElementById('notify-daily');
+      const notifySpecific = document.getElementById('notify-specific');
+      const btnNotifyCancel = document.getElementById('btn-notify-cancel');
+      const btnNotifySave = document.getElementById('btn-notify-save');
+      
       // 設定頁面
       const btnManageLabels = document.getElementById('btn-manage-labels');
       const btnManagePresets = document.getElementById('btn-manage-presets');
       const btnClearArchived = document.getElementById('btn-clear-archived');
+      const notifyTimeInput = document.getElementById('notify-time-input'); // v1.3.0
+      const btnTestNotification = document.getElementById('btn-test-notification'); // v1.3.0
 
       // 標籤管理子頁面
       const labelsList = document.getElementById('labels-list');
@@ -267,12 +314,15 @@
         events = eventData ? JSON.parse(eventData) : [];
         
         if (configData) {
-            // 合併儲存的 config，確保新加入的預設 config 結構也存在
             const savedConfig = JSON.parse(configData);
             config = { ...config, ...savedConfig };
-            // 確保 presets 結構完整
             if (!config.presets) config.presets = {}; 
+            if (!config.labels) config.labels = ['考試', '工作', '生日', '旅行'];
+            if (!config.notificationTime) config.notificationTime = '08:00';
         }
+        
+        // 載入設定
+        notifyTimeInput.value = config.notificationTime;
       }
 
       /** 儲存資料 */
@@ -286,7 +336,7 @@
         return 'id_' + Math.random().toString(36).substr(2, 9);
       }
       
-      /** 檢查並自動封存過期活動 */
+      /** 檢查並自動封存過期活動 (v1.3.0 支援進階週期) */
       function checkAndArchiveEvents() {
         let needsSave = false;
         const today = new Date();
@@ -300,19 +350,21 @@
 
           if (diffDays < 0) { // 已過期
             
-            // 處理週期性
-            if (event.recurrence !== 'None') {
+            // v1.3.0 處理進階週期
+            if (event.recurrence && event.recurrence.unit !== 'None') {
               let newDate = targetDate;
-              // 循環推進到未來
-              while (newDate < today) {
-                if (event.recurrence === 'Yearly') {
-                  newDate.setFullYear(newDate.getFullYear() + 1);
-                } else if (event.recurrence === 'Monthly') {
-                  newDate.setMonth(newDate.getMonth() + 1);
-                } else if (event.recurrence === 'Weekly') {
-                  newDate.setDate(newDate.getDate() + 7);
+              const unit = event.recurrence.unit;
+              const interval = event.recurrence.interval || 1;
+              
+              while (newDate < today) { // 循環推進到未來
+                if (unit === 'Yearly') {
+                  newDate.setFullYear(newDate.getFullYear() + interval);
+                } else if (unit === 'Monthly') {
+                  newDate.setMonth(newDate.getMonth() + interval);
+                } else if (unit === 'Weekly') {
+                  newDate.setDate(newDate.getDate() + (7 * interval));
                 } else {
-                    break; // 無效週期則跳出
+                    break; 
                 }
               }
               event.date = newDate.toISOString().split('T')[0];
@@ -341,7 +393,6 @@
         return { days: diffDays, unit: '天', status: 'pending' };
       }
 
-
       // --- 4. 渲染邏輯 (UI) ---
 
       /** 取得事件的顏色 */
@@ -353,14 +404,18 @@
           return DEFAULT_COLOR; 
       }
 
-      /** 產生單個卡片的 HTML */
+      /** 產生單個卡片的 HTML (v1.3.0 支援 🔔) */
       function createEventCardHTML(event) {
         const countdown = calculateCountdown(event.date);
         const eventColor = getEventColor(event);
         
+        // v1.3.0: 檢查通知
+        const hasNotification = event.notification && (event.notification.daily || (event.notification.specificDays && event.notification.specificDays.length > 0));
+        const notifyIcon = hasNotification ? '<span class="notification-icon">🔔</span> ' : '';
+        
         const labelsHTML = (event.labels || [])
           .map(label => `<span class="card-label">${label}</span>`)
-          .join('');
+          .join(' ');
         
         let countdownHTML;
         if (event.status === 'Archived') {
@@ -378,7 +433,7 @@
             style="--shadow-color: ${eventColor};"
           >
             <div class="card-details">
-              ${labelsHTML ? `<div class="card-labels">${labelsHTML}</div>` : ''}
+              ${notifyIcon || labelsHTML ? `<div class="card-labels">${notifyIcon}${labelsHTML}</div>` : ''}
               <div class="card-title">${event.title}</div>
               ${event.subtitle ? `<div class="card-subtitle">${event.subtitle}</div>` : ''}
               <div class="card-date">${event.date}</div>
@@ -390,14 +445,13 @@
         `;
       }
       
-      /** 渲染篩選器 (支援多選) */
+      /** 渲染篩選器 (v1.3.0 支援多選) */
       function renderFilterBar(page, container) {
           const isHome = page === 'home';
-          const current = currentFilter[page]; // 現在是陣列
+          const current = currentFilter[page]; // 陣列
           
-          // 取得所有可用標籤 (僅限當前頁面列表中的活動標籤)
           const allLabels = events
-            .filter(e => isHome ? e.is_pinned && e.status === 'Active' : e.status === 'Active') // 篩選器只看 Active 的
+            .filter(e => isHome ? e.is_pinned && e.status === 'Active' : e.status === 'Active')
             .reduce((acc, e) => {
                 (e.labels || []).forEach(label => acc.add(label));
                 return acc;
@@ -416,41 +470,36 @@
           `).join('');
       }
 
-      /** 取得過濾後的活動 */
+      /** 取得過濾後的活動 (v1.3.0 支援多選) */
       function getFilteredEvents(page) {
         const isHome = page === 'home';
         const filterLabels = currentFilter[page];
         const statusToShow = (page === 'all' && showArchived) ? 'Archived' : 'Active';
 
         let filtered = events
-          // 1. 基礎過濾 (定選/狀態)
           .filter(e => {
             if (isHome) {
               return e.is_pinned && e.status === 'Active';
             }
             return e.status === statusToShow;
           })
-          // 2. 預設集可見性過濾
           .filter(e => {
             if (e.presetId && config.presets[e.presetId]) {
               return config.presets[e.presetId].isVisible;
             }
-            return true; // 非預設集活動永遠可見
+            return true; 
           });
 
-        // 3. 標籤過濾 (多選)
+        // 標籤過濾 (多選)
         if (!filterLabels.includes('全部')) {
           filtered = filtered.filter(e => {
             if (!e.labels || e.labels.length === 0) return false;
-            // 檢查 e.labels 中是否至少有一個標籤存在於 filterLabels 中
             return e.labels.some(label => filterLabels.includes(label));
           });
         }
         
-        // 4. 排序
         return filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
       }
-
 
       /** 渲染首頁 */
       function renderHomePage() {
@@ -501,11 +550,11 @@
           });
       }
       
-      /** 渲染預設集管理頁面 (新) */
+      /** 渲染預設集管理頁面 */
       function renderPresetManagementPage() {
           presetManagementList.innerHTML = availablePresets.map(preset => {
               const presetConfig = config.presets[preset.id] || {};
-              const isVisible = presetConfig.isVisible || false; // 預設為未載入 (不可見)
+              const isVisible = presetConfig.isVisible || false;
               const color = presetConfig.color || DEFAULT_COLOR;
 
               return `
@@ -519,13 +568,12 @@
               `;
           }).join('');
           
-          // 綁定事件
           presetManagementList.querySelectorAll('.preset-color-picker').forEach(input => {
               input.addEventListener('change', (e) => {
                   const presetId = e.target.dataset.id;
                   config.presets[presetId].color = e.target.value;
                   saveData();
-                  renderAllPages(); // 顏色改變，需要重繪卡片
+                  renderAllPages(); 
               });
           });
 
@@ -534,7 +582,6 @@
                   const presetId = e.target.dataset.id;
                   const isVisible = e.target.checked;
                   handlePresetToggle(presetId, isVisible);
-                  // 切換時，啟用/禁用顏色選擇器
                   e.target.closest('.preset-item').querySelector('.preset-color-picker').disabled = !isVisible;
               });
           });
@@ -548,8 +595,6 @@
 
 
       // --- 5. 模態視窗與表單邏輯 ---
-      
-      let currentEventId = null;
 
       /** 顯示詳細資料視窗 */
       function showDetailModal(event) {
@@ -559,8 +604,12 @@
           btnDetailTogglePin.dataset.pinned = event.is_pinned;
 
           const eventColor = getEventColor(event);
+          const recurrence = event.recurrence || { unit: 'None', interval: 1 };
+          let recurrenceText = '永不';
+          if (recurrence.unit !== 'None') {
+              recurrenceText = `每 ${recurrence.interval} ${ {'Weekly':'週','Monthly':'月','Yearly':'年'}[recurrence.unit] }`;
+          }
           
-          // 內容
           const content = `
               <div class="detail-item">
                   <span class="detail-item-label">倒數</span>
@@ -572,12 +621,11 @@
               </div>
               ${event.subtitle ? `<div class="detail-item"><span class="detail-item-label">副標題</span><span class="detail-item-value">${event.subtitle}</span></div>` : ''}
               ${(event.labels && event.labels.length > 0) ? `<div class="detail-item"><span class="detail-item-label">標籤</span><span class="detail-item-value">${event.labels.join(', ')}</span></div>` : ''}
-              ${event.recurrence !== 'None' ? `<div class="detail-item"><span class="detail-item-label">重複週期</span><span class="detail-item-value">${event.recurrence}</span></div>` : ''}
-              ${event.presetId ? `<div class="detail-item"><span class="detail-item-label">所屬預設集</span><span class="detail-item-value">${config.presets[event.presetId]?.name || '未知'}</span></div>` : ''}
               <div class="detail-item">
-                  <span class="detail-item-label">狀態</span>
-                  <span class="detail-item-value">${event.status === 'Active' ? '活動中' : '已封存'}</span>
+                  <span class="detail-item-label">重複週期</span>
+                  <span class="detail-item-value">${recurrenceText}</span>
               </div>
+              ${event.presetId ? `<div class="detail-item"><span class="detail-item-label">所屬預設集</span><span class="detail-item-value">${config.presets[event.presetId]?.name || '未知'}</span></div>` : ''}
               <div class="detail-item">
                   <span class="detail-item-label">陰影顏色</span>
                   <span class="detail-item-value" style="color: ${eventColor};">${eventColor}</span>
@@ -587,8 +635,10 @@
           modalDetail.style.display = 'flex';
       }
 
-      /** 顯示新增/編輯視窗 */
+      /** 顯示新增/編輯視窗 (v1.3.0 支援 Feature 3, 4, 6) */
       function showFormModal(event = null) {
+        const isPresetEvent = !!(event && event.presetId);
+        
         if (event) {
           // 編輯模式
           formTitle.textContent = '編輯活動';
@@ -597,18 +647,14 @@
           formTitleInput.value = event.title;
           formDateInput.value = event.date;
           formSubtitleInput.value = event.subtitle || '';
-          formLabelsInput.value = (event.labels || []).join(', ');
-          formRecurrenceInput.value = event.recurrence || 'None';
+          
+          const recurrence = event.recurrence || { unit: 'None', interval: 1 };
+          formRecurrenceIntervalInput.value = recurrence.interval || 1;
+          formRecurrenceUnitInput.value = recurrence.unit || 'None';
+          
           formPinnedInput.checked = event.is_pinned;
           formColorInput.value = event.color || getEventColor(event);
-          btnFormDelete.style.display = 'block';
-
-          // 預設集導入的活動，標題/日期/週期鎖定
-          const isPresetEvent = !!event.presetId;
-          formTitleInput.disabled = isPresetEvent;
-          formDateInput.disabled = isPresetEvent;
-          formRecurrenceInput.disabled = isPresetEvent;
-          formColorInput.disabled = isPresetEvent; // 顏色由預設集管理
+          btnFormDelete.style.display = isPresetEvent ? 'none' : 'block'; // Feature 3
           
         } else {
           // 新增模式
@@ -618,23 +664,36 @@
           formTitleInput.value = '';
           formDateInput.value = '';
           formSubtitleInput.value = '';
-          formLabelsInput.value = ''; // 新增時預設為空
-          formRecurrenceInput.value = 'None';
+          formRecurrenceIntervalInput.value = 1;
+          formRecurrenceUnitInput.value = 'None';
           formPinnedInput.checked = false;
           formColorInput.value = DEFAULT_COLOR;
           btnFormDelete.style.display = 'none';
-          
-          formTitleInput.disabled = false;
-          formDateInput.disabled = false;
-          formRecurrenceInput.disabled = false;
-          formColorInput.disabled = false;
         }
-        hideDetailModal(); // 確保不會同時開啟
+        
+        // Feature 6: 渲染標籤勾選
+        const currentLabels = (event && event.labels) ? event.labels : [];
+        formLabelsContainer.innerHTML = (config.labels || []).map(label => `
+          <div class="label-checkbox-item">
+            <input type="checkbox" id="label-cb-${label}" class="label-checkbox-input" value="${label}" ${currentLabels.includes(label) ? 'checked' : ''}>
+            <label for="label-cb-${label}">${label}</label>
+          </div>
+        `).join('');
+        
+        // 預設集導入的活動，鎖定核心欄位
+        formTitleInput.disabled = isPresetEvent;
+        formDateInput.disabled = isPresetEvent;
+        formColorInput.disabled = isPresetEvent;
+        formRecurrenceIntervalInput.disabled = isPresetEvent;
+        formRecurrenceUnitInput.disabled = isPresetEvent;
+
+        hideDetailModal(); 
         modalForm.style.display = 'flex';
       }
       
       function hideDetailModal() { modalDetail.style.display = 'none'; currentEventId = null; }
       function hideFormModal() { modalForm.style.display = 'none'; }
+      function hideNotificationModal() { modalNotification.style.display = 'none'; }
 
       /** 刪除活動 */
       function handleDelete() {
@@ -649,6 +708,7 @@
         }
       }
       
+      /** 提交表單 (v1.3.0 支援 Feature 4, 6) */
       function handleFormSubmit() {
         const id = formEventId.value;
         const title = formTitleInput.value.trim();
@@ -659,33 +719,46 @@
           return;
         }
         
-        const labels = formLabelsInput.value.split(',').map(s => s.trim()).filter(Boolean);
+        // Feature 6: 讀取標籤
+        const selectedLabels = Array.from(document.querySelectorAll('#form-labels-container input[type="checkbox"]:checked'))
+                                    .map(cb => cb.value);
+        
+        // Feature 4: 讀取週期
+        const recurrenceUnit = formRecurrenceUnitInput.value;
+        const recurrenceInterval = parseInt(formRecurrenceIntervalInput.value) || 1;
+        const recurrence = (recurrenceUnit !== 'None') ? { unit: recurrenceUnit, interval: recurrenceInterval } : { unit: 'None', interval: 1 };
+        
+        const presetId = formPresetId.value || undefined;
+        let originalEvent = null;
+        if (id) {
+            originalEvent = events.find(e => e.id === id);
+        }
 
         const eventData = {
           id: id || generateID(),
           title: title,
           subtitle: formSubtitleInput.value.trim() || '',
           date: date,
-          labels: labels,
-          recurrence: formRecurrenceInput.value,
+          labels: selectedLabels,
+          recurrence: recurrence,
           is_pinned: formPinnedInput.checked,
           color: formColorInput.value !== DEFAULT_COLOR ? formColorInput.value : undefined,
-          presetId: formPresetId.value || undefined, 
+          presetId: presetId,
+          // 保留通知設定 (如果已存在)
+          notification: (originalEvent && originalEvent.notification) ? originalEvent.notification : undefined,
           status: 'Active' 
         };
         
         // 如果是預設集事件，則只更新可修改欄位
-        if (eventData.presetId) {
-            const originalEvent = events.find(e => e.id === id);
-            if(originalEvent) {
-                eventData.title = originalEvent.title;
-                eventData.date = originalEvent.date;
-                eventData.recurrence = originalEvent.recurrence;
-                eventData.color = originalEvent.color; 
-                eventData.subtitle = formSubtitleInput.value.trim() || ''; 
-                eventData.labels = labels;
-                eventData.is_pinned = formPinnedInput.checked;
-            }
+        if (presetId && originalEvent) {
+            eventData.title = originalEvent.title;
+            eventData.date = originalEvent.date;
+            eventData.recurrence = originalEvent.recurrence;
+            eventData.color = originalEvent.color; 
+            // 只允許修改 subtitle, labels, is_pinned
+            eventData.subtitle = formSubtitleInput.value.trim() || ''; 
+            eventData.labels = selectedLabels;
+            eventData.is_pinned = formPinnedInput.checked;
         }
 
         if (id) {
@@ -702,21 +775,17 @@
         hideFormModal();
       }
       
-      /** 處理預設集顯示/隱藏切換 (新) */
+      /** 處理預設集顯示/隱藏切換 */
       async function handlePresetToggle(presetId, isVisible) {
           const preset = availablePresets.find(p => p.id === presetId);
           if (!preset) return;
 
-          // 1. 更新 Config 狀態
           if (!config.presets[presetId]) {
               config.presets[presetId] = { name: preset.name, color: DEFAULT_COLOR, isVisible: false };
           }
           config.presets[presetId].isVisible = isVisible;
           
           let needsDataFetch = false;
-          
-          // 2. 檢查是否需要載入資料
-          // 如果切換為 "開啟" 且資料尚未載入 (以 presetId 檢查 events)
           if (isVisible && !events.some(e => e.presetId === presetId)) {
               needsDataFetch = true;
           }
@@ -724,7 +793,7 @@
           if (needsDataFetch) {
               console.log(`Fetching preset: ${preset.name}`);
               try {
-                  const response = await fetch(preset.path); // 使用相對路徑
+                  const response = await fetch(preset.path);
                   if (!response.ok) throw new Error(`無法載入 ${preset.name}`);
                   
                   const defaultEvents = await response.json();
@@ -739,57 +808,178 @@
                           });
                       }
                   });
-                  checkAndArchiveEvents(); // 導入後立即檢查
+                  checkAndArchiveEvents();
                   
-              } catch (error) {
+              } catch (error)
+ {
                   console.error('導入失敗:', error);
                   alert(`導入預設集 ${preset.name} 失敗。`);
-                  // 導入失敗，恢復切換
                   config.presets[presetId].isVisible = false;
                   e.target.checked = false; 
               }
           }
 
-          // 3. 儲存並重繪
           saveData();
           renderAllPages();
       }
+      
+      
+      // --- 6. v1.3.0 通知邏輯 (Feature 1, 2) ---
+      
+      /** 請求通知權限 (App 啟動時) */
+      function requestNotificationPermission() {
+        if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+          // 僅在尚未決定時詢問
+          setTimeout(() => {
+             Notification.requestPermission();
+          }, 3000); // 延遲 3 秒詢問
+        }
+      }
+      
+      /** 顯示通知設定視窗 */
+      function showNotificationModal() {
+          const event = events.find(e => e.id === currentEventId);
+          if (!event) return;
+          
+          if (Notification.permission !== 'granted') {
+              alert('您尚未開啟通知權限。請在瀏覽器設定中允許通知。');
+              Notification.requestPermission();
+              return;
+          }
+          
+          notifyFormTitle.textContent = event.title;
+          const settings = event.notification || { daily: false, specificDays: [] };
+          notifyDaily.checked = settings.daily;
+          notifySpecific.value = (settings.specificDays || []).join(', ');
+          
+          hideDetailModal();
+          modalNotification.style.display = 'flex';
+      }
+      
+      /** 儲存通知設定 */
+      function handleNotificationSave() {
+          const event = events.find(e => e.id === currentEventId);
+          if (!event) return;
+          
+          const specificDays = notifySpecific.value.split(',')
+                                .map(s => parseInt(s.trim()))
+                                .filter(n => !isNaN(n) && n > 0);
+                                
+          event.notification = {
+            daily: notifyDaily.checked,
+            specificDays: specificDays
+          };
+          
+          saveData();
+          renderAllPages();
+          hideNotificationModal();
+      }
 
-      // --- 6. 事件監聽器 ---
+      /** 發送測試通知 */
+      function handleTestNotification() {
+          if ('Notification' in window) {
+              if (Notification.permission === 'granted') {
+                sendNotification('測試通知 (v1.3.0)', '如果看到這個，表示通知設定成功！');
+              } else if (Notification.permission === 'denied') {
+                  alert('通知權限已被封鎖，請至瀏覽器設定中解除封鎖。');
+              } else {
+                  Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                      sendNotification('測試通知 (v1.3.0)', '如果看到這個，表示通知設定成功！');
+                    }
+                  });
+              }
+          }
+      }
 
-      /** 篩選器事件委派 (多選) */
+      /** 檢查並發送排程通知 (App 啟動時) */
+      function checkAndSendNotifications() {
+          if (Notification.permission !== 'granted') {
+              console.log('通知權限未開啟，跳過檢查。');
+              return;
+          }
+          
+          const today = new Date();
+          const notifyTime = config.notificationTime.split(':'); // e.g., ['08', '00']
+          const now = new Date();
+          
+          const lastCheckStorageKey = 'lastNotificationCheck_v1.3';
+          const lastCheckDate = localStorage.getItem(lastCheckStorageKey) || '';
+          const todayStr = today.toISOString().split('T')[0];
+          
+          // 檢查是否已過今日通知時間
+          const notifyHour = parseInt(notifyTime[0]);
+          const notifyMinute = parseInt(notifyTime[1]);
+          
+          if (now.getHours() < notifyHour || (now.getHours() === notifyHour && now.getMinutes() < notifyMinute)) {
+              console.log('尚未到達今日通知時間。');
+              localStorage.setItem(lastCheckStorageKey, ''); // 允許今天稍後檢查
+              return;
+          }
+          
+          if (lastCheckDate === todayStr) {
+              console.log('今日已檢查過通知。');
+              return;
+          }
+          
+          console.log(`執行 ${todayStr} 的通知檢查 (時間 ${config.notificationTime})...`);
+          localStorage.setItem(lastCheckStorageKey, todayStr);
+
+          events.forEach(event => {
+            if (event.status !== 'Active' || !event.notification) return;
+            
+            const countdown = calculateCountdown(event.date);
+            if (countdown.status === 'expired' || countdown.status === 'today') return;
+            
+            const daysLeft = countdown.days;
+
+            // 1. 每日通知
+            if (event.notification.daily) {
+               sendNotification(`每日提醒: ${event.title}`, `還剩下 ${daysLeft} 天！`);
+            }
+            // 2. 特定日期
+            if (event.notification.specificDays && event.notification.specificDays.includes(daysLeft)) {
+               sendNotification(`倒數提醒: ${event.title}`, `倒數 ${daysLeft} 天！`);
+            }
+          });
+      }
+      
+      /** 實際的 Web Notification API 呼叫 */
+      function sendNotification(title, body) {
+          // Service Worker 註冊成功後，可以使用 SW 來發送通知 (更穩定)
+          if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+              // 理想情況下，應該由 SW 發送 (但本架構中 SW 僅快取)
+              new Notification(title, { body: body, icon: './assets/icons/icon-192.png' });
+          } else {
+              // 備用方案
+              new Notification(title, { body: body, icon: './assets/icons/icon-192.png' });
+          }
+      }
+
+      // --- 7. 事件監聽器 ---
+
+      /** 篩選器事件委派 (v1.3.0 多選) */
       document.getElementById('main-content').addEventListener('click', (e) => {
           if (e.target.classList.contains('filter-chip')) {
               const page = e.target.dataset.page;
               const label = e.target.dataset.label;
-              
-              let current = currentFilter[page]; // [ '全部' ]
+              let current = currentFilter[page];
 
               if (label === '全部') {
                   current = ['全部'];
               } else {
-                  // 如果 "全部" 在裡面，先移除
                   const allIndex = current.indexOf('全部');
-                  if (allIndex > -1) {
-                      current.splice(allIndex, 1);
-                  }
+                  if (allIndex > -1) current.splice(allIndex, 1);
                   
-                  // 檢查標籤是否已存在
                   const labelIndex = current.indexOf(label);
                   if (labelIndex > -1) {
-                      // 存在 -> 移除
                       current.splice(labelIndex, 1);
                   } else {
-                      // 不存在 -> 加入
                       current.push(label);
                   }
                   
-                  // 如果陣列空了，改回 "全部"
-                  if (current.length === 0) {
-                      current = ['全部'];
-                  }
+                  if (current.length === 0) current = ['全部'];
               }
-              
               currentFilter[page] = current;
               
               if (page === 'home') renderHomePage();
@@ -826,6 +1016,11 @@
       btnFormDelete.addEventListener('click', handleDelete);
       fab.addEventListener('click', () => showFormModal(null));
       
+      // v1.3.0 通知模態視窗
+      btnDetailNotify.addEventListener('click', showNotificationModal);
+      btnNotifyCancel.addEventListener('click', hideNotificationModal);
+      btnNotifySave.addEventListener('click', handleNotificationSave);
+
       /** 頁面切換 */
       navTabs.forEach(tab => {
         tab.addEventListener('click', () => {
@@ -838,7 +1033,6 @@
 
           fab.style.display = (pageId === 'page-all') ? 'block' : 'none';
           
-          // 進入設定子頁面的渲染
           if (pageId === 'page-manage-labels') renderLabelManagement();
           if (pageId === 'page-manage-presets') renderPresetManagementPage();
           if (pageId === 'page-settings') renderAllPages(); 
@@ -854,6 +1048,12 @@
               renderAllPages();
           }
       });
+      // v1.3.0 通知設定
+      notifyTimeInput.addEventListener('change', (e) => { 
+          config.notificationTime = e.target.value; 
+          saveData(); 
+      });
+      btnTestNotification.addEventListener('click', handleTestNotification);
 
       // 標籤管理事件
       btnManageLabels.addEventListener('click', () => navigateToPage('page-manage-labels'));
@@ -868,7 +1068,7 @@
           }
       });
       
-      // 預設集管理事件 (新)
+      // 預設集管理事件
       btnManagePresets.addEventListener('click', () => navigateToPage('page-manage-presets'));
       
       // 返回按鈕
@@ -887,12 +1087,10 @@
           if (pageId === 'page-manage-presets') renderPresetManagementPage();
       }
 
-      // --- 7. PWA Service Worker 註冊 (修正) ---
+      // --- 8. PWA Service Worker 註冊 ---
       function registerServiceWorker() {
         if ('serviceWorker' in navigator) {
           window.addEventListener('load', () => {
-            // *** 關鍵修正: 改為使用相對路徑 "./sw.js" ***
-            // 解決了 /sw.js 的 404 錯誤
             navigator.serviceWorker.register('./sw.js') 
               .then(registration => {
                 console.log('ServiceWorker 註冊成功, scope: ', registration.scope);
@@ -904,7 +1102,7 @@
         }
       }
       
-      // --- 8. 應用程式啟動 (Init) ---
+      // --- 9. 應用程式啟動 (Init) ---
       function init() {
         loadData();
         checkAndArchiveEvents();
@@ -914,6 +1112,10 @@
         document.querySelector('.nav-tab[data-page="page-home"]').click(); 
         
         registerServiceWorker();
+        
+        // v1.3.0: 啟動時請求權限並檢查通知
+        requestNotificationPermission();
+        checkAndSendNotifications();
       }
 
       // 啟動！
