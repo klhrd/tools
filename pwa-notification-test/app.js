@@ -28,18 +28,27 @@ if ('serviceWorker' in navigator && 'Notification' in window) {
         });
     });
     
-    // 3. 實作本地通知測試
+    // 3. 實作本地通知測試 (透過 Service Worker 代理)
     testButton.addEventListener('click', () => {
         if (Notification.permission === 'granted') {
-            const title = '即時通知測試';
-            const options = {
-                body: '這是一個由網頁頁面直接發送的通知。',
-                // 這裡可以選擇加上 icon
-            };
+            const title = '本地按鈕透過 Service Worker 發送';
+            const body = '這是最可靠的網頁通知方式！';
             
-            // 使用瀏覽器的 Notification API 直接彈出通知
-            new Notification(title, options);
-            console.log('即時通知已發送。');
+            // 檢查 Service Worker 是否已註冊且就緒
+            navigator.serviceWorker.ready.then(registration => {
+                // 使用 Service Worker 的 showNotification()
+                // 由於這是從主執行緒發起的，我們用 showNotification() 而不是 push 事件
+                registration.showNotification(title, {
+                    body: body,
+                })
+                .then(() => {
+                    console.log('通知請求已成功傳遞給 Service Worker 執行。');
+                })
+                .catch(error => {
+                    console.error('Service Worker showNotification 執行失敗:', error);
+                });
+            });
+    
         } else {
             alert('請先點擊「啟用通知」按鈕並允許權限。');
         }
