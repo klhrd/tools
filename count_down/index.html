@@ -71,7 +71,7 @@
         <div class="settings-group">
           <div class="settings-item">
             <span class="settings-item-label">版本號</span>
-            <span class="settings-item-value">v1.3.0 (2025-11-02)</span>
+            <span class="settings-item-value">v1.3.1 (2025-11-02)</span>
           </div>
         </div>
 
@@ -223,21 +223,28 @@
   <script>
     document.addEventListener('DOMContentLoaded', () => {
 
-      // --- 1. 狀態與常數 ---
-      const STORAGE_KEY = 'countdownEvents_v1.3';
-      const CONFIG_KEY = 'countdownConfig_v1.3';
+      // --- 1. 狀態與常數 (v1.3.1 修正 Bug 1) ---
+      
+      // 修正: 使用穩定的 Key，不再隨版本變動，避免資料遺失
+      const STORAGE_KEY = 'countdownEvents_v1_stable';
+      const CONFIG_KEY = 'countdownConfig_v1_stable';
+      
+      // 用於遷移 v1.3 的資料
+      const OLD_STORAGE_KEY_v1_3 = 'countdownEvents_v1.3';
+      const OLD_CONFIG_KEY_v1_3 = 'countdownConfig_v1.3';
+      
       const DEFAULT_COLOR = '#007aff';
       
       let events = []; // 主資料陣列
       let config = {
           presets: {}, 
           labels: ['考試', '工作', '生日', '旅行'], 
-          notificationTime: '08:00', // v1.3.0 新增
+          notificationTime: '08:00',
       }; 
       
       let currentFilter = { home: ['全部'], all: ['全部'] }; 
       let showArchived = false;
-      let currentEventId = null; // 用於詳細/通知/編輯視窗
+      let currentEventId = null; 
       
       const availablePresets = [
         { id: 'holidays', name: '國定節日與紀念日', path: './assets/default_data/national_holidays.json' },
@@ -245,27 +252,22 @@
       ];
 
 
-      // --- 2. DOM 元素 ---
+      // --- 2. DOM 元素 (無變動) ---
       const pages = document.querySelectorAll('.page');
       const navTabs = document.querySelectorAll('.nav-tab');
       const fab = document.getElementById('fab-add');
-      
       const homeList = document.getElementById('home-list');
       const allList = document.getElementById('all-list');
       const homeFilter = document.getElementById('home-filter');
       const allFilter = document.getElementById('all-filter');
       const toggleArchivedBtn = document.getElementById('toggle-archived-btn');
-
-      // Modal: 詳細資料
       const modalDetail = document.getElementById('modal-detail-view');
       const detailTitle = document.getElementById('detail-title');
       const detailWindow = document.getElementById('event-detail-window');
       const btnDetailClose = document.getElementById('btn-detail-close');
       const btnDetailTogglePin = document.getElementById('btn-detail-toggle-pin');
       const btnDetailEdit = document.getElementById('btn-detail-edit');
-      const btnDetailNotify = document.getElementById('btn-detail-notify'); // v1.3.0
-      
-      // Modal: 新增/編輯
+      const btnDetailNotify = document.getElementById('btn-detail-notify');
       const modalForm = document.getElementById('modal-add-event');
       const formTitle = document.getElementById('form-title');
       const formEventId = document.getElementById('event-id');
@@ -273,46 +275,59 @@
       const formTitleInput = document.getElementById('event-title');
       const formDateInput = document.getElementById('event-date');
       const formSubtitleInput = document.getElementById('event-subtitle');
-      const formLabelsContainer = document.getElementById('form-labels-container'); // v1.3.0
-      const formRecurrenceIntervalInput = document.getElementById('event-recurrence-interval'); // v1.3.0
-      const formRecurrenceUnitInput = document.getElementById('event-recurrence-unit'); // v1.3.0
+      const formLabelsContainer = document.getElementById('form-labels-container');
+      const formRecurrenceIntervalInput = document.getElementById('event-recurrence-interval');
+      const formRecurrenceUnitInput = document.getElementById('event-recurrence-unit');
       const formPinnedInput = document.getElementById('event-pinned');
       const formColorInput = document.getElementById('event-color');
       const btnFormCancel = document.getElementById('btn-form-cancel');
       const btnFormSave = document.getElementById('btn-form-save');
       const btnFormDelete = document.getElementById('btn-form-delete');
-      
-      // Modal: 通知 (v1.3.0)
       const modalNotification = document.getElementById('modal-notification');
       const notifyFormTitle = document.getElementById('notify-form-title');
       const notifyDaily = document.getElementById('notify-daily');
       const notifySpecific = document.getElementById('notify-specific');
       const btnNotifyCancel = document.getElementById('btn-notify-cancel');
       const btnNotifySave = document.getElementById('btn-notify-save');
-      
-      // 設定頁面
       const btnManageLabels = document.getElementById('btn-manage-labels');
       const btnManagePresets = document.getElementById('btn-manage-presets');
       const btnClearArchived = document.getElementById('btn-clear-archived');
-      const notifyTimeInput = document.getElementById('notify-time-input'); // v1.3.0
-      const btnTestNotification = document.getElementById('btn-test-notification'); // v1.3.0
-
-      // 標籤管理子頁面
+      const notifyTimeInput = document.getElementById('notify-time-input');
+      const btnTestNotification = document.getElementById('btn-test-notification');
       const labelsList = document.getElementById('labels-list');
       const newLabelInput = document.getElementById('new-label-input');
       const btnAddLabel = document.getElementById('btn-add-label');
-      
-      // 預設集管理子頁面
       const presetManagementList = document.getElementById('preset-management-list');
       
       // --- 3. 核心邏輯 (日期計算與資料) ---
 
-      /** 載入資料 */
+      /** 載入資料 (v1.3.1 修正 Bug 1: 資料遷移) */
       function loadData() {
-        const eventData = localStorage.getItem(STORAGE_KEY);
-        const configData = localStorage.getItem(CONFIG_KEY);
-        events = eventData ? JSON.parse(eventData) : [];
+        let eventData = localStorage.getItem(STORAGE_KEY);
+        let configData = localStorage.getItem(CONFIG_KEY);
+
+        // v1.3.1 資料遷移邏輯
+        if (!eventData) {
+            console.log('Stable storage not found. Attempting migration from v1.3...');
+            eventData = localStorage.getItem(OLD_STORAGE_KEY_v1_3);
+            if (eventData) {
+                console.log('Migrating events data from v1.3...');
+                localStorage.setItem(STORAGE_KEY, eventData);
+                localStorage.removeItem(OLD_STORAGE_KEY_v1_3);
+            }
+        }
+        if (!configData) {
+            console.log('Stable config not found. Attempting migration from v1.3...');
+            configData = localStorage.getItem(OLD_CONFIG_KEY_v1_3);
+            if (configData) {
+                console.log('Migrating config data from v1.3...');
+                localStorage.setItem(CONFIG_KEY, configData);
+                localStorage.removeItem(OLD_CONFIG_KEY_v1_3);
+            }
+        }
         
+        // 正常載入
+        events = eventData ? JSON.parse(eventData) : [];
         if (configData) {
             const savedConfig = JSON.parse(configData);
             config = { ...config, ...savedConfig };
@@ -321,7 +336,6 @@
             if (!config.notificationTime) config.notificationTime = '08:00';
         }
         
-        // 載入設定
         notifyTimeInput.value = config.notificationTime;
       }
 
@@ -336,7 +350,7 @@
         return 'id_' + Math.random().toString(36).substr(2, 9);
       }
       
-      /** 檢查並自動封存過期活動 (v1.3.0 支援進階週期) */
+      /** 檢查並自動封存過期活動 (v1.3.0 邏輯) */
       function checkAndArchiveEvents() {
         let needsSave = false;
         const today = new Date();
@@ -350,13 +364,12 @@
 
           if (diffDays < 0) { // 已過期
             
-            // v1.3.0 處理進階週期
             if (event.recurrence && event.recurrence.unit !== 'None') {
               let newDate = targetDate;
               const unit = event.recurrence.unit;
               const interval = event.recurrence.interval || 1;
               
-              while (newDate < today) { // 循環推進到未來
+              while (newDate < today) {
                 if (unit === 'Yearly') {
                   newDate.setFullYear(newDate.getFullYear() + interval);
                 } else if (unit === 'Monthly') {
@@ -370,7 +383,6 @@
               event.date = newDate.toISOString().split('T')[0];
               needsSave = true;
             } else {
-              // 永久過期 -> 封存
               event.status = 'Archived';
               event.is_pinned = false;
               needsSave = true;
@@ -404,12 +416,11 @@
           return DEFAULT_COLOR; 
       }
 
-      /** 產生單個卡片的 HTML (v1.3.0 支援 🔔) */
+      /** 產生單個卡片的 HTML (v1.3.0 邏輯) */
       function createEventCardHTML(event) {
         const countdown = calculateCountdown(event.date);
         const eventColor = getEventColor(event);
         
-        // v1.3.0: 檢查通知
         const hasNotification = event.notification && (event.notification.daily || (event.notification.specificDays && event.notification.specificDays.length > 0));
         const notifyIcon = hasNotification ? '<span class="notification-icon">🔔</span> ' : '';
         
@@ -445,7 +456,7 @@
         `;
       }
       
-      /** 渲染篩選器 (v1.3.0 支援多選) */
+      /** 渲染篩選器 (v1.3.0 邏輯) */
       function renderFilterBar(page, container) {
           const isHome = page === 'home';
           const current = currentFilter[page]; // 陣列
@@ -470,7 +481,7 @@
           `).join('');
       }
 
-      /** 取得過濾後的活動 (v1.3.0 支援多選) */
+      /** 取得過濾後的活動 (v1.3.0 邏輯) */
       function getFilteredEvents(page) {
         const isHome = page === 'home';
         const filterLabels = currentFilter[page];
@@ -485,12 +496,12 @@
           })
           .filter(e => {
             if (e.presetId && config.presets[e.presetId]) {
-              return config.presets[e.presetId].isVisible;
+              // 如果 config 中有 isVisible 屬性，則使用它，否則預設為 true (相容舊版)
+              return config.presets[e.presetId].isVisible === undefined ? true : config.presets[e.presetId].isVisible;
             }
             return true; 
           });
 
-        // 標籤過濾 (多選)
         if (!filterLabels.includes('全部')) {
           filtered = filtered.filter(e => {
             if (!e.labels || e.labels.length === 0) return false;
@@ -554,7 +565,7 @@
       function renderPresetManagementPage() {
           presetManagementList.innerHTML = availablePresets.map(preset => {
               const presetConfig = config.presets[preset.id] || {};
-              const isVisible = presetConfig.isVisible || false;
+              const isVisible = presetConfig.isVisible === undefined ? false : presetConfig.isVisible; // 預設為 false
               const color = presetConfig.color || DEFAULT_COLOR;
 
               return `
@@ -571,6 +582,7 @@
           presetManagementList.querySelectorAll('.preset-color-picker').forEach(input => {
               input.addEventListener('change', (e) => {
                   const presetId = e.target.dataset.id;
+                  if (!config.presets[presetId]) config.presets[presetId] = {}; // 確保物件存在
                   config.presets[presetId].color = e.target.value;
                   saveData();
                   renderAllPages(); 
@@ -598,7 +610,7 @@
 
       /** 顯示詳細資料視窗 */
       function showDetailModal(event) {
-          currentEventId = event.id;
+          currentEventId = event.id; // 設定全域 ID
           detailTitle.textContent = event.title;
           btnDetailTogglePin.textContent = event.is_pinned ? '取消定選' : '定選到首頁';
           btnDetailTogglePin.dataset.pinned = event.is_pinned;
@@ -635,12 +647,11 @@
           modalDetail.style.display = 'flex';
       }
 
-      /** 顯示新增/編輯視窗 (v1.3.0 支援 Feature 3, 4, 6) */
+      /** 顯示新增/編輯視窗 */
       function showFormModal(event = null) {
         const isPresetEvent = !!(event && event.presetId);
         
         if (event) {
-          // 編輯模式
           formTitle.textContent = '編輯活動';
           formEventId.value = event.id;
           formPresetId.value = event.presetId || '';
@@ -654,10 +665,9 @@
           
           formPinnedInput.checked = event.is_pinned;
           formColorInput.value = event.color || getEventColor(event);
-          btnFormDelete.style.display = isPresetEvent ? 'none' : 'block'; // Feature 3
+          btnFormDelete.style.display = isPresetEvent ? 'none' : 'block'; 
           
         } else {
-          // 新增模式
           formTitle.textContent = '新增活動';
           formEventId.value = '';
           formPresetId.value = '';
@@ -671,7 +681,6 @@
           btnFormDelete.style.display = 'none';
         }
         
-        // Feature 6: 渲染標籤勾選
         const currentLabels = (event && event.labels) ? event.labels : [];
         formLabelsContainer.innerHTML = (config.labels || []).map(label => `
           <div class="label-checkbox-item">
@@ -680,20 +689,28 @@
           </div>
         `).join('');
         
-        // 預設集導入的活動，鎖定核心欄位
         formTitleInput.disabled = isPresetEvent;
         formDateInput.disabled = isPresetEvent;
         formColorInput.disabled = isPresetEvent;
         formRecurrenceIntervalInput.disabled = isPresetEvent;
         formRecurrenceUnitInput.disabled = isPresetEvent;
 
-        hideDetailModal(); 
+        modalDetail.style.display = 'none'; // 修正：只隱藏 detail，不清除 ID
         modalForm.style.display = 'flex';
       }
       
-      function hideDetailModal() { modalDetail.style.display = 'none'; currentEventId = null; }
-      function hideFormModal() { modalForm.style.display = 'none'; }
-      function hideNotificationModal() { modalNotification.style.display = 'none'; }
+      function hideDetailModal() { 
+          modalDetail.style.display = 'none'; 
+          currentEventId = null; // 只有在 "關閉" 詳細視窗時才清除 ID
+      }
+      function hideFormModal() { 
+          modalForm.style.display = 'none'; 
+          currentEventId = null; // 關閉表單時也清除 ID
+      }
+      function hideNotificationModal() { 
+          modalNotification.style.display = 'none'; 
+          currentEventId = null; // v1.3.1 修正 Bug 2: 關閉通知視窗時清除 ID
+      }
 
       /** 刪除活動 */
       function handleDelete() {
@@ -708,7 +725,7 @@
         }
       }
       
-      /** 提交表單 (v1.3.0 支援 Feature 4, 6) */
+      /** 提交表單 */
       function handleFormSubmit() {
         const id = formEventId.value;
         const title = formTitleInput.value.trim();
@@ -719,11 +736,9 @@
           return;
         }
         
-        // Feature 6: 讀取標籤
         const selectedLabels = Array.from(document.querySelectorAll('#form-labels-container input[type="checkbox"]:checked'))
                                     .map(cb => cb.value);
         
-        // Feature 4: 讀取週期
         const recurrenceUnit = formRecurrenceUnitInput.value;
         const recurrenceInterval = parseInt(formRecurrenceIntervalInput.value) || 1;
         const recurrence = (recurrenceUnit !== 'None') ? { unit: recurrenceUnit, interval: recurrenceInterval } : { unit: 'None', interval: 1 };
@@ -744,18 +759,15 @@
           is_pinned: formPinnedInput.checked,
           color: formColorInput.value !== DEFAULT_COLOR ? formColorInput.value : undefined,
           presetId: presetId,
-          // 保留通知設定 (如果已存在)
           notification: (originalEvent && originalEvent.notification) ? originalEvent.notification : undefined,
           status: 'Active' 
         };
         
-        // 如果是預設集事件，則只更新可修改欄位
         if (presetId && originalEvent) {
             eventData.title = originalEvent.title;
             eventData.date = originalEvent.date;
             eventData.recurrence = originalEvent.recurrence;
             eventData.color = originalEvent.color; 
-            // 只允許修改 subtitle, labels, is_pinned
             eventData.subtitle = formSubtitleInput.value.trim() || ''; 
             eventData.labels = selectedLabels;
             eventData.is_pinned = formPinnedInput.checked;
@@ -810,8 +822,7 @@
                   });
                   checkAndArchiveEvents();
                   
-              } catch (error)
- {
+              } catch (error) {
                   console.error('導入失敗:', error);
                   alert(`導入預設集 ${preset.name} 失敗。`);
                   config.presets[presetId].isVisible = false;
@@ -824,22 +835,24 @@
       }
       
       
-      // --- 6. v1.3.0 通知邏輯 (Feature 1, 2) ---
+      // --- 6. v1.3.1 通知邏輯 (修正 Bug 2, 3) ---
       
       /** 請求通知權限 (App 啟動時) */
       function requestNotificationPermission() {
         if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
-          // 僅在尚未決定時詢問
           setTimeout(() => {
              Notification.requestPermission();
-          }, 3000); // 延遲 3 秒詢問
+          }, 3000); 
         }
       }
       
-      /** 顯示通知設定視窗 */
+      /** 顯示通知設定視窗 (v1.3.1 修正 Bug 2) */
       function showNotificationModal() {
           const event = events.find(e => e.id === currentEventId);
-          if (!event) return;
+          if (!event) {
+              console.error('Notification modal: Event ID not found.');
+              return;
+          }
           
           if (Notification.permission !== 'granted') {
               alert('您尚未開啟通知權限。請在瀏覽器設定中允許通知。');
@@ -852,14 +865,19 @@
           notifyDaily.checked = settings.daily;
           notifySpecific.value = (settings.specificDays || []).join(', ');
           
-          hideDetailModal();
+          modalDetail.style.display = 'none'; // 修正: 只隱藏 detail，不呼叫 hideDetailModal()
           modalNotification.style.display = 'flex';
       }
       
-      /** 儲存通知設定 */
+      /** 儲存通知設定 (v1.3.1 修正 Bug 2) */
       function handleNotificationSave() {
           const event = events.find(e => e.id === currentEventId);
-          if (!event) return;
+          if (!event) {
+               console.error('Notification save failed: Event ID lost.');
+               alert('儲存失敗，請重試。');
+               hideNotificationModal();
+               return;
+          }
           
           const specificDays = notifySpecific.value.split(',')
                                 .map(s => parseInt(s.trim()))
@@ -867,28 +885,38 @@
                                 
           event.notification = {
             daily: notifyDaily.checked,
-            specificDays: specificDays
+            specificDays: Array.from(new Set(specificDays)) // 確保日期不重複
           };
           
+          console.log('Notification settings saved for:', event.title);
           saveData();
           renderAllPages();
-          hideNotificationModal();
+          hideNotificationModal(); // 關閉時會清除 currentEventId
       }
 
-      /** 發送測試通知 */
+      /** 發送測試通知 (v1.3.1 修正 Bug 3) */
       function handleTestNotification() {
-          if ('Notification' in window) {
-              if (Notification.permission === 'granted') {
-                sendNotification('測試通知 (v1.3.0)', '如果看到這個，表示通知設定成功！');
-              } else if (Notification.permission === 'denied') {
-                  alert('通知權限已被封鎖，請至瀏覽器設定中解除封鎖。');
-              } else {
-                  Notification.requestPermission().then(permission => {
-                    if (permission === 'granted') {
-                      sendNotification('測試通知 (v1.3.0)', '如果看到這個，表示通知設定成功！');
-                    }
-                  });
-              }
+          if (!('Notification' in window)) {
+              alert('您的瀏覽器不支援通知功能。');
+              return;
+          }
+          
+          console.log('Testing notification... Current permission:', Notification.permission);
+
+          if (Notification.permission === 'granted') {
+            sendNotification('測試通知 (v1.3.1)', '如果看到這個，表示通知設定成功！');
+          } else if (Notification.permission === 'denied') {
+              alert('通知權限已被封鎖，請至瀏覽器設定中解除封鎖。');
+          } else {
+              // 'default' (未決定) - 測試按鈕是使用者主動行為，可直接請求
+              alert('您尚未允許通知，將為您開啟權限請求。');
+              Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                  sendNotification('測試通知 (v1.3.1)', '如果看到這個，表示通知設定成功！');
+                } else {
+                  alert('您拒絕了通知權限。');
+                }
+              });
           }
       }
 
@@ -900,23 +928,25 @@
           }
           
           const today = new Date();
-          const notifyTime = config.notificationTime.split(':'); // e.g., ['08', '00']
+          const notifyTime = config.notificationTime.split(':'); 
           const now = new Date();
           
-          const lastCheckStorageKey = 'lastNotificationCheck_v1.3';
+          const lastCheckStorageKey = 'lastNotificationCheck_v1.3'; // Key 不變
           const lastCheckDate = localStorage.getItem(lastCheckStorageKey) || '';
           const todayStr = today.toISOString().split('T')[0];
           
-          // 檢查是否已過今日通知時間
           const notifyHour = parseInt(notifyTime[0]);
           const notifyMinute = parseInt(notifyTime[1]);
           
+          // 檢查是否已過今日通知時間
           if (now.getHours() < notifyHour || (now.getHours() === notifyHour && now.getMinutes() < notifyMinute)) {
               console.log('尚未到達今日通知時間。');
-              localStorage.setItem(lastCheckStorageKey, ''); // 允許今天稍後檢查
+              // 清除標記，允許今天稍後檢查
+              if(lastCheckDate) localStorage.setItem(lastCheckStorageKey, ''); 
               return;
           }
           
+          // 如果已過通知時間，且今天尚未檢查過
           if (lastCheckDate === todayStr) {
               console.log('今日已檢查過通知。');
               return;
@@ -932,33 +962,34 @@
             if (countdown.status === 'expired' || countdown.status === 'today') return;
             
             const daysLeft = countdown.days;
+            let triggered = false;
 
             // 1. 每日通知
             if (event.notification.daily) {
                sendNotification(`每日提醒: ${event.title}`, `還剩下 ${daysLeft} 天！`);
+               triggered = true;
             }
-            // 2. 特定日期
-            if (event.notification.specificDays && event.notification.specificDays.includes(daysLeft)) {
+            // 2. 特定日期 (避免重複發送)
+            if (!triggered && event.notification.specificDays && event.notification.specificDays.includes(daysLeft)) {
                sendNotification(`倒數提醒: ${event.title}`, `倒數 ${daysLeft} 天！`);
             }
           });
       }
       
-      /** 實際的 Web Notification API 呼叫 */
+      /** 實際的 Web Notification API 呼叫 (v1.3.1 修正 Bug 3) */
       function sendNotification(title, body) {
-          // Service Worker 註冊成功後，可以使用 SW 來發送通知 (更穩定)
-          if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-              // 理想情況下，應該由 SW 發送 (但本架構中 SW 僅快取)
-              new Notification(title, { body: body, icon: './assets/icons/icon-192.png' });
-          } else {
-              // 備用方案
-              new Notification(title, { body: body, icon: './assets/icons/icon-192.png' });
-          }
+          // 簡化：v1.3.0 的 SW 檢查是不必要的，因為 SW 沒有 showNotification 邏輯
+          // 直接使用 main thread API
+          new Notification(title, { 
+              body: body, 
+              icon: './assets/icons/icon-192.png',
+              badge: './assets/icons/icon-72.png' // 狀態列小圖示
+          });
       }
 
       // --- 7. 事件監聽器 ---
 
-      /** 篩選器事件委派 (v1.3.0 多選) */
+      /** 篩選器事件委派 (v1.3.0 邏輯) */
       document.getElementById('main-content').addEventListener('click', (e) => {
           if (e.target.classList.contains('filter-chip')) {
               const page = e.target.dataset.page;
@@ -986,7 +1017,6 @@
               if (page === 'all') renderAllPage();
           }
           
-          // 卡片點擊 -> 顯示詳細資料
           const card = e.target.closest('.event-card');
           if (card) {
               const id = card.dataset.id;
@@ -995,11 +1025,11 @@
           }
       });
 
-      /** 模態視窗操作 */
-      btnDetailClose.addEventListener('click', hideDetailModal);
+      /** 模態視窗操作 (v1.3.1 修正 Bug 2) */
+      btnDetailClose.addEventListener('click', hideDetailModal); // 關閉時清除 ID
       btnDetailEdit.addEventListener('click', () => {
           const event = events.find(e => e.id === currentEventId);
-          if (event) showFormModal(event);
+          if (event) showFormModal(event); // 編輯時 ID 保持
       });
       btnDetailTogglePin.addEventListener('click', () => {
           const event = events.find(e => e.id === currentEventId);
@@ -1007,19 +1037,19 @@
               event.is_pinned = !event.is_pinned;
               saveData();
               renderAllPages();
-              hideDetailModal();
+              hideDetailModal(); // 關閉時清除 ID
           }
       });
       
-      btnFormCancel.addEventListener('click', hideFormModal);
+      btnFormCancel.addEventListener('click', hideFormModal); // 關閉時清除 ID
       btnFormSave.addEventListener('click', handleFormSubmit);
       btnFormDelete.addEventListener('click', handleDelete);
       fab.addEventListener('click', () => showFormModal(null));
       
-      // v1.3.0 通知模態視窗
-      btnDetailNotify.addEventListener('click', showNotificationModal);
-      btnNotifyCancel.addEventListener('click', hideNotificationModal);
-      btnNotifySave.addEventListener('click', handleNotificationSave);
+      // v1.3.1 通知模態視窗 (修正 Bug 2)
+      btnDetailNotify.addEventListener('click', showNotificationModal); // 開啟時 ID 保持
+      btnNotifyCancel.addEventListener('click', hideNotificationModal); // 關閉時清除 ID
+      btnNotifySave.addEventListener('click', handleNotificationSave); // 儲存並關閉時清除 ID
 
       /** 頁面切換 */
       navTabs.forEach(tab => {
@@ -1048,7 +1078,6 @@
               renderAllPages();
           }
       });
-      // v1.3.0 通知設定
       notifyTimeInput.addEventListener('change', (e) => { 
           config.notificationTime = e.target.value; 
           saveData(); 
@@ -1104,16 +1133,15 @@
       
       // --- 9. 應用程式啟動 (Init) ---
       function init() {
-        loadData();
+        loadData(); // 包含 v1.3.1 遷移邏輯
         checkAndArchiveEvents();
         renderAllPages();
         
-        // 確保初始頁面是首頁
         document.querySelector('.nav-tab[data-page="page-home"]').click(); 
         
         registerServiceWorker();
         
-        // v1.3.0: 啟動時請求權限並檢查通知
+        // 啟動時請求權限並檢查通知
         requestNotificationPermission();
         checkAndSendNotifications();
       }
