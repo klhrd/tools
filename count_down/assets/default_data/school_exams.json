@@ -57,8 +57,8 @@
   },
   {
     "title": "國中教育會考",
-    "subtitle": "5/18, 5/19",
-    "date": "2026-05-18",
+    "subtitle": "5/16, 5/17",
+    "date": "2026-05-16",
     "labels": ["考試"],
     "recurrence": "None",
     "is_pinned": false
