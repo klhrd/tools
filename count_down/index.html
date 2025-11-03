@@ -45,6 +45,9 @@
           <div class="settings-item">
             <button id="btn-test-notification">測試發送通知</button>
           </div>
+          <div class="settings-item" style="cursor: default;">
+             <p style="font-size: 0.8rem; color: var(--color-text-secondary);">注意：排程通知僅在您下次於設定時間 (例如 08:00) 之後「開啟 App 時」才會觸發檢查。</p>
+          </div>
         </div>
         
         <div class="settings-group">
@@ -71,7 +74,7 @@
         <div class="settings-group">
           <div class="settings-item">
             <span class="settings-item-label">版本號</span>
-            <span class="settings-item-value">v1.3.1 (2025-11-02)</span>
+            <span class="settings-item-value">v1.3.2 (2025-11-03)</span>
           </div>
         </div>
 
@@ -95,7 +98,7 @@
       <section id="page-manage-presets" class="page">
         <h1 class="page-title">預設集管理</h1>
         <p style="margin-bottom: 16px; color: var(--color-text-secondary);">
-          開啟開關可將預設活動載入到您的「全部」頁面，並可隨時關閉隱藏。
+          開啟開關可將預設活動載入到您的「全部」頁面，並可隨時關閉隱藏。開啟時會自動同步最新資料。
         </p>
         <div id="preset-management-list" class="settings-group">
             </div>
@@ -223,19 +226,16 @@
   <script>
     document.addEventListener('DOMContentLoaded', () => {
 
-      // --- 1. 狀態與常數 (v1.3.1 修正 Bug 1) ---
-      
-      // 修正: 使用穩定的 Key，不再隨版本變動，避免資料遺失
+      // --- 1. 狀態與常數 (v1.3.1) ---
       const STORAGE_KEY = 'countdownEvents_v1_stable';
       const CONFIG_KEY = 'countdownConfig_v1_stable';
       
-      // 用於遷移 v1.3 的資料
       const OLD_STORAGE_KEY_v1_3 = 'countdownEvents_v1.3';
       const OLD_CONFIG_KEY_v1_3 = 'countdownConfig_v1.3';
       
       const DEFAULT_COLOR = '#007aff';
       
-      let events = []; // 主資料陣列
+      let events = []; 
       let config = {
           presets: {}, 
           labels: ['考試', '工作', '生日', '旅行'], 
@@ -252,7 +252,7 @@
       ];
 
 
-      // --- 2. DOM 元素 (無變動) ---
+      // --- 2. DOM 元素 ---
       const pages = document.querySelectorAll('.page');
       const navTabs = document.querySelectorAll('.nav-tab');
       const fab = document.getElementById('fab-add');
@@ -301,7 +301,7 @@
       
       // --- 3. 核心邏輯 (日期計算與資料) ---
 
-      /** 載入資料 (v1.3.1 修正 Bug 1: 資料遷移) */
+      /** 載入資料 (v1.3.1 遷移邏輯) */
       function loadData() {
         let eventData = localStorage.getItem(STORAGE_KEY);
         let configData = localStorage.getItem(CONFIG_KEY);
@@ -326,7 +326,6 @@
             }
         }
         
-        // 正常載入
         events = eventData ? JSON.parse(eventData) : [];
         if (configData) {
             const savedConfig = JSON.parse(configData);
@@ -362,8 +361,7 @@
           const targetDate = new Date(event.date + 'T00:00:00');
           const diffDays = Math.ceil((targetDate - today) / (1000 * 60 * 60 * 24));
 
-          if (diffDays < 0) { // 已過期
-            
+          if (diffDays < 0) {
             if (event.recurrence && event.recurrence.unit !== 'None') {
               let newDate = targetDate;
               const unit = event.recurrence.unit;
@@ -459,7 +457,7 @@
       /** 渲染篩選器 (v1.3.0 邏輯) */
       function renderFilterBar(page, container) {
           const isHome = page === 'home';
-          const current = currentFilter[page]; // 陣列
+          const current = currentFilter[page];
           
           const allLabels = events
             .filter(e => isHome ? e.is_pinned && e.status === 'Active' : e.status === 'Active')
@@ -496,7 +494,6 @@
           })
           .filter(e => {
             if (e.presetId && config.presets[e.presetId]) {
-              // 如果 config 中有 isVisible 屬性，則使用它，否則預設為 true (相容舊版)
               return config.presets[e.presetId].isVisible === undefined ? true : config.presets[e.presetId].isVisible;
             }
             return true; 
@@ -561,11 +558,11 @@
           });
       }
       
-      /** 渲染預設集管理頁面 */
+      /** 渲染預設集管理頁面 (v1.3.0 邏輯) */
       function renderPresetManagementPage() {
           presetManagementList.innerHTML = availablePresets.map(preset => {
               const presetConfig = config.presets[preset.id] || {};
-              const isVisible = presetConfig.isVisible === undefined ? false : presetConfig.isVisible; // 預設為 false
+              const isVisible = presetConfig.isVisible === undefined ? false : presetConfig.isVisible; 
               const color = presetConfig.color || DEFAULT_COLOR;
 
               return `
@@ -582,7 +579,7 @@
           presetManagementList.querySelectorAll('.preset-color-picker').forEach(input => {
               input.addEventListener('change', (e) => {
                   const presetId = e.target.dataset.id;
-                  if (!config.presets[presetId]) config.presets[presetId] = {}; // 確保物件存在
+                  if (!config.presets[presetId]) config.presets[presetId] = {}; 
                   config.presets[presetId].color = e.target.value;
                   saveData();
                   renderAllPages(); 
@@ -593,7 +590,7 @@
               toggle.addEventListener('click', (e) => {
                   const presetId = e.target.dataset.id;
                   const isVisible = e.target.checked;
-                  handlePresetToggle(presetId, isVisible);
+                  handlePresetToggle(presetId, isVisible, e.target); // 傳入 e.target
                   e.target.closest('.preset-item').querySelector('.preset-color-picker').disabled = !isVisible;
               });
           });
@@ -610,7 +607,7 @@
 
       /** 顯示詳細資料視窗 */
       function showDetailModal(event) {
-          currentEventId = event.id; // 設定全域 ID
+          currentEventId = event.id; 
           detailTitle.textContent = event.title;
           btnDetailTogglePin.textContent = event.is_pinned ? '取消定選' : '定選到首頁';
           btnDetailTogglePin.dataset.pinned = event.is_pinned;
@@ -695,21 +692,22 @@
         formRecurrenceIntervalInput.disabled = isPresetEvent;
         formRecurrenceUnitInput.disabled = isPresetEvent;
 
-        modalDetail.style.display = 'none'; // 修正：只隱藏 detail，不清除 ID
+        modalDetail.style.display = 'none'; 
         modalForm.style.display = 'flex';
       }
       
       function hideDetailModal() { 
           modalDetail.style.display = 'none'; 
-          currentEventId = null; // 只有在 "關閉" 詳細視窗時才清除 ID
+          currentEventId = null; 
       }
       function hideFormModal() { 
           modalForm.style.display = 'none'; 
-          currentEventId = null; // 關閉表單時也清除 ID
+          currentEventId = null; 
       }
       function hideNotificationModal() { 
           modalNotification.style.display = 'none'; 
-          currentEventId = null; // v1.3.1 修正 Bug 2: 關閉通知視窗時清除 ID
+          // v1.3.1: 關閉通知視窗時 *不清除* ID，這樣才能儲存
+          // v1.3.2 修正: 應該在 "取消" 或 "儲存" 時清除
       }
 
       /** 刪除活動 */
@@ -787,8 +785,8 @@
         hideFormModal();
       }
       
-      /** 處理預設集顯示/隱藏切換 */
-      async function handlePresetToggle(presetId, isVisible) {
+      /** 處理預設集顯示/隱藏切換 (v1.3.2 修正 Bug 1 & 3) */
+      async function handlePresetToggle(presetId, isVisible, toggleElement) {
           const preset = availablePresets.find(p => p.id === presetId);
           if (!preset) return;
 
@@ -798,35 +796,53 @@
           config.presets[presetId].isVisible = isVisible;
           
           let needsDataFetch = false;
-          if (isVisible && !events.some(e => e.presetId === presetId)) {
+          // v1.3.2: 只要開啟，就強制重新抓取 (同步)
+          if (isVisible) {
               needsDataFetch = true;
           }
 
           if (needsDataFetch) {
-              console.log(`Fetching preset: ${preset.name}`);
+              console.log(`Syncing preset: ${preset.name}`);
               try {
-                  const response = await fetch(preset.path);
+                  // v1.3.2 Bug 1 修正: 強制 bypass 快取
+                  const response = await fetch(preset.path, { cache: 'no-cache' }); 
                   if (!response.ok) throw new Error(`無法載入 ${preset.name}`);
                   
                   const defaultEvents = await response.json();
                   
+                  // v1.3.2 Bug 1 修正: 刪除舊的
+                  events = events.filter(e => e.presetId !== presetId);
+                  
+                  let newLabelsFound = new Set();
+                  
                   defaultEvents.forEach(event => {
-                      if (!events.some(e => e.title === event.title && e.presetId === preset.id)) {
-                          events.push({
-                              ...event,
-                              id: generateID(),
-                              status: 'Active',
-                              presetId: preset.id,
-                          });
+                      events.push({
+                          ...event,
+                          id: generateID(),
+                          status: 'Active',
+                          presetId: preset.id,
+                      });
+                      
+                      // v1.3.2 Bug 3: 收集標籤
+                      if (event.labels && event.labels.length > 0) {
+                          event.labels.forEach(label => newLabelsFound.add(label));
                       }
                   });
+                  
+                  // v1.3.2 Bug 3: 同步標籤
+                  newLabelsFound.forEach(label => {
+                      if (!config.labels.includes(label)) {
+                          config.labels.push(label);
+                      }
+                  });
+                  
                   checkAndArchiveEvents();
                   
               } catch (error) {
                   console.error('導入失敗:', error);
                   alert(`導入預設集 ${preset.name} 失敗。`);
                   config.presets[presetId].isVisible = false;
-                  e.target.checked = false; 
+                  if (toggleElement) toggleElement.checked = false; // 恢復切換
               }
           }
 
@@ -835,7 +851,7 @@
       }
       
       
-      // --- 6. v1.3.1 通知邏輯 (修正 Bug 2, 3) ---
+      // --- 6. v1.3.2 通知邏輯 (修正 Bug 2) ---
       
       /** 請求通知權限 (App 啟動時) */
       function requestNotificationPermission() {
@@ -846,7 +862,7 @@
         }
       }
       
-      /** 顯示通知設定視窗 (v1.3.1 修正 Bug 2) */
+      /** 顯示通知設定視窗 (v1.3.1) */
       function showNotificationModal() {
           const event = events.find(e => e.id === currentEventId);
           if (!event) {
@@ -865,16 +881,18 @@
           notifyDaily.checked = settings.daily;
           notifySpecific.value = (settings.specificDays || []).join(', ');
           
-          modalDetail.style.display = 'none'; // 修正: 只隱藏 detail，不呼叫 hideDetailModal()
+          modalDetail.style.display = 'none';
           modalNotification.style.display = 'flex';
       }
       
       /** 儲存通知設定 (v1.3.1 修正 Bug 2) */
       function handleNotificationSave() {
+          // v1.3.1 修正: 儲存時 currentEventId 仍然存在
           const event = events.find(e => e.id === currentEventId);
           if (!event) {
                console.error('Notification save failed: Event ID lost.');
                alert('儲存失敗，請重試。');
+               currentEventId = null; // 清除 ID
                hideNotificationModal();
                return;
           }
@@ -885,38 +903,38 @@
                                 
           event.notification = {
             daily: notifyDaily.checked,
-            specificDays: Array.from(new Set(specificDays)) // 確保日期不重複
+            specificDays: Array.from(new Set(specificDays)) 
           };
           
           console.log('Notification settings saved for:', event.title);
           saveData();
           renderAllPages();
-          hideNotificationModal(); // 關閉時會清除 currentEventId
+          hideNotificationModal();
+          currentEventId = null; // 儲存後清除 ID
+      }
+      
+      /** 取消通知設定 (v1.3.2 新增) */
+      function handleNotificationCancel() {
+          hideNotificationModal();
+          currentEventId = null; // 取消時清除 ID
       }
 
-      /** 發送測試通知 (v1.3.1 修正 Bug 3) */
-      function handleTestNotification() {
-          if (!('Notification' in window)) {
+      /** 發送測試通知 (v1.3.2 修正 Bug 2 - 手機) */
+      async function handleTestNotification() {
+          if (!('Notification' in window) || !('serviceWorker' in navigator)) {
               alert('您的瀏覽器不支援通知功能。');
               return;
           }
           
-          console.log('Testing notification... Current permission:', Notification.permission);
+          let permission = Notification.permission;
+          if (permission === 'default') {
+              permission = await Notification.requestPermission();
+          }
 
-          if (Notification.permission === 'granted') {
-            sendNotification('測試通知 (v1.3.1)', '如果看到這個，表示通知設定成功！');
-          } else if (Notification.permission === 'denied') {
+          if (permission === 'granted') {
+            sendNotification('測試通知 (v1.3.2)', '如果看到這個，表示通知設定成功！');
+          } else if (permission === 'denied') {
               alert('通知權限已被封鎖，請至瀏覽器設定中解除封鎖。');
-          } else {
-              // 'default' (未決定) - 測試按鈕是使用者主動行為，可直接請求
-              alert('您尚未允許通知，將為您開啟權限請求。');
-              Notification.requestPermission().then(permission => {
-                if (permission === 'granted') {
-                  sendNotification('測試通知 (v1.3.1)', '如果看到這個，表示通知設定成功！');
-                } else {
-                  alert('您拒絕了通知權限。');
-                }
-              });
           }
       }
 
@@ -931,22 +949,19 @@
           const notifyTime = config.notificationTime.split(':'); 
           const now = new Date();
           
-          const lastCheckStorageKey = 'lastNotificationCheck_v1.3'; // Key 不變
+          const lastCheckStorageKey = 'lastNotificationCheck_v1.3'; 
           const lastCheckDate = localStorage.getItem(lastCheckStorageKey) || '';
           const todayStr = today.toISOString().split('T')[0];
           
           const notifyHour = parseInt(notifyTime[0]);
           const notifyMinute = parseInt(notifyTime[1]);
           
-          // 檢查是否已過今日通知時間
           if (now.getHours() < notifyHour || (now.getHours() === notifyHour && now.getMinutes() < notifyMinute)) {
               console.log('尚未到達今日通知時間。');
-              // 清除標記，允許今天稍後檢查
               if(lastCheckDate) localStorage.setItem(lastCheckStorageKey, ''); 
               return;
           }
           
-          // 如果已過通知時間，且今天尚未檢查過
           if (lastCheckDate === todayStr) {
               console.log('今日已檢查過通知。');
               return;
@@ -964,32 +979,40 @@
             const daysLeft = countdown.days;
             let triggered = false;
 
-            // 1. 每日通知
             if (event.notification.daily) {
                sendNotification(`每日提醒: ${event.title}`, `還剩下 ${daysLeft} 天！`);
                triggered = true;
             }
-            // 2. 特定日期 (避免重複發送)
             if (!triggered && event.notification.specificDays && event.notification.specificDays.includes(daysLeft)) {
                sendNotification(`倒數提醒: ${event.title}`, `倒數 ${daysLeft} 天！`);
             }
           });
       }
       
-      /** 實際的 Web Notification API 呼叫 (v1.3.1 修正 Bug 3) */
+      /** 實際的 Web Notification API 呼叫 (v1.3.2 修正 Bug 2 - 手機) */
       function sendNotification(title, body) {
-          // 簡化：v1.3.0 的 SW 檢查是不必要的，因為 SW 沒有 showNotification 邏輯
-          // 直接使用 main thread API
-          new Notification(title, { 
-              body: body, 
-              icon: './assets/icons/icon-192.png',
-              badge: './assets/icons/icon-72.png' // 狀態列小圖示
-          });
+          // 修正: 透過 Service Worker 發送，確保在手機背景也能運作
+          if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+              navigator.serviceWorker.ready.then(registration => {
+                  registration.showNotification(title, {
+                      body: body,
+                      icon: './assets/icons/icon-192.png',
+                      badge: './assets/icons/icon-72.png'
+                  });
+              });
+          } else {
+              // 備用方案 (主要用於 SW 尚未啟動時的測試)
+              new Notification(title, { 
+                  body: body, 
+                  icon: './assets/icons/icon-192.png',
+                  badge: './assets/icons/icon-72.png'
+              });
+          }
       }
 
       // --- 7. 事件監聽器 ---
 
-      /** 篩選器事件委派 (v1.3.0 邏輯) */
+      /** 篩選器事件委派 */
       document.getElementById('main-content').addEventListener('click', (e) => {
           if (e.target.classList.contains('filter-chip')) {
               const page = e.target.dataset.page;
@@ -1025,11 +1048,11 @@
           }
       });
 
-      /** 模態視窗操作 (v1.3.1 修正 Bug 2) */
-      btnDetailClose.addEventListener('click', hideDetailModal); // 關閉時清除 ID
+      /** 模態視窗操作 */
+      btnDetailClose.addEventListener('click', hideDetailModal); 
       btnDetailEdit.addEventListener('click', () => {
           const event = events.find(e => e.id === currentEventId);
-          if (event) showFormModal(event); // 編輯時 ID 保持
+          if (event) showFormModal(event);
       });
       btnDetailTogglePin.addEventListener('click', () => {
           const event = events.find(e => e.id === currentEventId);
@@ -1037,19 +1060,19 @@
               event.is_pinned = !event.is_pinned;
               saveData();
               renderAllPages();
-              hideDetailModal(); // 關閉時清除 ID
+              hideDetailModal(); 
           }
       });
       
-      btnFormCancel.addEventListener('click', hideFormModal); // 關閉時清除 ID
+      btnFormCancel.addEventListener('click', hideFormModal); 
       btnFormSave.addEventListener('click', handleFormSubmit);
       btnFormDelete.addEventListener('click', handleDelete);
       fab.addEventListener('click', () => showFormModal(null));
       
-      // v1.3.1 通知模態視窗 (修正 Bug 2)
-      btnDetailNotify.addEventListener('click', showNotificationModal); // 開啟時 ID 保持
-      btnNotifyCancel.addEventListener('click', hideNotificationModal); // 關閉時清除 ID
-      btnNotifySave.addEventListener('click', handleNotificationSave); // 儲存並關閉時清除 ID
+      // v1.3.2 通知模態視窗 (修正 Bug 2)
+      btnDetailNotify.addEventListener('click', showNotificationModal); 
+      btnNotifyCancel.addEventListener('click', handleNotificationCancel); // 修正: 呼叫新函式
+      btnNotifySave.addEventListener('click', handleNotificationSave); 
 
       /** 頁面切換 */
       navTabs.forEach(tab => {
@@ -1133,7 +1156,7 @@
       
       // --- 9. 應用程式啟動 (Init) ---
       function init() {
-        loadData(); // 包含 v1.3.1 遷移邏輯
+        loadData(); // v1.3.1 遷移邏輯
         checkAndArchiveEvents();
         renderAllPages();
         
@@ -1141,7 +1164,6 @@
         
         registerServiceWorker();
         
-        // 啟動時請求權限並檢查通知
         requestNotificationPermission();
         checkAndSendNotifications();
       }
