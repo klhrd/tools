@@ -9,6 +9,7 @@
 - [Rule 細胞自動機生成器](https://klhrd.github.io/tools/rule30/)
 - [和弦翻譯機](https://klhrd.github.io/tools/chordtrans/chord_v2.1.2.html)
 - [日期倒數機](https://klhrd.github.io/tools/count_down)
+- [App Icon 批量產生器](https://klhrd.github.io/tools/icons_batch_scaling/)
 
 ## 來自其他我做的
 - [跑馬燈](https://klhrd.github.io/marquee/)
