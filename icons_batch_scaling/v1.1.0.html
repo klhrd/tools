@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>圖片批量縮放及 ZIP 打包工具</title>
+    <!-- 載入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 載入 Noto Sans 台灣字型 -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #f3f4f6;
+        }
+    </style>
+    <!-- 載入 JSZip 和 FileSaver.js 函式庫 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+</head>
+<body class="p-4 sm:p-8 min-h-screen flex items-start justify-center">
+
+    <div id="app" class="bg-white shadow-2xl rounded-xl p-6 md:p-10 w-full max-w-xl transition-all duration-300">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6 border-b pb-3 flex items-center">
+            <svg class="w-7 h-7 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 16m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+            App Icon 批量產生器
+        </h1>
+
+        <!-- 檔案上傳區域 -->
+        <div class="mb-6">
+            <label for="iconFile" class="block text-sm font-medium text-gray-700 mb-2">
+                步驟 1: 選擇原始圖檔 (建議 PNG 格式)
+            </label>
+            <input type="file" id="iconFile" accept="image/png" class="block w-full text-sm text-gray-500
+                file:mr-4 file:py-2 file:px-4
+                file:rounded-full file:border-0
+                file:text-sm file:font-semibold
+                file:bg-indigo-50 file:text-indigo-700
+                hover:file:bg-indigo-100"
+            />
+        </div>
+
+        <!-- 選擇輸出尺寸區域 -->
+        <div class="mb-6">
+            <label for="customSizes" class="block text-sm font-medium text-gray-700 mb-2">
+                步驟 2: 輸入所需的圖片尺寸 (像素，以逗號分隔)
+            </label>
+            <input type="text" id="customSizes" value="1024, 512, 192, 144, 128, 96, 72" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm" placeholder="例如: 512, 128, 64"/>
+        </div>
+
+        <!-- 輸出結構預覽 -->
+        <div class="mb-6 p-4 border border-indigo-200 rounded-lg bg-indigo-50">
+            <p class="font-medium text-gray-700 mb-2">輸出檔案結構預覽：</p>
+            <div id="outputStructure" class="text-sm text-gray-600 font-mono pl-3 border-l-2 border-indigo-400">
+                <span>icons.zip/</span><br>
+                <!-- 結構將由 JavaScript 填入 -->
+            </div>
+        </div>
+
+        <!-- 預覽與檔案資訊 -->
+        <div id="previewContainer" class="hidden mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50 flex flex-col md:flex-row items-center">
+            <img id="imagePreview" src="" alt="圖片預覽" class="w-24 h-24 rounded-lg shadow-md mb-4 md:mb-0 md:mr-6 object-contain"/>
+            <div class="text-center md:text-left">
+                <p id="fileNameDisplay" class="font-medium text-gray-700 truncate">已選擇檔案：</p>
+                <p class="text-sm text-gray-500">原始圖片尺寸：<span id="originalSizeDisplay"></span> px</p>
+            </div>
+        </div>
+        
+        <!-- 處理按鈕 -->
+        <div class="mb-6">
+            <button id="processButton" disabled class="w-full py-3 px-4 inline-flex justify-center items-center gap-2 rounded-xl border border-transparent bg-indigo-400 text-white transition-all text-sm font-medium shadow-lg hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed">
+                <svg id="buttonIcon" class="w-5 h-5 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                步驟 3: 開始縮放並打包 ZIP
+            </button>
+        </div>
+
+        <!-- 訊息與錯誤顯示 -->
+        <div id="messageBox" class="p-3 mt-4 text-sm rounded-lg transition-all duration-300 hidden" role="alert"></div>
+
+        <!-- 進度條 -->
+        <div id="progressBarContainer" class="hidden mt-4">
+            <p class="text-xs text-gray-500 mb-1">正在處理...</p>
+            <div class="w-full bg-gray-200 rounded-full h-2.5">
+                <div id="progressBar" class="bg-indigo-600 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const FILENAME_PREFIX = "icon-";
+        const DOWNLOAD_FILENAME = "icons.zip";
+
+        // DOM 元素參考
+        const fileInput = document.getElementById('iconFile');
+        const customSizesInput = document.getElementById('customSizes');
+        const processButton = document.getElementById('processButton');
+        const previewContainer = document.getElementById('previewContainer');
+        const imagePreview = document.getElementById('imagePreview');
+        const fileNameDisplay = document.getElementById('fileNameDisplay');
+        const originalSizeDisplay = document.getElementById('originalSizeDisplay');
+        const messageBox = document.getElementById('messageBox');
+        const progressBar = document.getElementById('progressBar');
+        const progressBarContainer = document.getElementById('progressBarContainer');
+        const outputStructureDiv = document.getElementById('outputStructure');
+
+        // 初始設定：預設圖片尺寸
+        let currentOriginalSize = 0; 
+        
+        // --- 輔助函式 ---
+
+        /**
+         * 顯示系統訊息
+         */
+        function displayMessage(message, type = 'info') {
+            messageBox.textContent = message;
+            messageBox.className = "p-3 mt-4 text-sm rounded-lg transition-all duration-300";
+            messageBox.classList.remove('hidden');
+
+            switch (type) {
+                case 'success':
+                    messageBox.classList.add('bg-green-100', 'text-green-800');
+                    break;
+                case 'error':
+                    messageBox.classList.add('bg-red-100', 'text-red-800');
+                    break;
+                case 'info':
+                default:
+                    messageBox.classList.add('bg-blue-100', 'text-blue-800');
+                    break;
+            }
+        }
+
+        /**
+         * 從輸入框解析並驗證圖片尺寸
+         * @returns {number[]} 有效、不重複、已排序的尺寸列表
+         */
+        function getValidSizes() {
+            const rawInput = customSizesInput.value;
+            // 分割字串，移除空白，過濾空值
+            const parts = rawInput.split(',').map(s => s.trim()).filter(s => s.length > 0);
+            
+            // 轉換為數字，並確保是正整數
+            const sizes = parts.map(s => parseInt(s)).filter(n => Number.isInteger(n) && n > 0);
+            
+            // 移除重複的尺寸並依大小降序排序
+            return [...new Set(sizes)].sort((a, b) => b - a);
+        }
+
+        /**
+         * 更新檔案結構圖示
+         * @param {number[]} sizes 尺寸列表
+         * @param {number} originalSize 原始圖片的尺寸
+         */
+        function updateStructureDisplay(sizes, originalSize) {
+            let html = `<span>${DOWNLOAD_FILENAME}/</span><br>`;
+
+            // 包含原始尺寸的列表（如果有設定，且不重複）
+            let allFiles = sizes.slice();
+            if (originalSize > 0 && !allFiles.includes(originalSize)) {
+                allFiles.push(originalSize);
+            }
+            
+            // 依尺寸降序排序，確保大的圖檔排在前面
+            allFiles.sort((a, b) => b - a);
+
+            // 產生結構 HTML
+            allFiles.forEach(size => {
+                html += `<span class="ml-4">├── ${FILENAME_PREFIX}${size}.png</span><br>`;
+            });
+
+            outputStructureDiv.innerHTML = html;
+        }
+
+        /**
+         * 將 Base64 資料 URL 轉換為 Blob (用於 JSZip)
+         */
+        function dataURLtoBlob(dataurl) {
+            const arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
+                bstr = atob(arr[1]);
+            let n = bstr.length;
+            const u8arr = new Uint8Array(n);
+            while(n--){
+                u8arr[n] = bstr.charCodeAt(n);
+            }
+            return new Blob([u8arr], {type:mime});
+        }
+
+        /**
+         * 將圖片縮放到指定尺寸並回傳 Blob
+         */
+        function resizeImage(img, size) {
+            return new Promise(resolve => {
+                const canvas = document.createElement('canvas');
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext('2d');
+                
+                // 設定高品質縮放
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+
+                // 繪製縮放後的圖片
+                ctx.drawImage(img, 0, 0, size, size);
+
+                // 匯出為 PNG Blob
+                canvas.toBlob(resolve, 'image/png');
+            });
+        }
+        
+        // --- 事件處理器 ---
+
+        /**
+         * 處理檔案選擇變更
+         */
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            
+            // 隱藏訊息和進度條
+            messageBox.classList.add('hidden');
+            progressBarContainer.classList.add('hidden');
+            
+            if (file && file.type === 'image/png') {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    imagePreview.src = e.target.result;
+                    fileNameDisplay.textContent = `已選擇檔案：${file.name}`;
+                    
+                    // 獲取圖片原始尺寸
+                    const img = new Image();
+                    img.onload = () => {
+                        currentOriginalSize = img.naturalWidth;
+                        originalSizeDisplay.textContent = currentOriginalSize;
+                        
+                        // 更新結構預覽 (使用當前輸入框的值和圖片原始尺寸)
+                        updateStructureDisplay(getValidSizes(), currentOriginalSize);
+                    };
+                    img.src = e.target.result;
+                    
+                    previewContainer.classList.remove('hidden');
+                    processButton.disabled = false;
+                    processButton.classList.replace('bg-indigo-400', 'bg-indigo-600');
+                };
+                reader.readAsDataURL(file);
+            } else {
+                currentOriginalSize = 0;
+                originalSizeDisplay.textContent = '';
+                previewContainer.classList.add('hidden');
+                processButton.disabled = true;
+                processButton.classList.replace('bg-indigo-600', 'bg-indigo-400');
+                if (file) {
+                    displayMessage('請選擇 PNG 格式的圖片檔案。', 'error');
+                }
+                updateStructureDisplay(getValidSizes(), currentOriginalSize);
+            }
+        });
+        
+        /**
+         * 監聽尺寸輸入框變更
+         */
+        customSizesInput.addEventListener('input', () => {
+            const validSizes = getValidSizes();
+            
+            // 更新結構預覽 (使用當前輸入框的值和圖片原始尺寸)
+            updateStructureDisplay(validSizes, currentOriginalSize);
+
+            // 檢查是否有有效的尺寸
+            if (validSizes.length === 0 && customSizesInput.value.trim().length > 0) {
+                displayMessage('請輸入有效的正整數尺寸，以逗號分隔。', 'error');
+                processButton.disabled = true;
+            } else {
+                messageBox.classList.add('hidden');
+                // 只有在有檔案選擇時才啟用按鈕
+                processButton.disabled = fileInput.files.length === 0;
+            }
+        });
+        
+        // 初始載入時先更新一次結構圖
+        document.addEventListener('DOMContentLoaded', () => {
+             updateStructureDisplay(getValidSizes(), currentOriginalSize);
+        });
+
+
+        /**
+         * 處理圖片縮放和 ZIP 打包的主邏輯
+         */
+        processButton.addEventListener('click', async () => {
+            const file = fileInput.files[0];
+            const ICON_SIZES = getValidSizes();
+
+            if (!file) {
+                displayMessage('請先選擇一個檔案。', 'error');
+                return;
+            }
+            if (ICON_SIZES.length === 0) {
+                displayMessage('請至少輸入一個有效的圖片尺寸 (正整數)。', 'error');
+                return;
+            }
+
+            // 禁用按鈕並開始顯示進度
+            processButton.disabled = true;
+            processButton.innerHTML = '<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> 處理中...';
+            progressBarContainer.classList.remove('hidden');
+            progressBar.style.width = '0%';
+            messageBox.classList.add('hidden');
+
+            try {
+                const zip = new JSZip();
+                const originalDataUrl = imagePreview.src;
+                const img = new Image();
+                img.src = originalDataUrl;
+
+                // 等待圖片載入完成
+                await new Promise(resolve => img.onload = resolve);
+
+                const finalSizesToProcess = [...ICON_SIZES];
+                
+                // 如果原始尺寸不在輸出清單中，也將其加入，確保原始檔案會被保留
+                if (!finalSizesToProcess.includes(img.naturalWidth)) {
+                    finalSizesToProcess.push(img.naturalWidth);
+                }
+
+                // 移除重複並再次排序
+                const uniqueSizes = [...new Set(finalSizesToProcess)].sort((a, b) => b - a);
+
+                // 2. 批量縮放並加入 ZIP
+                const resizePromises = uniqueSizes.map((size, index) => {
+                    return resizeImage(img, size).then(blob => {
+                        const filename = `${FILENAME_PREFIX}${size}.png`;
+                        zip.file(filename, blob);
+                        
+                        // 更新進度條
+                        const progress = Math.round(((index + 1) / uniqueSizes.length) * 90);
+                        progressBar.style.width = `${progress}%`;
+                        return filename;
+                    });
+                });
+
+                await Promise.all(resizePromises);
+
+                // 3. 生成 ZIP 檔案
+                progressBar.style.width = '90%';
+                displayMessage('正在生成 ZIP 檔案...', 'info');
+
+                const zipContent = await zip.generateAsync({ type: "blob" }, (metadata) => {
+                    // 更新 ZIP 生成過程中的進度
+                    if (metadata.percent) {
+                        const finalProgress = 90 + (metadata.percent / 100) * 10;
+                        progressBar.style.width = `${Math.min(finalProgress, 100)}%`;
+                    }
+                });
+                
+                // 4. 下載檔案
+                saveAs(zipContent, DOWNLOAD_FILENAME);
+
+                progressBar.style.width = '100%';
+                displayMessage(`成功！已產生 ${uniqueSizes.length} 個圖檔並打包為 ${DOWNLOAD_FILENAME}。`, 'success');
+
+            } catch (error) {
+                console.error("處理錯誤:", error);
+                displayMessage(`處理失敗：${error.message || '無法縮放或打包檔案。'}`, 'error');
+            } finally {
+                // 恢復按鈕狀態
+                processButton.disabled = false;
+                processButton.innerHTML = '<svg id="buttonIcon" class="w-5 h-5 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg> 步驟 3: 開始縮放並打包 ZIP';
+            }
+        });
+    </script>
+</body>
+</html>
