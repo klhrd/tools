@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>版本引導頁</title>
+</head>
+<body>
+    <h1>正在載入文件...</h1>
+    
+    <script>
+        // 1. 設定您目前的最新版本
+        const LATEST_VERSION = 'v1.1.0'; 
+        
+        // 2. 獲取 URL 中的查詢字串參數
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        // 3. 檢查是否有 'v' (版本) 參數
+        let targetFileName;
+        
+        if (urlParams.has('v')) {
+            // 如果有參數，使用參數作為檔案名 (例如 v=v1.0.0)
+            const requestedVersion = urlParams.get('v');
+            targetFileName = `${requestedVersion}.html`; // 構建檔案名 (e.g., v1.0.0.html)
+        } else {
+            // 如果沒有參數，導向到設定的最新版本
+            targetFileName = `${LATEST_VERSION}.html`; // 構建檔案名 (e.g., v1.1.0.html)
+        }
+
+        // 4. 執行導向
+        // window.location.replace() 是更好的導向方式，因為它不會保留歷史紀錄
+        window.location.replace(targetFileName);
+
+    </script>
+    
+    <p>如果頁面沒有自動跳轉，請檢查您的網址或點擊 <a href="v1.1.0.html">這裡</a>。</p>
+    <p>您可以手動指定版本，例如：<a href="./?v=v1.0.0">載入 v1.0.0</a></p>
+</body>
+</html>
