@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>v1.0.0 - 文字編碼色塊矩陣生成器</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="script.js" defer></script>
+</head>
+<body>
+    <div id="app-container">
+        <h1>文字編碼色塊矩陣生成器</h1>
+
+        <section id="config-panel" class="panel">
+            <h2>1. 編碼器：文字 ➔ 圖片</h2>
+            
+            <label for="text-input">文字訊息 (支援多行與 Emoji)：</label>
+            <textarea id="text-input" rows="5">這是一個測試的訊息😊
+這是第二行！</textarea>
+            
+            <div id="controls-grid">
+                <label for="block-width">區塊寬度 (px):</label>
+                <input type="number" id="block-width" value="25" min="5">
+
+                <label for="block-height">區塊高度 (px):</label>
+                <input type="number" id="block-height" value="40" min="5">
+
+                <button id="generate-button" class="btn-primary">生成色塊矩陣</button>
+            </div>
+        </section>
+
+        <section id="output-panel" class="panel">
+            <h2>輸出結果</h2>
+            <div class="canvas-wrapper">
+                <canvas id="color-canvas"></canvas>
+            </div>
+            <div id="tooltip"></div> <div id="export-panel">
+                <button id="export-png-button" class="btn-secondary">📥 匯出 PNG</button>
+                <button id="export-pdf-button" class="btn-secondary">📄 匯出 PDF</button>
+            </div>
+        </section>
+        
+        <hr>
+
+        <section id="decoder-panel" class="panel">
+            <h2>2. 解碼器：圖片 ➔ 文字</h2>
+            <p>請上傳一張由本程式生成的 PNG 圖片。</p>
+
+            <input type="file" id="image-upload" accept="image/png">
+            <button id="decode-button" class="btn-primary" disabled>開始解碼</button>
+
+            <h3>解碼結果：</h3>
+            <div id="decoded-output" class="result-box">
+                </div>
+            <canvas id="decode-canvas" style="display:none;"></canvas>
+        </section>
+    </div>
+</body>
+</html>
