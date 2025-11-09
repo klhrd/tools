@@ -127,10 +127,9 @@ main {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  align-items: center; /* v1.3.0: 對齊圖示 */
+  align-items: center; 
 }
 
-/* v1.3.0: 通知圖示 */
 .notification-icon {
   font-size: 1.1rem;
   line-height: 1;
@@ -227,7 +226,7 @@ main {
   font-size: 0.9rem;
   cursor: pointer;
   transition: background-color 0.2s;
-  user-select: none; /* v1.3.0: 避免選取文字 */
+  user-select: none; 
 }
 
 .filter-chip.selected {
@@ -377,6 +376,15 @@ main {
   gap: 12px;
   margin-top: 16px;
 }
+/* v1.3.3: 調整按鈕間距 */
+.detail-actions .form-buttons {
+    margin-top: 8px;
+    gap: 8px;
+}
+.detail-actions .form-buttons:first-child {
+    margin-top: 16px;
+}
+
 
 .form-btn {
   flex-grow: 1;
@@ -402,7 +410,7 @@ main {
   color: white;
 }
 
-/* --- 8. 詳細資料視窗 (Detail Modal) --- */
+/* --- 8. 詳細資料視窗 (Detail Modal) (v1.3.3 修正 Feature 1) --- */
 #event-detail-window {
   display: flex;
   flex-direction: column;
@@ -426,18 +434,14 @@ main {
   overflow-wrap: break-word;
 }
 
+/* v1.3.3: 移除 flex，改為 <div>.form-buttons 佈局 */
 .detail-actions {
-  display: flex;
-  gap: 8px; /* 縮小間距以容納 4 個按鈕 */
   margin-top: 16px;
 }
 .detail-actions .form-btn {
     flex-grow: 1;
-    font-size: 0.85rem; /* 縮小字體 */
-    padding: 10px 5px; /* 減少 padding */
-}
-.detail-actions #btn-detail-edit {
-    flex-grow: 0.8; /* 編輯按鈕小一點 */
+    font-size: 0.85rem; 
+    padding: 10px 5px;
 }
 
 
@@ -488,7 +492,15 @@ main {
   text-align: center;
 }
 
-/* v1.3.0: 通知時間輸入 */
+/* v1.3.3: 通知說明文字 (Feature 2) */
+.settings-help-text {
+    font-size: 0.8rem; 
+    color: var(--color-text-secondary); 
+    line-height: 1.4;
+    width: 100%;
+    padding: 0;
+}
+
 .settings-input-time {
     border: 1px solid var(--color-border);
     border-radius: 8px;
@@ -549,7 +561,7 @@ main {
 
 /* --- 10. v1.3.0 新表單元素 --- */
 
-/* 標籤勾選 (Feature 6) */
+/* 標籤勾選 */
 .form-labels-container {
     max-height: 150px;
     overflow-y: auto;
@@ -572,18 +584,18 @@ main {
     font-weight: normal;
 }
 
-/* 進階週期 (Feature 4) */
+/* 進階週期 */
 .form-recurrence-container {
     display: flex;
     align-items: center;
     gap: 8px;
 }
 .form-recurrence-container input[type="number"] {
-    width: 80px; /* 限制數字輸入框寬度 */
+    width: 80px; 
     flex-grow: 0;
 }
 .form-recurrence-container select {
-    flex-grow: 1; /* 下拉選單佔滿剩餘空間 */
+    flex-grow: 1; 
 }
 
 /* --- 11. 空狀態與輔助 --- */
