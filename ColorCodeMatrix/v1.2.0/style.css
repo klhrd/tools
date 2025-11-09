@@ -13,7 +13,7 @@ body {
     background: #fff;
     border-radius: 12px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
-    overflow: hidden;
+    overflow: hidden; /* 確保圓角生效 */
 }
 
 h1, h2 {
@@ -22,55 +22,67 @@ h1, h2 {
 
 h1 {
     text-align: center;
-    padding: 20px 30px;
+    padding: 25px 30px;
     background-color: #4a90e2;
     color: white;
     margin: 0;
-}
-h1 small {
-    font-size: 0.5em;
-    opacity: 0.8;
 }
 
 .panel {
     padding: 20px 30px;
 }
 
-/* --- v1.2.0: 菜單樣式 --- */
-.menu-header {
-    background-color: #f1f1f1;
-    padding: 15px 30px;
-    border-bottom: 1px solid #ddd;
+/* --- v1.2.0: 頂部選單按鈕 --- */
+.main-menu {
     display: flex;
-    align-items: center;
+    background-color: #f1f1f1;
+    border-bottom: 1px solid #ddd;
 }
 
-#function-selector {
-    padding: 10px;
-    border-radius: 6px;
-    border: 1px solid #ccc;
+.menu-btn {
+    flex: 1;
+    padding: 15px 20px;
+    border: none;
+    background: #f1f1f1;
+    cursor: pointer;
+    text-align: center;
     font-size: 16px;
-    margin-left: 10px;
+    font-weight: 600;
+    color: #555;
+    transition: background-color 0.2s, color 0.2s;
+    border-bottom: 3px solid transparent;
+}
+
+.menu-btn:hover {
+    background-color: #e9e9e9;
+}
+
+.menu-btn.active {
+    background-color: #ffffff;
+    color: #007bff;
+    border-bottom: 3px solid #007bff;
 }
 
 .tab-content {
-    display: none;
+    display: none; /* 預設隱藏所有內容 */
 }
 .tab-content.active {
-    display: block;
+    display: block; /* 僅顯示 active 的內容 */
 }
+/* --- 結束選單樣式 --- */
 
 
-/* --- 通用控制項樣式 --- */
-textarea, input[type="number"], input[type="file"], .reader-controls {
+/* --- 1. 配置面板 --- */
+textarea, input[type="number"], input[type="file"] {
     width: 100%;
     padding: 10px;
     margin-bottom: 15px;
     border: 1px solid #ddd;
     border-radius: 6px;
-    box-sizing: border-box;
+    box-sizing: border-box; /* 確保 padding 不影響寬度 */
     font-size: 16px;
 }
+
 textarea {
     resize: vertical;
 }
@@ -88,7 +100,7 @@ textarea {
 }
 
 #generate-button {
-    grid-column: 1 / -1;
+    grid-column: 1 / -1; /* 按鈕橫跨所有欄 */
     margin-top: 10px;
 }
 
@@ -116,46 +128,49 @@ button:disabled {
 .btn-primary:not(:disabled):hover {
     background-color: #0056b3;
 }
+.btn-primary:not(:disabled):active {
+    transform: translateY(1px);
+}
 
 .btn-secondary {
     background-color: #6c757d;
     color: white;
+    margin-right: 15px;
 }
 .btn-secondary:hover {
     background-color: #5a6268;
 }
 
-/* --- 輸出面板 --- */
+/* --- 2. 輸出面板 --- */
 .canvas-wrapper {
     width: 100%;
-    overflow: auto;
+    overflow: auto; 
     margin: 20px 0;
-    max-height: 600px;
+    max-height: 600px; 
+    border: 1px solid #eee;
 }
 
 #color-canvas {
     display: block;
-    border: 3px solid #ccc;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-    background: #fff;
+    background: #fff; 
 }
 
 #tooltip {
     display: none;
-    position: absolute;
+    position: absolute; 
     padding: 8px 12px;
     background: rgba(0, 0, 0, 0.85);
     color: #fff;
     border-radius: 4px;
     font-size: 13px;
-    pointer-events: none;
+    pointer-events: none; 
     z-index: 1000;
     line-height: 1.5;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     white-space: nowrap;
 }
 
-/* --- 解碼器/結果面板 --- */
+/* --- 3. 解碼器面板 --- */
 .result-box {
     min-height: 100px;
     background: #f9f9f9;
@@ -163,55 +178,27 @@ button:disabled {
     padding: 15px;
     border-radius: 6px;
     font-family: "Courier New", Courier, monospace;
-    white-space: pre-wrap;
+    white-space: pre-wrap; /* 保留換行和空格 */
     word-break: break-all;
     margin-top: 15px;
 }
 
-/* --- v1.2.0: 測字儀樣式 --- */
-.reader-display {
-    position: relative;
-    width: 100%;
-    max-height: 500px;
-    overflow: hidden;
-    margin: 20px 0;
-    border: 1px solid #ccc;
-    background: #333; /* 攝影機背景 */
-}
-
-#reader-canvas {
-    cursor: crosshair; /* 準心游標 */
-    display: block;
-    max-width: 100%;
-}
-
-#reader-video {
-    display: none; /* 預設隱藏 */
-    max-width: 100%;
-}
-
-#crosshair {
-    position: absolute;
-    width: 16px;
-    height: 16px;
-    border: 1px solid white;
-    box-shadow: 0 0 0 1px black;
-    border-radius: 50%;
-    pointer-events: none; /* 確保不影響滑鼠事件 */
-    transform: translate(-50%, -50%); /* 確保準心中心對齊滑鼠 */
-    mix-blend-mode: difference; /* 與下方內容形成強烈對比 */
-    display: none; /* 預設隱藏 */
-}
-
-.warning-text {
-    color: orange;
-    font-size: 0.9em;
-}
-
 /* --- 響應式設計 --- */
 @media (max-width: 650px) {
+    .main-menu {
+        flex-direction: column;
+    }
+    .menu-btn {
+        text-align: left;
+        padding-left: 20px;
+    }
+    .menu-btn.active {
+        border-bottom: 3px solid transparent;
+        border-left: 3px solid #007bff;
+    }
+
     #controls-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr; /* 小螢幕自動堆疊為單欄 */
     }
     #controls-grid label {
         text-align: left;
