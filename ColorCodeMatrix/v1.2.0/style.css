@@ -1,0 +1,224 @@
+/* --- 全域設定 --- */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: #f4f7f6;
+    margin: 0;
+    padding: 20px;
+    line-height: 1.6;
+}
+
+#app-container {
+    max-width: 900px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+}
+
+h1, h2 {
+    color: #333;
+}
+
+h1 {
+    text-align: center;
+    padding: 20px 30px;
+    background-color: #4a90e2;
+    color: white;
+    margin: 0;
+}
+h1 small {
+    font-size: 0.5em;
+    opacity: 0.8;
+}
+
+.panel {
+    padding: 20px 30px;
+}
+
+/* --- v1.2.0: 菜單樣式 --- */
+.menu-header {
+    background-color: #f1f1f1;
+    padding: 15px 30px;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    align-items: center;
+}
+
+#function-selector {
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-size: 16px;
+    margin-left: 10px;
+}
+
+.tab-content {
+    display: none;
+}
+.tab-content.active {
+    display: block;
+}
+
+
+/* --- 通用控制項樣式 --- */
+textarea, input[type="number"], input[type="file"], .reader-controls {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    box-sizing: border-box;
+    font-size: 16px;
+}
+textarea {
+    resize: vertical;
+}
+
+#controls-grid {
+    display: grid;
+    grid-template-columns: auto 1fr auto 1fr;
+    gap: 15px 10px;
+    align-items: center;
+}
+
+#controls-grid label {
+    text-align: right;
+    font-weight: 500;
+}
+
+#generate-button {
+    grid-column: 1 / -1;
+    margin-top: 10px;
+}
+
+/* --- 按鈕樣式 --- */
+button {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 16px;
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    color: white;
+    width: 100%;
+}
+.btn-primary:not(:disabled):hover {
+    background-color: #0056b3;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+.btn-secondary:hover {
+    background-color: #5a6268;
+}
+
+/* --- 輸出面板 --- */
+.canvas-wrapper {
+    width: 100%;
+    overflow: auto;
+    margin: 20px 0;
+    max-height: 600px;
+}
+
+#color-canvas {
+    display: block;
+    border: 3px solid #ccc;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    background: #fff;
+}
+
+#tooltip {
+    display: none;
+    position: absolute;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.85);
+    color: #fff;
+    border-radius: 4px;
+    font-size: 13px;
+    pointer-events: none;
+    z-index: 1000;
+    line-height: 1.5;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    white-space: nowrap;
+}
+
+/* --- 解碼器/結果面板 --- */
+.result-box {
+    min-height: 100px;
+    background: #f9f9f9;
+    border: 1px solid #eee;
+    padding: 15px;
+    border-radius: 6px;
+    font-family: "Courier New", Courier, monospace;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin-top: 15px;
+}
+
+/* --- v1.2.0: 測字儀樣式 --- */
+.reader-display {
+    position: relative;
+    width: 100%;
+    max-height: 500px;
+    overflow: hidden;
+    margin: 20px 0;
+    border: 1px solid #ccc;
+    background: #333; /* 攝影機背景 */
+}
+
+#reader-canvas {
+    cursor: crosshair; /* 準心游標 */
+    display: block;
+    max-width: 100%;
+}
+
+#reader-video {
+    display: none; /* 預設隱藏 */
+    max-width: 100%;
+}
+
+#crosshair {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border: 1px solid white;
+    box-shadow: 0 0 0 1px black;
+    border-radius: 50%;
+    pointer-events: none; /* 確保不影響滑鼠事件 */
+    transform: translate(-50%, -50%); /* 確保準心中心對齊滑鼠 */
+    mix-blend-mode: difference; /* 與下方內容形成強烈對比 */
+    display: none; /* 預設隱藏 */
+}
+
+.warning-text {
+    color: orange;
+    font-size: 0.9em;
+}
+
+/* --- 響應式設計 --- */
+@media (max-width: 650px) {
+    #controls-grid {
+        grid-template-columns: 1fr;
+    }
+    #controls-grid label {
+        text-align: left;
+        margin-top: 10px;
+    }
+    #export-panel button {
+        width: 100%;
+        margin: 5px 0;
+    }
+}
