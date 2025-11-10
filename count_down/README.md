@@ -1,4 +1,4 @@
-# (📆 日期倒數機 (Countdown PWA))[https://klhrd.github.io/tools/count_down/]
+# [📆 日期倒數機 (Countdown PWA)](https://klhrd.github.io/tools/count_down/)
 
 一個清爽、簡單、專注於日期倒數的漸進式網頁應用程式 (PWA)。它提供跨平台的使用體驗，讓您輕鬆追蹤重要的日子、考試、假期或紀念日。
 
