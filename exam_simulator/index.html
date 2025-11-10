@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 監考者策略模擬器 v2.1.2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.6/jstat.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .panel { @apply bg-white shadow-sm rounded-xl p-6 border border-slate-200; }
+        .btn { @apply px-4 py-2 rounded-lg font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed; }
+        .btn-primary { @apply bg-sky-600 text-white hover:bg-sky-700 active:scale-95; }
+        .btn-success { @apply bg-emerald-500 text-white hover:bg-emerald-600 active:scale-95; }
+        .btn-warning { @apply bg-amber-500 text-white hover:bg-amber-600 active:scale-95; }
+        .btn-danger { @apply bg-rose-500 text-white hover:bg-rose-600 active:scale-95; }
+        .btn-ai { @apply bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 shadow-sm hover:shadow-indigo-200/50; }
+        .btn-auto { @apply bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:from-violet-700 hover:to-indigo-700 active:scale-95 shadow-md; }
+        .input-field { @apply w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition; }
+        .stat-card { @apply bg-slate-50 p-4 rounded-lg text-center border border-slate-200; }
+        .log-entry { @apply py-2 border-b border-slate-100 text-sm; }
+        #log-area::-webkit-scrollbar { width: 8px; }
+        #log-area::-webkit-scrollbar-track { background: #f1f5f9; }
+        #log-area::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        #log-area::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="p-6 flex flex-col md:flex-row justify-center gap-6 max-w-7xl mx-auto">
+
+    <!-- 左側：設定與 AI 面板 -->
+    <div class="flex flex-col gap-6 w-full md:w-1/3 min-w-[320px]">
+        <div class="panel">
+            <h2 class="text-xl font-bold text-slate-800 mb-4 flex items-center">
+                🛠️ 考試參數設定
+            </h2>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-sm font-medium text-slate-600">總考生人數 (N)</label>
+                    <input type="number" id="student-count" value="1000" class="input-field">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-sm font-medium text-slate-600">平均時間 (μ)</label>
+                        <input type="number" id="mean-time" value="90" class="input-field">
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-slate-600">標準差 (σ)</label>
+                        <input type="number" id="std-dev" value="15" class="input-field">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-sm font-medium text-slate-600">基礎考試時間 (T_base)</label>
+                    <input type="number" id="base-time" value="100" class="input-field">
+                </div>
+                <button id="start-exam" class="btn btn-primary w-full mt-2">開始考試</button>
+            </div>
+        </div>
+
+        <div class="panel border-indigo-100 bg-indigo-50/50">
+            <h2 class="text-xl font-bold text-indigo-900 mb-4 flex items-center">
+                🤖 AI 監考官
+            </h2>
+            
+            <button id="auto-pilot-btn" class="btn btn-auto w-full mb-4 flex items-center justify-center gap-2" disabled>
+                <span>🚀 啟動自動監考 (Auto-Pilot)</span>
+            </button>
+
+            <hr class="border-indigo-200 my-4">
+
+            <p class="text-sm text-indigo-700 mb-4">
+                手動模式：請先「詢問舉手」獲取數據，再請求建議。
+            </p>
+            <div id="ai-suggestion-box" class="hidden bg-white p-4 rounded-lg border border-indigo-100 shadow-sm mb-4">
+                <h3 class="font-bold text-indigo-800 mb-2">💡 分析報告</h3>
+                <p id="ai-analysis-text" class="text-sm text-slate-600 leading-relaxed mb-3"></p>
+                <button id="apply-ai-suggestion" class="btn btn-ai w-full text-sm">
+                    採納建議：延長 <span id="ai-suggest-minutes">0</span> 分鐘
+                </button>
+            </div>
+            <button id="ask-ai-btn" class="btn btn-ai w-full" disabled>
+                請求 AI 分析與建議
+            </button>
+        </div>
+    </div>
+
+    <!-- 右側：模擬操作與結果 -->
+    <div class="flex flex-col gap-6 w-full md:w-2/3">
+        <div class="panel">
+            <h2 class="text-xl font-bold text-slate-800 mb-4">🎮 監考操作台</h2>
+            
+            <div class="grid grid-cols-3 gap-4 mb-6">
+                <div class="stat-card">
+                    <div class="text-slate-500 text-sm mb-1">目前時間</div>
+                    <div id="current-time-display" class="text-3xl font-bold text-sky-600">--</div>
+                    <div class="text-xs text-slate-400">分鐘</div>
+                </div>
+                <div class="stat-card">
+                    <div class="text-slate-500 text-sm mb-1">未完成人數</div>
+                    <div id="unfinished-display" class="text-3xl font-bold text-rose-500">--</div>
+                    <div class="text-xs text-slate-400">人 (上次詢問)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="text-slate-500 text-sm mb-1">詢問次數</div>
+                    <div id="inquiry-count-display" class="text-3xl font-bold text-amber-500">0</div>
+                    <div class="text-xs text-slate-400">次</div>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap gap-3 mb-6 p-4 bg-slate-50 rounded-lg border border-slate-100">
+                <button id="inquire-btn" class="btn btn-warning flex-1 min-w-[120px]" disabled>
+                    🙋‍♂️ 詢問舉手
+                </button>
+                <div class="flex flex-1 min-w-[180px] gap-2">
+                    <input type="number" id="extend-minutes" value="10" class="input-field w-20 text-center" placeholder="分">
+                    <button id="extend-btn" class="btn btn-success flex-1" disabled>
+                        ⏱️ 延長時間
+                    </button>
+                </div>
+                <button id="end-exam-btn" class="btn btn-danger flex-1 min-w-[120px]" disabled>
+                    🛑 立即收卷
+                </button>
+            </div>
+
+            <div class="flex justify-between items-center mb-2">
+                <h3 class="font-bold text-slate-700 flex items-center gap-2">
+                    <span>📋 事件日誌</span>
+                    <span id="auto-status" class="text-sm font-normal text-indigo-600 hidden bg-indigo-50 px-2 py-1 rounded-full animate-pulse">
+                        🤖 自動監考中...
+                    </span>
+                </h3>
+                <button id="copy-log-btn" class="text-xs text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded transition flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                    </svg>
+                    複製日誌
+                </button>
+            </div>
+            <div id="log-area" class="h-80 overflow-y-auto bg-slate-50 p-4 rounded-lg border border-slate-200 font-mono text-sm leading-relaxed">
+                <div class="text-slate-500 italic">請設定參數並點擊「開始考試」。</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const $ = (id) => document.getElementById(id);
+        const gaussian = (mu, sigma) => {
+            let u = 0, v = 0;
+            while(u === 0) u = Math.random();
+            while(v === 0) v = Math.random();
+            return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v) * sigma + mu;
+        };
+
+        let state = {
+            running: false, autoPilot: false,
+            N: 1000, mu: 90, sigma: 15, t_base: 100,
+            students: [], currentTime: 0, inquiries: 0,
+            lastInquiryTime: -1, lastInquiryCount: -1,
+            sameInquiryCountTimes: 0
+        };
+
+        function log(msg, type = 'info') {
+            const colors = {
+                info: 'text-slate-600', start: 'text-sky-600 font-bold',
+                inquiry: 'text-amber-600', extend: 'text-emerald-600',
+                ai: 'text-indigo-600', end: 'text-rose-600 font-bold',
+                stats: 'bg-amber-50 p-3 rounded-lg text-amber-900 my-2 border border-amber-100 shadow-sm'
+            };
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${colors[type] || colors.info}`;
+            entry.innerHTML = msg;
+            $('log-area').appendChild(entry);
+            $('log-area').scrollTop = $('log-area').scrollHeight;
+        }
+
+        function updateDisplay() {
+            $('current-time-display').textContent = state.currentTime.toFixed(0);
+            $('inquiry-count-display').textContent = state.inquiries;
+            $('unfinished-display').textContent = state.lastInquiryCount !== -1 ? state.lastInquiryCount : '--';
+        }
+
+        function setControlsEnabled(enabled) {
+            ['inquire-btn', 'extend-btn', 'end-exam-btn', 'ask-ai-btn', 'auto-pilot-btn'].forEach(id => $(id).disabled = !enabled);
+            ['start-exam', 'student-count', 'mean-time', 'std-dev', 'base-time'].forEach(id => $(id).disabled = enabled);
+        }
+
+        // --- 核心操作 ---
+        $('start-exam').onclick = () => {
+            state.N = +$('student-count').value;
+            state.mu = +$('mean-time').value;
+            state.sigma = +$('std-dev').value;
+            state.t_base = +$('base-time').value;
+            state.students = Array.from({length: state.N}, () => Math.max(1, Math.ceil(gaussian(state.mu, state.sigma))));
+            const realAllFinishedTime = Math.max(...state.students);
+            state.currentTime = state.t_base;
+            state.inquiries = 0;
+            state.lastInquiryTime = -1;
+            state.lastInquiryCount = -1;
+            state.sameInquiryCountTimes = 0;
+            state.running = true;
+            state.autoPilot = false;
+
+            $('log-area').innerHTML = '';
+            $('ai-suggestion-box').classList.add('hidden');
+            $('auto-status').classList.add('hidden');
+            log(`🚀 考試開始！N=${state.N}, μ=${state.mu}, σ=${state.sigma}, 基礎時間=${state.t_base}分`, 'start');
+            updateDisplay();
+            setControlsEnabled(true);
+        };
+
+        $('inquire-btn').onclick = () => {
+            const currentUnfinished = state.students.filter(t => t > state.currentTime).length;
+            
+            if (currentUnfinished === state.lastInquiryCount && currentUnfinished > 0) {
+                state.sameInquiryCountTimes++;
+            } else {
+                state.sameInquiryCountTimes = 0;
+            }
+
+            state.inquiries++;
+            state.lastInquiryTime = state.currentTime;
+            state.lastInquiryCount = currentUnfinished;
+
+            log(`🙋 [${state.currentTime}分] 詢問：<strong>${state.lastInquiryCount}</strong> 人未完成。`, 'inquiry');
+            updateDisplay();
+            return state.lastInquiryCount;
+        };
+
+        $('extend-btn').onclick = () => {
+            const mins = +$('extend-minutes').value;
+            if (mins <= 0) return;
+            state.currentTime += mins;
+            log(`⏱️ 延長 ${mins} 分鐘 -> 目前時間: ${state.currentTime} 分`, 'extend');
+            updateDisplay();
+        };
+
+        $('end-exam-btn').onclick = () => {
+            state.running = false;
+            state.autoPilot = false;
+            $('auto-status').classList.add('hidden');
+            const finalUnfinished = state.students.filter(t => t > state.currentTime).length;
+            const realAllFinishedTime = Math.max(...state.students);
+            const wasted = Math.max(0, state.currentTime - realAllFinishedTime);
+
+            log(`🛑 收卷！最終時間: ${state.currentTime} 分`, 'end');
+            log(`📊 <strong>最終報告：</strong><br>
+                 - 總詢問次數: ${state.inquiries} 次<br>
+                 - 全體等待時間: ${wasted.toFixed(0)} 分鐘<br>
+                 - 未完成人數: ${finalUnfinished} 人 (${(finalUnfinished/state.N*100).toFixed(2)}%)`, 'stats');
+            setControlsEnabled(false);
+        };
+
+        // --- AI 分析函數 (v2.1.2 優化版：高 Sigma 穩定策略) ---
+        function getAIAnalysis() {
+            const t = state.lastInquiryTime;
+            const n_unf = state.lastInquiryCount;
+            const p_unf = Math.max(n_unf / state.N, 1e-9);
+            const p_fin = 1 - p_unf;
+            const current_z = jStat.normal.inv(p_fin, 0, 1);
+            const est_mu = t - (state.sigma * current_z);
+
+            let target_z = 3.09; // 99.9%
+            if (p_unf < 0.001) target_z = 3.71; // 99.99%
+            if (p_unf < 0.0001) target_z = 4.26; // 99.999%
+
+            let suggested_end = Math.ceil(est_mu + state.sigma * target_z);
+            let suggest_extend = Math.max(0, suggested_end - state.currentTime);
+
+            // --- 階段性延長策略 v2.1.2 ---
+
+            // 1. 高 Sigma 穩定策略 (人數較多時，強制最小進度)
+            // 適用於 n_unf > 5 的情況 (避免陷入 1-2 分鐘循環，特別是當 Sigma 很大時)
+            if (n_unf > 5) {
+                const MIN_PROGRESS_PERCENTAGE = 0.01; // 1% of sigma as a minimum step
+                const MIN_PROGRESS_MINUTES = Math.min(Math.ceil(state.sigma * MIN_PROGRESS_PERCENTAGE), 20); // 上限 20 分鐘
+                
+                // 如果 Z-score 計算結果小於這個最小進度，則強制使用最小進度
+                if (suggest_extend <= 2) { // 僅在計算結果極小時才介入
+                    suggest_extend = Math.max(suggest_extend, MIN_PROGRESS_MINUTES);
+                }
+            }
+
+
+            // 2. 極端尾部策略 (n_unf <= 5): 採用漸進式緩衝
+            // 處理極少數人時，避免一次延長太多，但仍要強制進度。
+            if (n_unf <= 5 && n_unf > 0) {
+                 // 根據連續詢問次數，動態決定緩衝係數 (0.1 -> 0.2 -> 0.3 -> 0.5)
+                 let buffer_multiplier = 0.1;
+                 if (state.sameInquiryCountTimes === 1) buffer_multiplier = 0.2;
+                 else if (state.sameInquiryCountTimes === 2) buffer_multiplier = 0.3;
+                 else if (state.sameInquiryCountTimes >= 3) buffer_multiplier = 0.5;
+
+                 // 漸進緩衝：基於 Sigma 的百分比
+                 let buffered_extension = Math.ceil(state.sigma * buffer_multiplier);
+                 
+                 // 採用 calculated, buffered, 或最小值 5 分鐘中的最大值
+                 // 確保至少延長 5 分鐘，並將緩衝上限設為 30 分鐘
+                 suggest_extend = Math.max(suggest_extend, Math.min(buffered_extension, 30), 5);
+            }
+
+            if (suggest_extend === 0 && n_unf > 0) suggest_extend = 1;
+
+            return { est_mu, suggest_extend, n_unf, p_unf, target_z };
+        }
+
+        $('ask-ai-btn').onclick = () => {
+            if (state.lastInquiryTime === -1) return alert("請先詢問一次！");
+            const analysis = getAIAnalysis();
+            $('ai-analysis-text').innerHTML = `
+                在 ${state.lastInquiryTime} 分時有 ${analysis.n_unf} 人未完成。<br>
+                推估 μ ≈ <strong>${analysis.est_mu.toFixed(1)}</strong>。<br>
+                建議延長：
+            `;
+            $('ai-suggest-minutes').textContent = analysis.suggest_extend;
+            $('ai-suggestion-box').classList.remove('hidden');
+            log(`🤖 AI 建議延長 ${analysis.suggest_extend} 分鐘。`, 'ai');
+        };
+
+        $('apply-ai-suggestion').onclick = () => {
+             const mins = +$('ai-suggest-minutes').textContent;
+             $('extend-minutes').value = mins;
+             $('extend-btn').click();
+             $('ai-suggestion-box').classList.add('hidden');
+        };
+
+        // --- 自動監考 ---
+        $('auto-pilot-btn').onclick = async () => {
+            if (!state.running) return;
+            state.autoPilot = true;
+            $('auto-status').classList.remove('hidden');
+            setControlsEnabled(false);
+            $('end-exam-btn').disabled = false;
+            log("🤖 --- 自動監考模式啟動 ---", 'ai');
+
+            while (state.autoPilot && state.running) {
+                await new Promise(r => setTimeout(r, 800));
+                if (!state.autoPilot) break;
+
+                const unf = $('inquire-btn').click();
+                if (unf <= 0) {
+                    log("🤖 AI 判斷：所有人已完成，收卷。", 'ai');
+                    $('end-exam-btn').click();
+                    break;
+                }
+
+                const analysis = getAIAnalysis();
+                
+                // 增加一個強制收卷的條件：在極端尾部（少於3人）連續卡住超過 3 次
+                if (analysis.n_unf < 3 && state.inquiries > 8 && state.sameInquiryCountTimes >= 3) {
+                     log(`🤖 AI 判斷：剩餘 ${analysis.n_unf} 人為極端異常值，為顧及全體，強制收卷。`, 'ai');
+                     $('end-exam-btn').click();
+                     break;
+                }
+
+                log(`🤖 AI 建議延長 ${analysis.suggest_extend} 分鐘。`, 'ai');
+                await new Promise(r => setTimeout(r, 500));
+                $('extend-minutes').value = analysis.suggest_extend;
+                $('extend-btn').click();
+            }
+        };
+
+        // --- 修復後的複製日誌功能 (v2.1.1 導入) ---
+        $('copy-log-btn').onclick = () => {
+            const logText = Array.from($('log-area').children)
+                                .map(entry => entry.innerText.replace(/\n/g, ' '))
+                                .join('\n');
+            
+            // 創建一個隱藏的 textarea 來選取和複製文字
+            const textarea = document.createElement('textarea');
+            textarea.value = logText;
+            textarea.style.position = 'fixed'; 
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            
+            try {
+                document.execCommand('copy'); 
+                const originalText = $('copy-log-btn').innerHTML;
+                $('copy-log-btn').innerHTML = '✅ 已複製！';
+                setTimeout(() => $('copy-log-btn').innerHTML = originalText, 2000);
+            } catch (err) {
+                alert('複製失敗，請手動選取日誌內容。');
+                console.error('Copy failed', err);
+            } finally {
+                document.body.removeChild(textarea);
+            }
+        };
+
+    </script>
+</body>
+</html>
