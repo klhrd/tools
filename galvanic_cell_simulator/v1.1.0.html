@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>電化學電池模擬器 v1.1.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 使用 Inter 字體 */
+        body {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+        }
+        
+        /* v1.1.0: 粒子樣式優化 */
+        .electron-circle {
+            fill: #FDE047; /* 亮黃色 */
+            stroke: #F59E0B;
+            stroke-width: 1;
+        }
+        .electron-text {
+            font-size: 10px;
+            font-weight: bold;
+            fill: #A16207; /* 暗黃色 */
+            text-anchor: middle;
+            dominant-baseline: middle;
+        }
+
+        /* 離子基礎樣式 (半透明色塊) */
+        .ion-circle {
+            opacity: 0.5;
+        }
+        .ion-cu { fill: #007bff; } /* 銅離子 */
+        .ion-zn { fill: #6c757d; } /* 鋅離子 */
+        .ion-mg { fill: #28a745; } /* 鎂離子 */
+        .ion-ag { fill: #adb5bd; } /* 銀離子 */
+        .ion-pb { fill: #343a40; } /* 鉛離子 */
+        .ion-k { fill: #fd7e14; }  /* 鉀離子 (陽離子) */
+        .ion-no3 { fill: #dc3545; } /* 硝酸根 (陰離子) */
+
+        /* 離子文字樣式 */
+        .ion-text {
+            font-size: 10px;
+            font-weight: 500;
+            fill: #000;
+            text-anchor: middle;
+            dominant-baseline: middle; /* 垂直置中 */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4 md:p-8">
+
+    <div class="bg-white rounded-2xl shadow-xl overflow-hidden max-w-7xl w-full mx-auto">
+        
+        <header class="p-4 md:p-6 bg-gray-800 text-white">
+            <h1 class="text-2xl md:text-3xl font-bold text-center">電化學電池模擬器 v1.1.0</h1>
+        </header>
+
+        <div class="p-4 md:p-6 flex flex-col md:flex-row items-center justify-center gap-4 border-b border-gray-200">
+            <div class="w-full md:w-auto">
+                <label for="batterySelect" class="text-sm font-medium text-gray-700 mr-2">選擇電池組合:</label>
+                <select id="batterySelect" class="rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    </select>
+            </div>
+            <button id="startButton" class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow transition duration-150 ease-in-out">
+                開始動畫
+            </button>
+            <button id="resetButton" class="w-full md:w-auto bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg shadow transition duration-150 ease-in-out" disabled>
+                重置
+            </button>
+        </div>
+
+        <div class="p-4 bg-gray-50">
+            <svg id="simulatorCanvas" viewBox="0 0 800 550" class="w-full rounded-lg" xmlns="http://www.w3.org/2000/svg">
+                
+                <defs>
+                    <linearGradient id="beakerGradient" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stop-color="#E0E7FF" />
+                        <stop offset="50%" stop-color="#FFFFFF" />
+                        <stop offset="100%" stop-color="#E0E7FF" />
+                    </linearGradient>
+                    <linearGradient id="saltBridgeGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#F3F4F6" />
+                        <stop offset="50%" stop-color="#E5E7EB" />
+                        <stop offset="100%" stop-color="#F3F4F6" />
+                    </linearGradient>
+                </defs>
+
+                <rect id="leftSolution" x="50" y="200" width="200" height="250" fill="transparent" rx="10" />
+                <path d="M 50 200 V 450 H 250 V 200" stroke="#4B5563" stroke-width="3" fill="url(#beakerGradient)" fill-opacity="0.5" />
+                <rect id="rightSolution" x="550" y="200" width="200" height="250" fill="#BFDBFE" rx="10" />
+                <path d="M 550 200 V 450 H 750 V 200" stroke="#4B5563" stroke-width="3" fill="url(#beakerGradient)" fill-opacity="0.5" />
+                
+                <path d="M 220 280 Q 250 230, 325 230 H 475 Q 550 230, 580 280" stroke="#9CA3AF" stroke-width="20" fill="url(#saltBridgeGradient)" />
+                
+                <rect id="leftElectrode" x="140" y="150" width="20" height="200" fill="#BCC6D0" stroke="#374151" stroke-width="2" rx="3" />
+                <rect id="rightElectrode" x="640" y="150" width="20" height="200" fill="#F0B071" stroke="#374151" stroke-width="2" rx="3" />
+                
+                <path id="wirePath" d="M 150 150 V 80 H 370 M 430 80 H 650 V 150" stroke="#374151" stroke-width="4" fill="none" />
+                
+                <g id="voltmeter">
+                    <rect x="370" y="60" width="60" height="40" fill="#F9FAFB" stroke="#1F2937" stroke-width="2" rx="5" />
+                    <text id="voltageText" x="400" y="85" font-size="16" font-weight="bold" fill="#16A34A" text-anchor="middle">1.10 V</text>
+                    <circle cx="400" cy="80" r="18" fill="none" stroke="#D1D5DB" stroke-width="1" />
+                </g>
+
+                <g id="ionsGroup"></g>
+                <g id="electronsGroup"></g>
+                
+                <g id="labelsGroup" font-family="Arial, 'Noto Sans TC', sans-serif">
+                    <text id="leftElectrodeLabel" x="150" y="140" text-anchor="middle" font-weight="bold" font-size="16">Zn (鋅)</text>
+                    <text id="rightElectrodeLabel" x="650" y="140" text-anchor="middle" font-weight="bold" font-size="16">Cu (銅)</text>
+                    <text id="leftSolutionLabel" x="150" y="480" text-anchor="middle" font-size="14" fill="#374151">ZnSO₄ (aq)</text>
+                    <text id="rightSolutionLabel" x="650" y="480" text-anchor="middle" font-size="14" fill="#374151">CuSO₄ (aq)</text>
+                    <text id="leftReactionLabel" x="150" y="510" text-anchor="middle" font-size="12" fill="#D97706">Zn → Zn²⁺ + 2e⁻ (陽極/負極)</text>
+                    <text id="rightReactionLabel" x="650" y="510" text-anchor="middle" font-size="12" fill="#15803D">Cu²⁺ + 2e⁻ → Cu (陰極/正極)</text>
+                </g>
+            </svg>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            // --- 1. 資料庫 (Database) ---
+            // v1.1.0: 新增 'symbol' 欄位用於顯示粒子標籤
+            const batteryData = {
+                'Zn-Cu': {
+                    left: { electrode: 'Zn (鋅)', ion: 'Zn²', symbol: 'Zn²⁺', ionClass: 'ion-zn', solution: 'ZnSO₄ (aq)', color: 'transparent', startWidth: 20, reaction: 'Zn → Zn²⁺ + 2e⁻ (陽極/負極)', ionSpawnX: 160 },
+                    right: { electrode: 'Cu (銅)', ion: 'Cu²', symbol: 'Cu²⁺', ionClass: 'ion-cu', solution: 'CuSO₄ (aq)', color: '#BFDBFE', startWidth: 20, reaction: 'Cu²⁺ + 2e⁻ → Cu (陰極/正極)', ionSpawnX: 640 },
+                    voltage: '1.10 V'
+                },
+                'Mg-Cu': {
+                    left: { electrode: 'Mg (鎂)', ion: 'Mg²', symbol: 'Mg²⁺', ionClass: 'ion-mg', solution: 'MgSO₄ (aq)', color: 'transparent', startWidth: 20, reaction: 'Mg → Mg²⁺ + 2e⁻ (陽極/負極)', ionSpawnX: 160 },
+                    right: { electrode: 'Cu (銅)', ion: 'Cu²', symbol: 'Cu²⁺', ionClass: 'ion-cu', solution: 'CuSO₄ (aq)', color: '#BFDBFE', startWidth: 20, reaction: 'Cu²⁺ + 2e⁻ → Cu (陰極/正極)', ionSpawnX: 640 },
+                    voltage: '2.71 V'
+                },
+                'Cu-Ag': {
+                    left: { electrode: 'Cu (銅)', ion: 'Cu²', symbol: 'Cu²⁺', ionClass: 'ion-cu', solution: 'CuSO₄ (aq)', color: '#BFDBFE', startWidth: 20, reaction: 'Cu → Cu²⁺ + 2e⁻ (陽極/負極)', ionSpawnX: 160 },
+                    right: { electrode: 'Ag (銀)', ion: 'Ag⁺', symbol: 'Ag⁺', ionClass: 'ion-ag', solution: 'AgNO₃ (aq)', color: 'transparent', startWidth: 20, reaction: 'Ag⁺ + e⁻ → Ag (陰極/正極)', ionSpawnX: 640 },
+                    voltage: '0.46 V'
+                },
+                'Zn-Pb': {
+                    left: { electrode: 'Zn (鋅)', ion: 'Zn²', symbol: 'Zn²⁺', ionClass: 'ion-zn', solution: 'ZnSO₄ (aq)', color: 'transparent', startWidth: 20, reaction: 'Zn → Zn²⁺ + 2e⁻ (陽極/負極)', ionSpawnX: 160 },
+                    right: { electrode: 'Pb (鉛)', ion: 'Pb²', symbol: 'Pb²⁺', ionClass: 'ion-pb', solution: 'Pb(NO₃)₂ (aq)', color: 'transparent', startWidth: 20, reaction: 'Pb²⁺ + 2e⁻ → Pb (陰極/正極)', ionSpawnX: 640 },
+                    voltage: '0.63 V'
+                }
+            };
+
+            // --- 2. DOM 元素參照 ---
+            const select = document.getElementById('batterySelect');
+            const startBtn = document.getElementById('startButton');
+            const resetBtn = document.getElementById('resetButton');
+            const leftSolution = document.getElementById('leftSolution');
+            const rightSolution = document.getElementById('rightSolution');
+            const leftElectrode = document.getElementById('leftElectrode');
+            const rightElectrode = document.getElementById('rightElectrode');
+            const wirePath = document.getElementById('wirePath');
+            const voltageText = document.getElementById('voltageText');
+            const leftElectrodeLabel = document.getElementById('leftElectrodeLabel');
+            const rightElectrodeLabel = document.getElementById('rightElectrodeLabel');
+            const leftSolutionLabel = document.getElementById('leftSolutionLabel');
+            const rightSolutionLabel = document.getElementById('rightSolutionLabel');
+            const leftReactionLabel = document.getElementById('leftReactionLabel');
+            const rightReactionLabel = document.getElementById('rightReactionLabel');
+            const ionsGroup = document.getElementById('ionsGroup');
+            const electronsGroup = document.getElementById('electronsGroup');
+            const svgNS = "http://www.w3.org/2000/svg";
+
+            // --- 3. 狀態變數 ---
+            let isAnimating = false;
+            let animationFrameId = null;
+            let currentBatteryType = 'Zn-Cu';
+            let electrons = [];
+            let ions = [];
+            let electrodeState = { left: {}, right: {} };
+            let lastSpawnTime = 0;
+            const wireLength = wirePath.getTotalLength();
+            const electronSpeed = wireLength / 3000; // 3 秒走完全程
+
+            // --- 4. 初始化函式 ---
+            function init() {
+                Object.keys(batteryData).forEach(key => {
+                    const option = document.createElement('option');
+                    option.value = key;
+                    option.textContent = key;
+                    select.appendChild(option);
+                });
+                
+                select.addEventListener('change', (e) => {
+                    if (isAnimating) {
+                        resetAnimation();
+                    }
+                    setupBattery(e.target.value);
+                });
+                
+                startBtn.addEventListener('click', startAnimation);
+                resetBtn.addEventListener('click', resetAnimation);
+                
+                setupBattery(currentBatteryType);
+            }
+
+            // --- 5. 設定電池 (重置畫面) ---
+            function setupBattery(type) {
+                currentBatteryType = type;
+                const data = batteryData[type];
+                
+                leftSolution.setAttribute('fill', data.left.color);
+                rightSolution.setAttribute('fill', data.right.color);
+                voltageText.textContent = data.voltage;
+
+                electrodeState.left.width = data.left.startWidth;
+                electrodeState.left.x = 150 - data.left.startWidth / 2;
+                leftElectrode.setAttribute('width', electrodeState.left.width);
+                leftElectrode.setAttribute('x', electrodeState.left.x);
+                
+                electrodeState.right.width = data.right.startWidth;
+                electrodeState.right.x = 650 - data.right.startWidth / 2;
+                rightElectrode.setAttribute('width', electrodeState.right.width);
+                rightElectrode.setAttribute('x', electrodeState.right.x);
+
+                leftElectrodeLabel.textContent = data.left.electrode;
+                rightElectrodeLabel.textContent = data.right.electrode;
+                leftSolutionLabel.textContent = data.left.solution;
+                rightSolutionLabel.textContent = data.right.solution;
+                leftReactionLabel.textContent = data.left.reaction;
+                rightReactionLabel.textContent = data.right.reaction;
+                
+                ionsGroup.innerHTML = '';
+                electronsGroup.innerHTML = '';
+                electrons = [];
+                ions = [];
+                
+                // 建立初始離子池 (陰極)
+                const cathodeData = data.right;
+                for (let i = 0; i < 15; i++) {
+                    const x = cathodeData.ionSpawnX - 50 + Math.random() * 100;
+                    const y = 250 + Math.random() * 180;
+                    // v1.1.0: 傳入 symbol
+                    createIon(cathodeData.ionClass, cathodeData.symbol, x, y, 'cathode');
+                }
+                
+                // 建立初始離子池 (鹽橋)
+                for (let i = 0; i < 5; i++) {
+                    createIon('ion-k', 'K⁺', 400 - 60 + Math.random() * 120, 240 + Math.random() * 20, 'salt-cation');
+                    createIon('ion-no3', 'NO₃⁻', 400 - 60 + Math.random() * 120, 240 + Math.random() * 20, 'salt-anion');
+                }
+            }
+
+            // --- 6. 動畫控制 ---
+            function startAnimation() {
+                if (isAnimating) return;
+                isAnimating = true;
+                startBtn.disabled = true;
+                resetBtn.disabled = false;
+                select.disabled = true;
+                
+                for (let i = 0; i < 10; i++) {
+                    createElectron(i * (wireLength / 10));
+                }
+                
+                lastSpawnTime = 0;
+                animationFrameId = requestAnimationFrame(animationLoop);
+            }
+
+            function resetAnimation() {
+                if (!isAnimating) return;
+                isAnimating = false;
+                cancelAnimationFrame(animationFrameId);
+                
+                startBtn.disabled = false;
+                resetBtn.disabled = true;
+                select.disabled = false;
+                
+                setupBattery(currentBatteryType);
+            }
+
+            // --- 7. 核心動畫迴圈 ---
+            function animationLoop(timestamp) {
+                if (!isAnimating) return;
+                
+                const deltaTime = timestamp - (lastSpawnTime || timestamp);
+                lastSpawnTime = timestamp;
+
+                animateElectrons(deltaTime);
+                animateElectrodes(deltaTime);
+                animateIons(deltaTime);
+                
+                animationFrameId = requestAnimationFrame(animationLoop);
+            }
+
+            // --- 8. 動畫子函式 ---
+            
+            // v1.1.0: 電子動畫 (使用 <g> 群組)
+            function createElectron(distance) {
+                const g = document.createElementNS(svgNS, 'g');
+                
+                const circle = document.createElementNS(svgNS, 'circle');
+                circle.setAttribute('r', 4);
+                circle.setAttribute('class', 'electron-circle');
+                g.appendChild(circle);
+
+                const text = document.createElementNS(svgNS, 'text');
+                text.setAttribute('class', 'electron-text');
+                text.textContent = 'e⁻';
+                g.appendChild(text);
+
+                const pos = wirePath.getPointAtLength(distance);
+                g.setAttribute('transform', `translate(${pos.x}, ${pos.y})`);
+                
+                electronsGroup.appendChild(g);
+                electrons.push({ g: g, dist: distance });
+            }
+            
+            function animateElectrons(deltaTime) {
+                const speed = electronSpeed * deltaTime;
+                electrons.forEach(e => {
+                    e.dist += speed;
+                    if (e.dist > wireLength) {
+                        e.dist = 0; // 回到起點
+                    }
+                    const pos = wirePath.getPointAtLength(e.dist);
+                    e.g.setAttribute('transform', `translate(${pos.x}, ${pos.y})`);
+                });
+            }
+
+            // (b) 電極動畫
+            function animateElectrodes(deltaTime) {
+                const rate = 0.0005 * deltaTime; 
+                
+                electrodeState.left.width -= rate;
+                electrodeState.left.x += rate / 2;
+                if (electrodeState.left.width < 2) electrodeState.left.width = 2;
+                leftElectrode.setAttribute('width', electrodeState.left.width);
+                leftElectrode.setAttribute('x', electrodeState.left.x);
+                
+                electrodeState.right.width += rate;
+                electrodeState.right.x -= rate / 2;
+                rightElectrode.setAttribute('width', electrodeState.right.width);
+                rightElectrode.setAttribute('x', electrodeState.right.x);
+            }
+
+            // v1.1.0: 離子動畫 (使用 <g> 群組)
+            function createIon(cssClass, symbol, x, y, type) {
+                const g = document.createElementNS(svgNS, 'g');
+
+                const circle = document.createElementNS(svgNS, 'circle');
+                circle.setAttribute('r', 6); // 放大一點
+                circle.setAttribute('class', `ion-circle ${cssClass}`);
+                g.appendChild(circle);
+                
+                const text = document.createElementNS(svgNS, 'text');
+                text.setAttribute('class', 'ion-text');
+                text.textContent = symbol;
+                g.appendChild(text);
+                
+                g.setAttribute('transform', `translate(${x}, ${y})`);
+                ionsGroup.appendChild(g);
+                
+                const data = batteryData[currentBatteryType];
+                let targetX, targetY;
+                let speed = 0.01 + Math.random() * 0.02;
+                
+                if (type === 'cathode') {
+                    targetX = data.right.ionSpawnX + electrodeState.right.width / 2;
+                    targetY = y;
+                } else if (type === 'anode') {
+                    targetX = x + (Math.random() - 0.5) * 100;
+                    targetY = y + (Math.random() - 0.2) * 50;
+                } else if (type === 'salt-cation') {
+                    targetX = 650;
+                    targetY = 300;
+                } else if (type === 'salt-anion') {
+                    targetX = 150;
+                    targetY = 300;
+                }
+                
+                ions.push({ 
+                    g: g, 
+                    type: type, 
+                    symbol: symbol, // 儲存 symbol 供重生使用
+                    cssClass: cssClass, // 儲存 class 供重生使用
+                    x: x, y: y, 
+                    targetX: targetX, 
+                    targetY: targetY, 
+                    speed: speed 
+                });
+            }
+            
+            function animateIons(deltaTime) {
+                const data = batteryData[currentBatteryType];
+                
+                // 隨機生成陽極離子
+                if (Math.random() < 0.02) { 
+                    createIon(
+                        data.left.ionClass, 
+                        data.left.symbol,
+                        data.left.ionSpawnX - electrodeState.left.width / 2, 
+                        250 + Math.random() * 150, 
+                        'anode'
+                    );
+                }
+                
+                for (let i = ions.length - 1; i >= 0; i--) {
+                    const ion = ions[i];
+                    
+                    const dx = ion.targetX - ion.x;
+                    const dy = ion.targetY - ion.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    
+                    if (dist < 5) {
+                        // 到達目的地
+                        if (ion.type === 'cathode') {
+                            ion.g.remove();
+                            ions.splice(i, 1);
+                            // 重生
+                            createIon(
+                                ion.cssClass,
+                                ion.symbol,
+                                data.right.ionSpawnX - 50 + Math.random() * 100, 
+                                250 + Math.random() * 180, 
+                                'cathode'
+                            );
+                        } else if (ion.type === 'anode') {
+                            // 陽極離子: 設定新目標
+                            ion.targetX = ion.x + (Math.random() - 0.5) * 100;
+                            let newY = ion.y + (Math.random() - 0.5) * 100;
+                            // v1.1.0: 邊界修正，防止跑出燒杯
+                            ion.targetY = Math.max(220, Math.min(newY, 440));
+                        } else if (ion.type === 'salt-cation' || ion.type === 'salt-anion') {
+                            // 鹽橋離子: 重生
+                            ion.g.remove();
+                            ions.splice(i, 1);
+                            createIon(
+                                ion.cssClass,
+                                ion.symbol,
+                                400 - 60 + Math.random() * 120, 
+                                240 + Math.random() * 20,
+                                ion.type
+                            );
+                        }
+                    } else {
+                        // 持續移動
+                        ion.x += (dx / dist) * ion.speed * deltaTime;
+                        ion.y += (dy / dist) * ion.speed * deltaTime;
+                        ion.g.setAttribute('transform', `translate(${ion.x}, ${ion.y})`);
+                    }
+                }
+            }
+
+            // --- 9. 啟動 ---
+            init();
+        });
+    </script>
+
+</body>
+</html>
