@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>透鏡公式光學模擬器</title>
+    <!-- 載入 Tailwind CSS CDN for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom canvas styling */
+        #lens-canvas {
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+            background-color: #ffffff;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 p-4 min-h-screen font-sans">
+
+    <div class="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-2xl">
+        <h1 class="text-3xl font-extrabold text-blue-800 mb-6 text-center">薄透鏡公式模擬器</h1>
+        
+        <!-- Controls Panel -->
+        <div class="grid md:grid-cols-3 gap-6 mb-8 p-4 bg-blue-50 rounded-lg">
+            
+            <!-- Focal Length (f) Control -->
+            <div>
+                <label for="focalLength" class="block text-lg font-semibold text-blue-700 mb-2">
+                    焦距 f (cm): <span id="fValue" class="font-mono bg-white px-2 py-0.5 rounded shadow-inner">20</span> cm
+                </label>
+                <input type="range" id="focalLength" min="-50" max="50" step="1" value="20" class="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer">
+                <p class="text-sm text-gray-500 mt-1">(f > 0: 凸透鏡 / f < 0: 凹透鏡)</p>
+            </div>
+
+            <!-- Object Distance (u) Control -->
+            <div>
+                <label for="objectDistance" class="block text-lg font-semibold text-blue-700 mb-2">
+                    物距 u (cm): <span id="uValue" class="font-mono bg-white px-2 py-0.5 rounded shadow-inner">30</span> cm
+                </label>
+                <input type="range" id="objectDistance" min="1" max="100" step="1" value="30" class="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer">
+                <p class="text-sm text-gray-500 mt-1">(u 恆為正，從左側入射)</p>
+            </div>
+
+            <!-- (NEW) Object Height (H) Control -->
+            <div>
+                <label for="objectHeight" class="block text-lg font-semibold text-blue-700 mb-2">
+                    物高 H (cm): <span id="hValue" class="font-mono bg-white px-2 py-0.5 rounded shadow-inner">5</span> cm
+                </label>
+                <input type="range" id="objectHeight" min="1" max="15" step="1" value="5" class="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer">
+                <p class="text-sm text-gray-500 mt-1">(控制物體箭頭的高度)</p>
+            </div>
+        </div>
+
+        <!-- Simulation Canvas -->
+        <div class="mb-8">
+            <canvas id="lens-canvas" width="800" height="400" class="w-full h-auto mx-auto rounded-lg"></canvas>
+        </div>
+
+        <!-- Results Panel -->
+        <div class="p-6 bg-gray-100 rounded-lg border border-gray-200">
+            <h2 class="text-2xl font-bold text-gray-700 mb-4">計算結果與成像性質</h2>
+            <!-- Updated Grid to 4 columns for new info -->
+            <div class="grid md:grid-cols-4 gap-4 text-lg">
+                <p class="p-2 bg-white rounded shadow">像距 v: <span id="imageDistance" class="font-mono text-green-600 font-bold"></span> cm</p>
+                <p class="p-2 bg-white rounded shadow">放大率 M: <span id="magnification" class="font-mono text-indigo-600 font-bold"></span></p>
+                <!-- (NEW) Image Height Display -->
+                <p class="p-2 bg-white rounded shadow">像高 h: <span id="imageHeight" class="font-mono text-indigo-600 font-bold"></span> cm</p>
+                <p class="p-2 bg-white rounded shadow">透鏡類型: <span id="lensType" class="font-bold"></span></p>
+                <p class="p-2 bg-white rounded shadow col-span-full md:col-span-3">成像性質: <span id="imageNature" class="font-bold text-red-600"></span></p>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // 使用 IIFE (立即執行函數表達式) 將所有變數包裹在局部作用域內，避免 'W' 重複宣告錯誤。
+        (function() {
+            // --- Configuration & Initialization ---
+            const canvas = document.getElementById('lens-canvas');
+            const ctx = canvas.getContext('2d');
+            const W = canvas.width;
+            const H = canvas.height; // H = 畫布高度 (e.g., 400px)
+            const ORIGIN_X = W / 2; // Lens center at the horizontal middle
+            const ORIGIN_Y = H / 2; // Optical axis at the vertical middle
+            const SCALE = 4; // Scale factor: 1 cm in physics world = 4 pixels
+            // const OBJ_HEIGHT_CM = 5; // (REMOVED) Now a variable from slider
+            const ARROW_WIDTH = 5; // Width of the arrow body in pixels
+
+            // Get UI elements
+            const fRange = document.getElementById('focalLength');
+            const uRange = document.getElementById('objectDistance');
+            const hRange = document.getElementById('objectHeight'); // (NEW)
+            
+            const fValueSpan = document.getElementById('fValue');
+            const uValueSpan = document.getElementById('uValue');
+            const hValueSpan = document.getElementById('hValue'); // (NEW)
+            
+            const vResult = document.getElementById('imageDistance');
+            const mResult = document.getElementById('magnification');
+            const hResult = document.getElementById('imageHeight'); // (NEW)
+            const lensTypeResult = document.getElementById('lensType');
+            const natureResult = document.getElementById('imageNature');
+
+            // --- Utility Functions ---
+
+            // Converts physical length (cm) to canvas pixel length (px)
+            const toPixels = (length) => length * SCALE;
+            // Converts physical X coordinate (cm) to canvas X coordinate (px)
+            const toCanvasX = (distance) => ORIGIN_X + toPixels(distance);
+
+            // Helper for drawing a dashed line
+            const drawDashedLine = (x1, y1, x2, y2, color, dash = [5, 5]) => {
+                ctx.strokeStyle = color;
+                ctx.setLineDash(dash);
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            };
+
+            // Helper for drawing a solid line with an arrowhead
+            const drawArrowLine = (x1, y1, x2, y2, color, dash = []) => {
+                ctx.strokeStyle = color;
+                ctx.setLineDash(dash);
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+                
+                // Draw arrowhead
+                const angle = Math.atan2(y2 - y1, x2 - x1);
+                const headLength = 8;
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.moveTo(x2, y2);
+                ctx.lineTo(x2 - headLength * Math.cos(angle - Math.PI / 6), y2 - headLength * Math.sin(angle - Math.PI / 6));
+                ctx.lineTo(x2 - headLength * Math.cos(angle + Math.PI / 6), y2 - headLength * Math.sin(angle + Math.PI / 6));
+                ctx.closePath();
+                ctx.fill();
+            };
+
+            // --- Core Physics Calculation ---
+            
+            // (FIXED) 參數 H 改名為 obj_H_cm (物高, 單位 cm)
+            function calculateLens(f, u, obj_H_cm) { 
+                let v, M, h;
+                let nature = '';
+                let lensType = '';
+
+                // Update UI for controls
+                fValueSpan.textContent = f;
+                uValueSpan.textContent = u;
+                hValueSpan.textContent = obj_H_cm; // (FIXED)
+
+                // Determine Lens Type
+                if (f > 0) {
+                    lensType = '凸透鏡 (會聚)';
+                } else if (f < 0) {
+                    lensType = '凹透鏡 (發散)';
+                } else {
+                    lensType = '平面玻璃 (f=∞)';
+                }
+                lensTypeResult.textContent = lensType;
+
+                if (f === 0) {
+                    v = u; // No lens effect
+                    M = 1;
+                    h = obj_H_cm; // (FIXED)
+                    nature = '透鏡失效 (f=0)';
+                } else if (u === f) {
+                    v = Infinity;
+                    M = Infinity;
+                    h = Infinity;
+                    vResult.textContent = '無限遠';
+                    mResult.textContent = '無限大';
+                    hResult.textContent = '無限大'; // (NEW)
+                    nature = '光線平行，不成像';
+                } else {
+                    // Lens Formula: v = (f * u) / (u - f)
+                    v = (f * u) / (u - f);
+                    M = -v / u; // Magnification Formula
+                    h = M * obj_H_cm; // (FIXED) Image height calculation
+
+                    vResult.textContent = v.toFixed(2);
+                    mResult.textContent = M.toFixed(2);
+                    hResult.textContent = h.toFixed(2); // (NEW)
+
+                    // Determine Image Nature
+                    const isReal = v > 0;
+                    const isVirtual = v < 0;
+                    const isUpright = M > 0;
+                    const isMagnified = Math.abs(M) > 1.01;
+                    const isReduced = Math.abs(M) < 0.99;
+
+                    nature = (isReal ? '實像' : '虛像') + '，';
+                    nature += (isUpright ? '正立' : '倒立') + '，';
+
+                    if (isMagnified) {
+                        nature += '放大';
+                    } else if (isReduced) {
+                        nature += '縮小';
+                    } else {
+                        nature += '等大';
+                    }
+                }
+
+                natureResult.textContent = nature;
+                // (FIXED) 回傳的 key 也同步修改
+                return { f, u, v, M, obj_H_cm, img_h_cm: h }; 
+            }
+
+            // --- Visual Simulation Drawing ---
+
+            // (FIXED) 參數 H 和 h 改名為 obj_H_cm 和 img_h_cm
+            function drawSimulation(f, u, v, M, obj_H_cm, img_h_cm) { 
+                // Clear canvas
+                ctx.clearRect(0, 0, W, H);
+                ctx.lineWidth = 1;
+                ctx.setLineDash([]); // Reset dash for main elements
+
+                // --- 1. Draw Optical Axis ---
+                ctx.strokeStyle = '#374151'; // Gray
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(0, ORIGIN_Y);
+                ctx.lineTo(W, ORIGIN_Y);
+                ctx.stroke();
+
+                // --- 2. Draw Lens (Simple Representation) ---
+                // (FIXED) 這裡的 H 確保是使用外層的 const H = canvas.height
+                const lensHeight = H * 0.9;
+                const lensTop = (H - lensHeight) / 2;
+                const isConvex = f > 0;
+                const LENS_COLOR = isConvex ? '#10b981' : '#f59e0b'; // Green for Convex, Orange for Concave
+                
+                ctx.strokeStyle = LENS_COLOR;
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(ORIGIN_X, lensTop);
+                ctx.lineTo(ORIGIN_X, H - lensTop);
+                ctx.stroke();
+                
+                // Draw lens shape indicator (triangles)
+                ctx.fillStyle = LENS_COLOR;
+                if (isConvex) {
+                    // Upward triangle
+                    ctx.beginPath();
+                    ctx.moveTo(ORIGIN_X - 5, lensTop);
+                    ctx.lineTo(ORIGIN_X + 5, lensTop);
+                    ctx.lineTo(ORIGIN_X, lensTop + 10);
+                    ctx.closePath();
+                    ctx.fill();
+                    // Downward triangle
+                    ctx.beginPath();
+                    ctx.moveTo(ORIGIN_X - 5, H - lensTop);
+                    ctx.lineTo(ORIGIN_X + 5, H - lensTop);
+                    ctx.lineTo(ORIGIN_X, H - lensTop - 10);
+                    ctx.closePath();
+                    ctx.fill();
+                } else { // Concave
+                    // Downward pointing triangle (top)
+                    ctx.beginPath();
+                    ctx.moveTo(ORIGIN_X, lensTop);
+                    ctx.lineTo(ORIGIN_X - 5, lensTop + 10);
+                    ctx.lineTo(ORIGIN_X + 5, lensTop + 10);
+                    ctx.closePath();
+                    ctx.fill();
+                    // Upward pointing triangle (bottom)
+                    ctx.beginPath();
+                    ctx.moveTo(ORIGIN_X, H - lensTop);
+                    ctx.lineTo(ORIGIN_X - 5, H - lensTop - 10);
+                    ctx.lineTo(ORIGIN_X + 5, H - lensTop - 10);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                
+                // --- 3. Focal Points (F and 2F) ---
+                const f_px = toPixels(Math.abs(f));
+                const color = '#3b82f6'; // Blue for focal points
+                
+                const drawFocalPoint = (x, label) => {
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+                    ctx.arc(x, ORIGIN_Y, 4, 0, 2 * Math.PI);
+                    ctx.fill();
+                    ctx.font = '14px Arial';
+                    ctx.fillText(label, x - 5, ORIGIN_Y - 10);
+                };
+
+                // F and 2F on the left (object side)
+                drawFocalPoint(ORIGIN_X - f_px, 'F\'');
+                drawFocalPoint(ORIGIN_X - 2 * f_px, '2F\'');
+
+                // F and 2F on the right (image side)
+                drawFocalPoint(ORIGIN_X + f_px, 'F');
+                drawFocalPoint(ORIGIN_X + 2 * f_px, '2F');
+
+
+                // --- 4. Draw Object (Solid Arrow) ---
+                const OBJ_HEIGHT_PX = toPixels(obj_H_cm); // (FIXED) Use obj_H_cm
+                const obj_x = toCanvasX(-u);
+                const OBJ_COLOR = '#ef4444'; // Red
+                
+                // Draw Object body (rectangle)
+                ctx.fillStyle = OBJ_COLOR;
+                ctx.fillRect(obj_x - ARROW_WIDTH / 2, ORIGIN_Y - OBJ_HEIGHT_PX, ARROW_WIDTH, OBJ_HEIGHT_PX);
+
+                // Draw Object tip (triangle)
+                ctx.beginPath();
+                ctx.moveTo(obj_x, ORIGIN_Y - OBJ_HEIGHT_PX);
+                ctx.lineTo(obj_x + ARROW_WIDTH, ORIGIN_Y - OBJ_HEIGHT_PX + 10);
+                ctx.lineTo(obj_x - ARROW_WIDTH, ORIGIN_Y - OBJ_HEIGHT_PX + 10);
+                ctx.closePath();
+                ctx.fill();
+
+                // Draw text label
+                ctx.font = '16px Arial';
+                ctx.fillStyle = OBJ_COLOR;
+                ctx.fillText('物體 (O)', obj_x - 30, ORIGIN_Y + 20);
+
+                // --- 5. Draw Image (Solid/Dashed Arrow) ---
+                // (FIXED) 宣告 img_tip_y, img_x 在此處，以便後續延伸線使用
+                let img_x = 0;
+                let img_tip_y = 0;
+                const isVirtual = isFinite(v) && v < 0;
+
+                if (isFinite(v)) {
+                    img_x = toCanvasX(v);
+                    const IMG_HEIGHT_PX = toPixels(Math.abs(img_h_cm)); // (FIXED) Use img_h_cm
+                    // (FIXED) 虛像顏色加深
+                    const IMG_COLOR = (v > 0) ? '#10b981' : '#4b5563'; // Green for Real, Dark Gray for Virtual
+                    const isUpright = M > 0;
+                    // const isVirtual = v < 0; // 移到
+                    
+                    // Calculate body position
+                    let img_bottom_y;
+                    if (isUpright) {
+                        // Upright: Tip is up (smaller Y), body extends down to ORIGIN_Y
+                        img_tip_y = ORIGIN_Y - IMG_HEIGHT_PX;
+                        img_bottom_y = ORIGIN_Y;
+                    } else {
+                        // Inverted: Tip is down (larger Y), body extends up from ORIGIN_Y
+                        img_tip_y = ORIGIN_Y + IMG_HEIGHT_PX;
+                        img_bottom_y = ORIGIN_Y;
+                    }
+                    
+                    // Virtual image (dashed line)
+                    if (isVirtual) {
+                        ctx.setLineDash([5, 5]);
+                        ctx.strokeStyle = IMG_COLOR;
+                        ctx.lineWidth = 3; // (FIXED) 虛像線條加粗
+                        ctx.beginPath();
+                        ctx.moveTo(img_x, img_bottom_y);
+                        ctx.lineTo(img_x, img_tip_y);
+                        ctx.stroke();
+                        ctx.setLineDash([]); // Reset dash
+                    } else {
+                        // Real image (solid fill)
+                        ctx.fillStyle = IMG_COLOR;
+                        ctx.fillRect(img_x - ARROW_WIDTH / 2, Math.min(img_tip_y, img_bottom_y), ARROW_WIDTH, IMG_HEIGHT_PX);
+                        
+                        // Draw tip
+                        ctx.beginPath();
+                        if (isUpright) {
+                            // Tip up
+                            ctx.moveTo(img_x, img_tip_y);
+                            ctx.lineTo(img_x + ARROW_WIDTH, img_tip_y + 10);
+                            ctx.lineTo(img_x - ARROW_WIDTH, img_tip_y + 10);
+                        } else {
+                            // Tip down
+                            ctx.moveTo(img_x, img_tip_y);
+                            ctx.lineTo(img_x + ARROW_WIDTH, img_tip_y - 10);
+                            ctx.lineTo(img_x - ARROW_WIDTH, img_tip_y - 10);
+                        }
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+                    
+                    // Add Image label
+                    ctx.font = '16px Arial';
+                    ctx.fillStyle = IMG_COLOR;
+                    ctx.fillText('像 (I)', img_x + 10, img_tip_y > ORIGIN_Y ? img_tip_y + 20 : img_tip_y - 10);
+                }
+
+                // --- 6. Draw Principal Rays (Ray Tracing) ---
+                const RAY_COLOR = '#9333ea'; // Purple
+                ctx.lineWidth = 2; // Increase line width for rays
+                
+                // (FIXED) Ray start Y position now depends on OBJ_HEIGHT_PX
+                // const OBJ_HEIGHT_PX = toPixels(obj_H_cm); // (FIXED) REDECLARATION REMOVED
+                const R_START_Y = ORIGIN_Y - OBJ_HEIGHT_PX; 
+
+                // Ray 1: Parallel to axis, refracts through F (or appears from F')
+                const R1_START_X = obj_x;
+                const R1_START_Y = R_START_Y;
+                const R1_REFRACT_X = ORIGIN_X;
+                const R1_REFRACT_Y = R1_START_Y;
+                
+                // 儲存光線 3 的折射點 Y 座標
+                let R3_REFRACT_Y;
+
+                // Incident Ray 1 (before lens)
+                drawArrowLine(R1_START_X, R1_START_Y, R1_REFRACT_X, R1_REFRACT_Y, RAY_COLOR);
+
+                if (isConvex) {
+                    // Convex: Refracts through F (right focal point)
+                    const f_x = ORIGIN_X + toPixels(Math.abs(f));
+                    const R1_END_X = W;
+                    const slope = (ORIGIN_Y - R1_REFRACT_Y) / (f_x - ORIGIN_X);
+                    const R1_END_Y = R1_REFRACT_Y + slope * (R1_END_X - ORIGIN_X);
+                    drawArrowLine(R1_REFRACT_X, R1_REFRACT_Y, R1_END_X, R1_END_Y, RAY_COLOR);
+                } else if (isFinite(v)) {
+                    // Concave: Appears to diverge from F' (left focal point)
+                    const f_prime_x = ORIGIN_X - toPixels(Math.abs(f));
+                    const slope = (ORIGIN_Y - R1_REFRACT_Y) / (f_prime_x - ORIGIN_X);
+                    const R1_END_X = W;
+                    const R1_END_Y = R1_REFRACT_Y + slope * (R1_END_X - ORIGIN_X);
+                    // (REMOVED) 不在此處畫延伸線，統一在第 7 區塊繪製
+                    // drawDashedLine(R1_REFRACT_X, R1_REFRACT_Y, f_prime_x, ORIGIN_Y, RAY_COLOR);
+                    drawArrowLine(R1_REFRACT_X, R1_REFRACT_Y, R1_END_X, R1_END_Y, RAY_COLOR);
+                }
+                
+                // Ray 2: Through Optical Center (O)
+                const R2_END_X = W;
+                const slope_R2 = (R1_START_Y - ORIGIN_Y) / (R1_START_X - ORIGIN_X);
+                const R2_END_Y = ORIGIN_Y + slope_R2 * (R2_END_X - ORIGIN_X);
+                drawArrowLine(R1_START_X, R1_START_Y, R2_END_X, R2_END_Y, RAY_COLOR);
+
+
+                // Ray 3: Through F' (or towards F), refracts parallel to axis
+                // let R3_REFRACT_Y; // 移到前面宣告
+                
+                if (isConvex) {
+                    // Convex: Through F' (left focal point), refracts parallel
+                    const f_prime_x = ORIGIN_X - toPixels(Math.abs(f));
+                    const slope_R3_inc = (R1_START_Y - ORIGIN_Y) / (R1_START_X - f_prime_x);
+                    R3_REFRACT_Y = ORIGIN_Y + slope_R3_inc * (ORIGIN_X - f_prime_x);
+                    drawArrowLine(R1_START_X, R1_START_Y, ORIGIN_X, R3_REFRACT_Y, RAY_COLOR);
+                    drawArrowLine(ORIGIN_X, R3_REFRACT_Y, W, R3_REFRACT_Y, RAY_COLOR);
+
+                } else { // Concave
+                    // Concave: Towards F (right focal point), refracts parallel
+                    const f_x = ORIGIN_X + toPixels(Math.abs(f));
+                    const slope_R3_inc = (R1_START_Y - ORIGIN_Y) / (R1_START_X - f_x);
+                    R3_REFRACT_Y = ORIGIN_Y + slope_R3_inc * (ORIGIN_X - f_x);
+                    drawArrowLine(R1_START_X, R1_START_Y, ORIGIN_X, R3_REFRACT_Y, RAY_COLOR);
+                    drawArrowLine(ORIGIN_X, R3_REFRACT_Y, W, R3_REFRACT_Y, RAY_COLOR);
+                    // (REMOVED) 不在此處畫延伸線
+                    // drawDashedLine(ORIGIN_X, R3_REFRACT_Y, f_x, ORIGIN_Y, RAY_COLOR);
+                }
+                
+                // --- 7. (NEW) Draw Virtual Image Ray Extensions ---
+                if (isVirtual) {
+                    const EXT_COLOR = '#ec4899'; // Pink for extensions
+                    ctx.lineWidth = 1.5;
+                    
+                    // 延伸線 1 (來自平行光)
+                    drawDashedLine(ORIGIN_X, R1_REFRACT_Y, img_x, img_tip_y, EXT_COLOR);
+                    
+                    // 延伸線 2 (來自穿心光)
+                    drawDashedLine(ORIGIN_X, ORIGIN_Y, img_x, img_tip_y, EXT_COLOR);
+                    
+                    // 延伸線 3 (來自焦點光)
+                    if (R3_REFRACT_Y) { // Ensure R3_REFRACT_Y is defined
+                        drawDashedLine(ORIGIN_X, R3_REFRACT_Y, img_x, img_tip_y, EXT_COLOR);
+                    }
+                }
+            }
+
+
+            // --- Event Handlers and Main Loop ---
+
+            function updateAll() {
+                let f = parseFloat(fRange.value);
+                let u = parseFloat(uRange.value);
+                let obj_H_cm = parseFloat(hRange.value); // (FIXED) Get H value
+                
+                let valueChanged = false; // Flag to track if we changed the value
+
+                // Limit u to prevent issues if it gets too close to f for small f values
+                if (f > 0 && u > f - 0.1 && u < f + 0.1) {
+                     u = f + 0.1;
+                     uRange.value = u; 
+                     valueChanged = true;
+                }
+                if (u < 1) { 
+                    u = 1; 
+                    uRange.value = u;
+                    valueChanged = true;
+                }
+
+                if (valueChanged) {
+                    return; 
+                }
+
+                // (FIXED) Pass H to calculation and drawing
+                const results = calculateLens(f, u, obj_H_cm);
+                drawSimulation(results.f, results.u, results.v, results.M, results.obj_H_cm, results.img_h_cm);
+            }
+
+            // Add event listeners
+            fRange.addEventListener('input', updateAll);
+            uRange.addEventListener('input', updateAll);
+            hRange.addEventListener('input', updateAll); // (NEW)
+
+            // Initial draw on load
+            window.onload = function() {
+                updateAll();
+            };
+
+            // Handle window resize to keep canvas responsive
+            window.addEventListener('resize', updateAll);
+        })(); // End of IIFE
+    </script>
+</body>
+</html>
