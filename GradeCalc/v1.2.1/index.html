@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>會考加權分數計算器 - 等第查詢 v1.2.1</title>
+    <style>
+        /* CSS 樣式 v1.2.1 */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f7f9;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 40px auto;
+            background: #fff;
+            padding: 30px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            border-radius: 8px;
+        }
+
+        h1 {
+            color: #007bff;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            margin-top: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        h1 small { font-size: 0.5em; color: #6c757d; }
+
+        /* 頁籤導覽列 */
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .tab-button {
+            padding: 10px 20px;
+            cursor: pointer;
+            background-color: #f1f1f1;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            border-radius: 5px 5px 0 0;
+            margin-right: 5px;
+            transition: background-color 0.3s;
+            text-decoration: none;
+            color: #555;
+            font-weight: bold;
+        }
+
+        .tab-button.active {
+            background-color: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+
+        /* 主內容區塊 (Flex/Grid container) */
+        .content-area {
+            display: flex;
+            gap: 20px;
+        }
+        
+        /* 計算器和設定區 (左側/主區) */
+        .main-content {
+            flex-grow: 1;
+        }
+
+        /* 對照表區 (右側/側邊欄) */
+        .grade-ref-area {
+            width: 300px;
+            min-width: 300px;
+        }
+        
+        .calculator, .settings-content {
+            border: 1px solid #ccc;
+            padding: 20px;
+            border-radius: 5px;
+        }
+
+        /* 簡化表格樣式 */
+        .score-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            table-layout: fixed;
+        }
+
+        .score-table th, .score-table td {
+            border: 1px solid #ddd;
+            padding: 10px 5px;
+            text-align: center;
+        }
+        
+        .score-table th:first-child, .score-table td:first-child {
+            width: 30%; 
+            text-align: left;
+            font-weight: bold;
+        }
+
+        .score-table th {
+            background-color: #e9f7fe;
+            color: #007bff;
+        }
+
+        .score-table td input[type="number"] {
+            width: 80%;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            text-align: center;
+        }
+
+        /* 結果顯示 */
+        .result-box {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e9f7fe;
+            border: 1px solid #cceeff;
+            border-radius: 5px;
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+
+        .result-box strong {
+            color: #0056b3;
+            margin-right: 10px;
+        }
+
+        .grade-a { color: #28a745; }
+        .grade-b { color: #ffc107; }
+        .grade-c { color: #dc3545; }
+
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+        
+        /* 隱藏區塊 */
+        .hidden {
+            display: none;
+        }
+
+        /* 等第對照表及設定頁面的表格樣式 */
+        .ref-table, .settings-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+        }
+        .ref-table th, .ref-table td, .settings-table th, .settings-table td {
+            border: 1px solid #ddd;
+            padding: 5px;
+            text-align: center;
+        }
+        .ref-table th, .settings-table th {
+            background-color: #f1f1f1;
+        }
+
+        .settings-table input[type="number"] {
+            width: 80px;
+            padding: 5px;
+            text-align: center;
+        }
+
+        /* 響應式設計：電腦版 (>= 768px) */
+        @media (min-width: 768px) {
+            .content-area {
+                flex-direction: row; /* 計算區在左，對照表在右 */
+            }
+            .mobile-grade-ref {
+                display: none; /* 手機版的對照表隱藏 */
+            }
+        }
+        
+        /* 響應式設計：手機版 (< 768px) */
+        @media (max-width: 767px) {
+            .container {
+                margin: 10px;
+                padding: 15px;
+            }
+            .content-area {
+                flex-direction: column; /* 垂直堆疊 */
+            }
+            .grade-ref-area {
+                width: 100%; /* 佔滿寬度 */
+            }
+            .desktop-grade-ref {
+                display: none; /* 電腦版的對照表隱藏 */
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>會考加權分數計算器 <small>v1.2.1</small></h1>
+
+    <div class="tabs">
+        <a class="tab-button" id="tab-english" href="#english">英文科</a>
+        <a class="tab-button" id="tab-math" href="#math">數學科</a>
+        <a class="tab-button" id="tab-settings" href="#settings">設定</a>
+    </div>
+
+    <div class="content-area">
+        <div class="main-content">
+            <div id="calc-english" class="calculator hidden">
+                <h2>1. 英文科 (閱讀 + 聽力)</h2>
+                
+                <table class="score-table">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th>閱讀</th>
+                            <th>聽力</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>權重 (佔比)</td>
+                            <td><input type="number" id="e_read_weight" value="80"></td>
+                            <td><input type="number" id="e_listen_weight" value="20"></td>
+                        </tr>
+                        <tr>
+                            <td>總題數</td>
+                            <td><input type="number" id="e_read_total" value="43"></td>
+                            <td><input type="number" id="e_listen_total" value="21"></td>
+                        </tr>
+                        <tr>
+                            <td>對題數</td>
+                            <td><input type="number" id="e_read_correct" placeholder="答對題數"></td>
+                            <td><input type="number" id="e_listen_correct" placeholder="答對題數"></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <button onclick="calculateEnglish()">計算英文科等第</button>
+            </div>
+
+            <div id="calc-math" class="calculator hidden">
+                <h2>2. 數學科 (選擇題 + 非選擇題)</h2>
+
+                <table class="score-table">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th>選擇題</th>
+                            <th>非選題</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>權重 (佔比)</td>
+                            <td><input type="number" id="g_select_weight" value="85"></td>
+                            <td><input type="number" id="g_nonselect_weight" value="15"></td>
+                        </tr>
+                        <tr>
+                            <td>總數</td>
+                            <td><input type="number" id="g_select_total" value="25"> 題</td>
+                            <td><input type="number" id="g_nonselect_total" value="6"> 分</td>
+                        </tr>
+                        <tr>
+                            <td>得分/題數</td>
+                            <td><input type="number" id="g_select_correct" placeholder="答對題數"> 題</td>
+                            <td><input type="number" id="g_nonselect_score" placeholder="實得分數"> 分</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <button onclick="calculateGeneral()">計算數學科等第</button>
+            </div>
+            
+            <div id="tab-settings-content" class="settings-content hidden">
+                <h2>⚙️ 設定</h2>
+                <p>版本號碼：v1.2.1</p>
+                
+                <h3 style="margin-top: 30px;">英文科等第門檻設定 (最低加權分數)</h3>
+                <div id="english-settings-inputs"></div>
+                <button onclick="saveGradeSettings('english')">儲存英文設定</button>
+                <span id="english-save-status" style="margin-left: 10px;"></span>
+                
+                <h3 style="margin-top: 30px;">數學科等第門檻設定 (最低加權分數)</h3>
+                <div id="math-settings-inputs"></div>
+                <button onclick="saveGradeSettings('general')">儲存數學設定</button>
+                <span id="general-save-status" style="margin-left: 10px;"></span>
+            </div>
+            
+
+            <div id="result-container">
+                <div class="result-box">
+                    <strong>計算結果：</strong>
+                    加權分數: <span id="final_score">--</span>
+                    能力等第: <span id="final_grade">--</span>
+                </div>
+            </div>
+            
+            <div id="mobile-grade-ref" class="mobile-grade-ref">
+                <h3 style="margin-top: 20px;">等第對照表</h3>
+                <div id="mobile-ref-table-container"></div>
+            </div>
+        </div>
+
+        <div id="desktop-grade-ref" class="grade-ref-area desktop-grade-ref">
+            <h3 style="margin-top: 0;">等第對照表</h3>
+            <div id="desktop-ref-table-container"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ===========================================
+    // V1.2.1 - 資料定義 (預設值)
+    // ===========================================
+
+    // 預設的等第標準 (門檻為最低分數)
+    const DEFAULT_ENGLISH_GRADES = [
+        { grade: 'A++', threshold: 98.14 },
+        { grade: 'A+', threshold: 95.33 },
+        { grade: 'A', threshold: 90.70 },
+        { grade: 'B++', threshold: 83.21 },
+        { grade: 'B+', threshold: 71.05 },
+        { grade: 'B', threshold: 38.43 },
+        { grade: 'C', threshold: 0.00 }
+    ];
+
+    const DEFAULT_GENERAL_GRADES = [
+        { grade: 'A++', threshold: 93.20 },
+        { grade: 'A+', threshold: 85.70 },
+        { grade: 'A', threshold: 76.20 },
+        { grade: 'B++', threshold: 67.10 },
+        { grade: 'B+', threshold: 56.40 },
+        { grade: 'B', threshold: 40.60 },
+        { grade: 'C', threshold: 0.00 }
+    ];
+    
+    // 統一結果顯示元素
+    const finalScoreEl = document.getElementById('final_score');
+    const finalGradeEl = document.getElementById('final_grade');
+    const resultContainerEl = document.getElementById('result-container'); // 結果區塊的容器
+
+    
+    // 從 Local Storage 或預設值加載等第標準
+    let ENGLISH_GRADES = loadGradeSettings('english') || DEFAULT_ENGLISH_GRADES;
+    let GENERAL_GRADES = loadGradeSettings('general') || DEFAULT_GENERAL_GRADES;
+    
+    // ===========================================
+    // Local Storage 存取與設定頁面生成
+    // ===========================================
+    
+    function loadGradeSettings(subject) {
+        const key = `grades_${subject}`;
+        const stored = localStorage.getItem(key);
+        if (stored) {
+            try {
+                return JSON.parse(stored).sort((a, b) => b.threshold - a.threshold);
+            } catch (e) {
+                console.error(`Failed to parse ${key} from localStorage`);
+                return null;
+            }
+        }
+        return null;
+    }
+
+    function saveGradeSettings(subject) {
+        const containerId = subject === 'english' ? 'english-settings-inputs' : 'math-settings-inputs';
+        const statusElId = subject === 'english' ? 'english-save-status' : 'general-save-status';
+        const container = document.getElementById(containerId);
+        const statusEl = document.getElementById(statusElId);
+        const newSettings = [];
+        
+        try {
+            // 讀取新的輸入值
+            const inputs = container.querySelectorAll('input');
+            inputs.forEach(input => {
+                const threshold = parseFloat(input.value);
+                const grade = input.dataset.grade;
+                if (!isNaN(threshold)) {
+                    newSettings.push({ grade, threshold });
+                }
+            });
+            
+            // 排序 (從高到低)
+            newSettings.sort((a, b) => b.threshold - a.threshold);
+            
+            // 檢查 C 等第是否在最後且為 0.00
+            const cGrade = newSettings.find(g => g.grade === 'C');
+            if (cGrade && cGrade.threshold !== 0) {
+                 alert("C 等第的最低分數必須設定為 0。");
+                 return;
+            }
+
+            // 更新全域變量並存入 Local Storage
+            const key = `grades_${subject}`;
+            localStorage.setItem(key, JSON.stringify(newSettings));
+            
+            if (subject === 'english') {
+                ENGLISH_GRADES = newSettings;
+            } else {
+                GENERAL_GRADES = newSettings;
+            }
+
+            statusEl.textContent = '✅ 儲存成功！';
+            updateAllRefTables();
+            setTimeout(() => statusEl.textContent = '', 3000);
+
+        } catch (e) {
+            statusEl.textContent = '❌ 儲存失敗！';
+            console.error(e);
+        }
+    }
+    
+    function generateSettingsInputs(subject) {
+        const grades = subject === 'english' ? ENGLISH_GRADES : GENERAL_GRADES;
+        const containerId = subject === 'english' ? 'english-settings-inputs' : 'math-settings-inputs';
+        const container = document.getElementById(containerId);
+        
+        let html = '<table class="settings-table"><thead><tr><th>標示</th><th>最低加權分數門檻</th></tr></thead><tbody>';
+        
+        grades.forEach(item => {
+            html += `<tr>
+                <td>${item.grade}</td>
+                <td><input type="number" data-grade="${item.grade}" value="${item.threshold.toFixed(2)}" step="0.01"></td>
+            </tr>`;
+        });
+
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+
+    // ===========================================
+    // 核心計算邏輯 (V1.2.0 邏輯不變)
+    // ===========================================
+
+    // ... (calculateEnglish, calculateGeneral, validateInput, getGrade, updateResult 函數保持不變)
+
+    // 查找等第的通用函數
+    function getGrade(score, gradeMap) {
+        for (const item of gradeMap) {
+            if (score >= item.threshold) {
+                const className = item.grade.startsWith('A') ? 'grade-a' : item.grade.startsWith('B') ? 'grade-b' : 'grade-c';
+                return { grade: item.grade, className: className };
+            }
+        }
+        return { grade: 'N/A', className: '' };
+    }
+    
+    // 更新結果顯示
+    function updateResult(score, gradeResult) {
+        finalScoreEl.textContent = score.toFixed(2);
+        finalGradeEl.textContent = gradeResult.grade;
+        finalGradeEl.classList.remove('grade-a', 'grade-b', 'grade-c');
+        if (gradeResult.className) {
+            finalGradeEl.classList.add(gradeResult.className);
+        }
+    }
+    
+    // 輔助函數：檢查輸入是否有效
+    function validateInput(value, total, name) {
+        if (value === undefined || value === null || isNaN(value)) {
+            // 允許空值，但計算時會視為 0。這裡只檢查計算按鈕按下時的有效性。
+            // 由於 HTML input type="number" 已經會處理非數字，這裡只檢查範圍。
+            // 但為確保使用者輸入，我們在計算前先將空值轉為 0
+            if (document.activeElement && document.activeElement.id.startsWith('e_') || document.activeElement && document.activeElement.id.startsWith('g_')) {
+                // 如果是計算按鈕觸發，則將空值視為 0
+            } else if (value === undefined || value === null || isNaN(value)) {
+                 // 這裡邏輯簡化：在計算函數中將空值視為 0
+                 // return true; 
+            }
+        }
+        if (value < 0 || value > total) {
+            alert(`❌ 【數值範圍錯誤】${name} ( ${value} ) 必須在 0 到總數 ( ${total} ) 之間！`);
+            return false;
+        }
+        return true;
+    }
+    
+    // 1. 英文科計算函數 (Reading + Listening)
+    function calculateEnglish() {
+        const readTotal = parseFloat(document.getElementById('e_read_total').value);
+        const listenTotal = parseFloat(document.getElementById('e_listen_total').value);
+        const readWeight = parseFloat(document.getElementById('e_read_weight').value);
+        const listenWeight = parseFloat(document.getElementById('e_listen_weight').value);
+
+        // 將輸入框的空值視為 0
+        const readCorrect = parseFloat(document.getElementById('e_read_correct').value || 0);
+        const listenCorrect = parseFloat(document.getElementById('e_listen_correct').value || 0);
+
+        if (readTotal <= 0 || listenTotal <= 0) {
+            alert("❌ 【參數錯誤】閱讀或聽力的總題數必須大於 0。"); return;
+        }
+        if ((readWeight + listenWeight) !== 100) {
+            alert("❌ 【參數錯誤】閱讀和聽力的權重總和必須為 100。"); return;
+        }
+
+        if (!validateInput(readCorrect, readTotal, '閱讀答對題數') ||
+            !validateInput(listenCorrect, listenTotal, '聽力答對題數')) { return; }
+
+        const weightedScore = 
+            (readCorrect / readTotal * readWeight) + 
+            (listenCorrect / listenTotal * listenWeight);
+        
+        const finalScore = Math.round(weightedScore * 100) / 100;
+        const gradeResult = getGrade(finalScore, ENGLISH_GRADES);
+
+        updateResult(finalScore, gradeResult);
+    }
+
+    // 2. 數學科/一般學科計算函數 (Select + Non-Select)
+    function calculateGeneral() {
+        const selectTotal = parseFloat(document.getElementById('g_select_total').value);
+        const nonselectTotal = parseFloat(document.getElementById('g_nonselect_total').value);
+        const selectWeight = parseFloat(document.getElementById('g_select_weight').value);
+        const nonselectWeight = parseFloat(document.getElementById('g_nonselect_weight').value);
+
+        // 將輸入框的空值視為 0
+        const selectCorrect = parseFloat(document.getElementById('g_select_correct').value || 0);
+        const nonselectScore = parseFloat(document.getElementById('g_nonselect_score').value || 0);
+
+        if (selectTotal <= 0 || nonselectTotal <= 0) {
+            alert("❌ 【參數錯誤】選擇題總題數或非選擇題總分必須大於 0。"); return;
+        }
+        if ((selectWeight + nonselectWeight) !== 100) {
+            alert("❌ 【參數錯誤】選擇題和非選題的權重總和必須為 100。"); return;
+        }
+        
+        if (!validateInput(selectCorrect, selectTotal, '選擇題答對題數') ||
+            !validateInput(nonselectScore, nonselectTotal, '非選擇題得分')) { return; }
+
+        const weightedScore = 
+            (selectCorrect / selectTotal * selectWeight) + 
+            (nonselectScore / nonselectTotal * nonselectWeight);
+
+        const finalScore = Math.round(weightedScore * 100) / 100;
+        const gradeResult = getGrade(finalScore, GENERAL_GRADES);
+
+        updateResult(finalScore, gradeResult);
+    }
+    
+    // ===========================================
+    // 頁籤切換與版面更新
+    // ===========================================
+    
+    const calcEnglishEl = document.getElementById('calc-english');
+    const calcMathEl = document.getElementById('calc-math');
+    const settingsContentEl = document.getElementById('tab-settings-content');
+    
+    const tabEnglishEl = document.getElementById('tab-english');
+    const tabMathEl = document.getElementById('tab-math');
+    const tabSettingsEl = document.getElementById('tab-settings');
+
+    function createRefTableHTML(grades) {
+        let html = '<table class="ref-table"><thead><tr><th>標示</th><th>加權分數範圍 (最低分 ~ 最高分)</th></tr></thead><tbody>';
+        
+        grades.forEach((item, index) => {
+            // 處理分數範圍的顯示 (最高分處理)
+            let upperBound = 100.00;
+            if (index > 0) {
+                // 上限是前一級的門檻減去 0.01
+                upperBound = grades[index - 1].threshold - 0.01;
+            }
+
+            // 格式化範圍
+            const range = (item.grade === 'C') ? 
+                `0.00 ~ ${grades[grades.length - 2].threshold - 0.01}` : 
+                `${item.threshold.toFixed(2)} ~ ${upperBound.toFixed(2)}`;
+            
+            const className = item.grade.startsWith('A') ? 'grade-a' : item.grade.startsWith('B') ? 'grade-b' : 'grade-c';
+
+            html += `<tr>
+                <td class="${className}">${item.grade}</td>
+                <td>${range}</td>
+            </tr>`;
+        });
+        
+        html += '</tbody></table>';
+        return html;
+    }
+    
+    function updateRefTable(subject, containerId) {
+        const grades = subject === 'english' ? ENGLISH_GRADES : GENERAL_GRADES;
+        const container = document.getElementById(containerId);
+        container.innerHTML = createRefTableHTML(grades);
+    }
+    
+    function updateAllRefTables() {
+        const currentHash = window.location.hash || '#english';
+        let subject = 'english';
+        if (currentHash === '#math') {
+            subject = 'general';
+        }
+        
+        // 更新當前頁面主題的對照表
+        updateRefTable(subject, 'mobile-ref-table-container');
+        updateRefTable(subject, 'desktop-ref-table-container');
+    }
+
+    function switchTab(hash) {
+        // 清除所有 active 狀態和隱藏狀態
+        [tabEnglishEl, tabMathEl, tabSettingsEl].forEach(el => el.classList.remove('active'));
+        [calcEnglishEl, calcMathEl, settingsContentEl].forEach(el => el.classList.add('hidden'));
+        
+        // 預設隱藏結果區，僅在計算頁籤顯示
+        resultContainerEl.classList.add('hidden');
+        
+        // 根據 hash 顯示對應的頁籤
+        if (hash === '#math') {
+            tabMathEl.classList.add('active');
+            calcMathEl.classList.remove('hidden');
+            resultContainerEl.classList.remove('hidden');
+            updateRefTable('general', 'mobile-ref-table-container');
+            updateRefTable('general', 'desktop-ref-table-container');
+        } else if (hash === '#settings') {
+            tabSettingsEl.classList.add('active');
+            settingsContentEl.classList.remove('hidden');
+            // 加載設定頁面的輸入框
+            generateSettingsInputs('english');
+            generateSettingsInputs('general');
+            // 注意：設定頁籤時，右側對照表不需隱藏，但內容會更新為當前主題 (英文)
+            updateRefTable('english', 'mobile-ref-table-container');
+            updateRefTable('english', 'desktop-ref-table-container');
+
+        } else { // 預設為 #english
+            tabEnglishEl.classList.add('active');
+            calcEnglishEl.classList.remove('hidden');
+            resultContainerEl.classList.remove('hidden');
+            updateRefTable('english', 'mobile-ref-table-container');
+            updateRefTable('english', 'desktop-ref-table-container');
+            
+            if (window.location.hash !== '#english') {
+                 window.history.replaceState(null, null, '#english');
+            }
+        }
+        
+        // 清空結果區
+        finalScoreEl.textContent = '--';
+        finalGradeEl.textContent = '--';
+        finalGradeEl.classList.remove('grade-a', 'grade-b', 'grade-c');
+    }
+
+    // 監聽 URL hash 變動
+    window.addEventListener('hashchange', () => {
+        switchTab(window.location.hash);
+    });
+
+    // 頁面初次載入時，根據 URL 決定顯示哪個頁籤
+    window.addEventListener('load', () => {
+        // 先確保頁面結構完成後再執行
+        const initialHash = window.location.hash || '#english'; // 預設為英文
+        switchTab(initialHash);
+    });
+
+</script>
+
+</body>
+</html>
