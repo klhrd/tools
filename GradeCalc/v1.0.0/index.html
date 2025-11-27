@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>會考加權分數計算器 - 等第查詢</title>
+    <style>
+        /* CSS 樣式 */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f7f9;
+            color: #333;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 40px auto;
+            background: #fff;
+            padding: 30px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            border-radius: 8px;
+        }
+
+        h1 {
+            color: #007bff;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+
+        /* 頁籤導覽列 */
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .tab-button {
+            padding: 10px 20px;
+            cursor: pointer;
+            background-color: #f1f1f1;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            border-radius: 5px 5px 0 0;
+            margin-right: 5px;
+            transition: background-color 0.3s;
+            text-decoration: none; /* 移除超連結下劃線 */
+            color: #555;
+            font-weight: bold;
+        }
+
+        .tab-button.active {
+            background-color: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+
+        /* 計算器區塊 */
+        .calculator {
+            border: 1px solid #ccc;
+            padding: 20px;
+            margin-top: 20px;
+            border-radius: 5px;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+            padding: 5px 0;
+            border-bottom: 1px dashed #eee;
+        }
+
+        .input-group label {
+            display: inline-block;
+            width: 150px;
+            font-weight: 600;
+        }
+        .input-group span {
+            display: inline-block;
+            width: 80px;
+            text-align: right;
+        }
+
+        input[type="number"] {
+            width: 60px;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            text-align: center;
+        }
+
+        /* 結果顯示 */
+        .result-box {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e9f7fe;
+            border: 1px solid #cceeff;
+            border-radius: 5px;
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+
+        .result-box strong {
+            color: #0056b3;
+            margin-right: 10px;
+        }
+
+        .grade-a { color: #28a745; }
+        .grade-b { color: #ffc107; }
+        .grade-c { color: #dc3545; }
+
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+        
+        /* 隱藏區塊 */
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>會考加權分數計算器</h1>
+    <p>請輸入您的分數/題數，並可調整公式中的預設參數。</p>
+
+    <div class="tabs">
+        <a class="tab-button" id="tab-english" href="#english">英文科</a>
+        <a class="tab-button" id="tab-math" href="#math">數學科</a>
+    </div>
+
+    <div id="calc-english" class="calculator hidden">
+        <h2>1. 英文科 (閱讀 + 聽力)</h2>
+        
+        <h3>📖 參數設定 (總權重應為 100)</h3>
+        <div class="input-group">
+            <label>閱讀總題數 (R_t):</label>
+            <input type="number" id="e_read_total" value="43">
+            <label style="width:100px;">權重 (W_r):</label>
+            <input type="number" id="e_read_weight" value="80">
+        </div>
+        <div class="input-group">
+            <label>聽力總題數 (L_t):</label>
+            <input type="number" id="e_listen_total" value="21">
+            <label style="width:100px;">權重 (W_l):</label>
+            <input type="number" id="e_listen_weight" value="20">
+        </div>
+
+        <h3>📝 考生輸入</h3>
+        <div class="input-group">
+            <label>閱讀答對題數 (R_c):</label>
+            <input type="number" id="e_read_correct" placeholder="答對題數">
+        </div>
+        <div class="input-group">
+            <label>聽力答對題數 (L_c):</label>
+            <input type="number" id="e_listen_correct" placeholder="答對題數">
+        </div>
+
+        <button onclick="calculateEnglish()">計算等第</button>
+    </div>
+
+    <div id="calc-math" class="calculator hidden">
+        <h2>2. 數學科 (選擇題 + 非選擇題)</h2>
+
+        <h3>📖 參數設定 (總權重應為 100)</h3>
+        <div class="input-group">
+            <label>選擇題總題數 (S_t):</label>
+            <input type="number" id="g_select_total" value="25">
+            <label style="width:100px;">權重 (W_s):</label>
+            <input type="number" id="g_select_weight" value="85">
+        </div>
+        <div class="input-group">
+            <label>非選擇題總分 (N_t):</label>
+            <input type="number" id="g_nonselect_total" value="6">
+            <label style="width:100px;">權重 (W_n):</label>
+            <input type="number" id="g_nonselect_weight" value="15">
+        </div>
+
+        <h3>📝 考生輸入</h3>
+        <div class="input-group">
+            <label>選擇題答對題數 (S_c):</label>
+            <input type="number" id="g_select_correct" placeholder="答對題數">
+        </div>
+        <div class="input-group">
+            <label>非選擇題得分 (N_s):</label>
+            <input type="number" id="g_nonselect_score" placeholder="實得分數">
+        </div>
+
+        <button onclick="calculateGeneral()">計算等第</button>
+    </div>
+    
+    <div class="result-box">
+        <strong>計算結果：</strong>
+        加權分數: <span id="final_score">--</span>
+        能力等第: <span id="final_grade">--</span>
+    </div>
+</div>
+
+<script>
+    // ===========================================
+    // 等第標準 (門檻為最低分數)
+    // ===========================================
+
+    // 1. 英文科等第標準 (來自 9202.jpg)
+    const ENGLISH_GRADES = [
+        { threshold: 98.14, grade: 'A++', className: 'grade-a' },
+        { threshold: 95.33, grade: 'A+', className: 'grade-a' },
+        { threshold: 90.70, grade: 'A', className: 'grade-a' },
+        { threshold: 83.21, grade: 'B++', className: 'grade-b' },
+        { threshold: 71.05, grade: 'B+', className: 'grade-b' },
+        { threshold: 38.43, grade: 'B', className: 'grade-b' },
+        { threshold: 0.00, grade: 'C', className: 'grade-c' }
+    ];
+
+    // 2. 數學科/一般學科等第標準 (來自 9203.jpg)
+    const GENERAL_GRADES = [
+        { threshold: 93.20, grade: 'A++', className: 'grade-a' },
+        { threshold: 85.70, grade: 'A+', className: 'grade-a' },
+        { threshold: 76.20, grade: 'A', className: 'grade-a' },
+        { threshold: 67.10, grade: 'B++', className: 'grade-b' },
+        { threshold: 56.40, grade: 'B+', className: 'grade-b' },
+        { threshold: 40.60, grade: 'B', className: 'grade-b' },
+        { threshold: 0.00, grade: 'C', className: 'grade-c' }
+    ];
+    
+    // 統一結果顯示元素
+    const finalScoreEl = document.getElementById('final_score');
+    const finalGradeEl = document.getElementById('final_grade');
+
+    // ===========================================
+    // 核心計算邏輯
+    // ===========================================
+
+    // 查找等第的通用函數
+    function getGrade(score, gradeMap) {
+        for (const item of gradeMap) {
+            if (score >= item.threshold) {
+                return item;
+            }
+        }
+        return { grade: 'N/A', className: '' };
+    }
+    
+    // 更新結果顯示
+    function updateResult(score, gradeResult) {
+        finalScoreEl.textContent = score.toFixed(2);
+        finalGradeEl.textContent = gradeResult.grade;
+        finalGradeEl.className = gradeResult.className;
+    }
+
+    // 1. 英文科計算函數 (Reading + Listening)
+    function calculateEnglish() {
+        // 取得參數
+        const readTotal = parseFloat(document.getElementById('e_read_total').value);
+        const listenTotal = parseFloat(document.getElementById('e_listen_total').value);
+        const readWeight = parseFloat(document.getElementById('e_read_weight').value);
+        const listenWeight = parseFloat(document.getElementById('e_listen_weight').value);
+
+        // 取得考生輸入
+        const readCorrect = parseFloat(document.getElementById('e_read_correct').value || 0);
+        const listenCorrect = parseFloat(document.getElementById('e_listen_correct').value || 0);
+
+        if (readTotal <= 0 || listenTotal <= 0 || (readWeight + listenWeight) !== 100) {
+            alert("請檢查參數設定：總題數需大於 0，權重總和需為 100。");
+            return;
+        }
+        
+        if (readCorrect > readTotal || listenCorrect > listenTotal || readCorrect < 0 || listenCorrect < 0) {
+            alert("答對題數必須在 0 到總題數之間！");
+            return;
+        }
+
+        // 加權分數計算公式 P = (R_c / R_t * W_r) + (L_c / L_t * W_l)
+        const weightedScore = 
+            (readCorrect / readTotal * readWeight) + 
+            (listenCorrect / listenTotal * listenWeight);
+        
+        // 四捨五入至小數點後 2 位
+        const finalScore = Math.round(weightedScore * 100) / 100;
+        const gradeResult = getGrade(finalScore, ENGLISH_GRADES);
+
+        updateResult(finalScore, gradeResult);
+    }
+
+    // 2. 數學科/一般學科計算函數 (Select + Non-Select)
+    function calculateGeneral() {
+        // 取得參數
+        const selectTotal = parseFloat(document.getElementById('g_select_total').value);
+        const nonselectTotal = parseFloat(document.getElementById('g_nonselect_total').value);
+        const selectWeight = parseFloat(document.getElementById('g_select_weight').value);
+        const nonselectWeight = parseFloat(document.getElementById('g_nonselect_weight').value);
+
+        // 取得考生輸入
+        const selectCorrect = parseFloat(document.getElementById('g_select_correct').value || 0);
+        const nonselectScore = parseFloat(document.getElementById('g_nonselect_score').value || 0);
+
+        if (selectTotal <= 0 || nonselectTotal <= 0 || (selectWeight + nonselectWeight) !== 100) {
+            alert("請檢查參數設定：總題數/總分需大於 0，權重總和需為 100。");
+            return;
+        }
+        
+        if (selectCorrect > selectTotal || nonselectScore > nonselectTotal || selectCorrect < 0 || nonselectScore < 0) {
+            alert("答對題數/得分必須在 0 到總題數/總分之間！");
+            return;
+        }
+
+        // 加權分數計算公式 P = (S_c / S_t * W_s) + (N_s / N_t * W_n)
+        const weightedScore = 
+            (selectCorrect / selectTotal * selectWeight) + 
+            (nonselectScore / nonselectTotal * nonselectWeight);
+
+        // 四捨五入至小數點後 2 位
+        const finalScore = Math.round(weightedScore * 100) / 100;
+        const gradeResult = getGrade(finalScore, GENERAL_GRADES);
+
+        updateResult(finalScore, gradeResult);
+    }
+    
+    // ===========================================
+    // 頁籤切換邏輯 (基於 URL #Hash)
+    // ===========================================
+    
+    const calcEnglishEl = document.getElementById('calc-english');
+    const calcMathEl = document.getElementById('calc-math');
+    const tabEnglishEl = document.getElementById('tab-english');
+    const tabMathEl = document.getElementById('tab-math');
+
+    function switchTab(hash) {
+        // 清除所有 active 狀態和隱藏狀態
+        tabEnglishEl.classList.remove('active');
+        tabMathEl.classList.remove('active');
+        calcEnglishEl.classList.add('hidden');
+        calcMathEl.classList.add('hidden');
+        
+        // 根據 hash 顯示對應的頁籤
+        if (hash === '#math') {
+            tabMathEl.classList.add('active');
+            calcMathEl.classList.remove('hidden');
+        } else { // 預設為 #english
+            tabEnglishEl.classList.add('active');
+            calcEnglishEl.classList.remove('hidden');
+            // 如果網址沒有 hash，則設定為 #english，保持網址一致
+            if (window.location.hash !== '#english') {
+                 window.history.replaceState(null, null, '#english');
+            }
+        }
+        
+        // 清空結果區
+        finalScoreEl.textContent = '--';
+        finalGradeEl.textContent = '--';
+        finalGradeEl.className = '';
+    }
+
+    // 監聽 URL hash 變動
+    window.addEventListener('hashchange', () => {
+        switchTab(window.location.hash);
+    });
+
+    // 頁面初次載入時，根據 URL 決定顯示哪個頁籤
+    window.addEventListener('load', () => {
+        const initialHash = window.location.hash || '#english'; // 預設為英文
+        switchTab(initialHash);
+    });
+
+</script>
+
+</body>
+</html>
