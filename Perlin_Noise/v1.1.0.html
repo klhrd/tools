@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>柏林噪聲模擬器 v1.1.0 (Perlin Noise Simulator)</title>
+    <!-- 引入 p5.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --panel-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --accent-color: #00E5FF; /* 改為更具科技感的青色 */
+            --secondary-color: #2979FF;
+            --border-color: #333;
+            --panel-border: rgba(255,255,255,0.08);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 左側控制面板 */
+        .sidebar {
+            width: 340px;
+            background-color: var(--panel-bg);
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.4);
+            z-index: 20;
+        }
+
+        /* 滾動條樣式 */
+        .sidebar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .sidebar::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 4px;
+        }
+
+        .section {
+            background: rgba(255,255,255,0.03);
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid var(--panel-border);
+            transition: border-color 0.3s;
+        }
+        
+        .section:hover {
+            border-color: rgba(255,255,255,0.15);
+        }
+
+        h1 {
+            font-size: 1.2rem;
+            margin: 0 0 15px 0;
+            color: white;
+            text-align: center;
+            letter-spacing: 1px;
+            text-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+        }
+        
+        h1 span {
+            color: var(--accent-color);
+            font-size: 0.8em;
+            display: block;
+            margin-top: 5px;
+        }
+
+        h2 {
+            font-size: 0.85rem;
+            margin: 0 0 12px 0;
+            color: var(--accent-color);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* 表單控制項 */
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            margin-bottom: 6px;
+            color: #bbb;
+        }
+
+        .value-display {
+            color: var(--accent-color);
+            font-weight: bold;
+            font-family: monospace;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: var(--accent-color);
+            height: 4px;
+            background: #444;
+            border-radius: 2px;
+            appearance: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--accent-color);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        input[type="text"], input[type="number"], select {
+            background: #252525;
+            border: 1px solid #444;
+            color: white;
+            padding: 8px;
+            border-radius: 6px;
+            width: 100%;
+            box-sizing: border-box;
+            font-size: 0.9rem;
+        }
+        
+        input:focus, select:focus {
+            border-color: var(--accent-color);
+            outline: none;
+        }
+
+        button {
+            background: linear-gradient(45deg, var(--secondary-color), #00B0FF);
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+            width: 100%;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+            filter: brightness(1.1);
+        }
+        
+        button:active {
+            transform: translateY(1px);
+        }
+
+        /* 開關樣式 (Toggle Switch) */
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            padding: 4px 0;
+        }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 36px;
+            height: 20px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #444;
+            transition: .4s;
+            border-radius: 20px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--accent-color); }
+        input:checked + .slider:before { transform: translateX(16px); }
+
+        /* 主畫布區域 */
+        .main-content {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #000;
+            background-image: 
+                radial-gradient(#333 1px, transparent 1px);
+            background-size: 30px 30px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #canvas-wrapper {
+            position: relative;
+            box-shadow: 0 0 50px rgba(0,0,0,0.7);
+            border: 1px solid #333;
+            border-radius: 4px;
+            overflow: hidden;
+            /* 確保畫布不會大於視窗 */
+            max-width: 95vw;
+            max-height: 95vh;
+        }
+
+        /* 探針資訊 */
+        .probe-info {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid var(--accent-color);
+            color: var(--accent-color);
+            font-family: monospace;
+            font-size: 0.9rem;
+            pointer-events: none;
+            backdrop-filter: blur(4px);
+        }
+
+        .tooltip-icon {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            background: #555;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 14px;
+            font-size: 10px;
+            cursor: help;
+            margin-left: 5px;
+        }
+
+        /* Loading */
+        .loading-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            color: var(--accent-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            display: none;
+            flex-direction: column;
+            backdrop-filter: blur(5px);
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(0, 229, 255, 0.3);
+            border-top: 4px solid var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+        
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <!-- 側邊欄 -->
+    <div class="sidebar">
+        <h1>NOISE LAB <span>v1.1.0</span></h1>
+
+        <!-- 1. 核心生成 -->
+        <div class="section">
+            <h2>⚙️ 核心生成 (Core)</h2>
+            
+            <div class="control-group">
+                <label>種子代碼 (Seed)</label>
+                <div style="display:flex; gap:5px;">
+                    <input type="text" id="seedInput" value="v1.1.0">
+                    <button id="randomSeedBtn" style="width: 40px;">🎲</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>縮放 (Scale) <span id="scaleVal" class="value-display">0.015</span></label>
+                <input type="range" id="scaleSlider" min="0.002" max="0.1" step="0.001" value="0.015">
+            </div>
+
+            <div class="control-group">
+                <label>細節層數 (Octaves) <span id="octavesVal" class="value-display">3</span></label>
+                <input type="range" id="octavesSlider" min="1" max="8" step="1" value="3">
+            </div>
+            
+            <div class="control-group">
+                <label>動畫速度 (Flow Speed) <span id="speedVal" class="value-display">0.005</span></label>
+                <input type="range" id="speedSlider" min="0" max="0.03" step="0.001" value="0.005">
+            </div>
+        </div>
+
+        <!-- 2. 視覺渲染 -->
+        <div class="section">
+            <h2>🎨 視覺渲染 (Render)</h2>
+            
+            <div class="control-group">
+                <label>主題 (Theme)</label>
+                <select id="themeSelect">
+                    <option value="terrain">⛰️ 地形 (Terrain)</option>
+                    <option value="lava">🔥 熔岩 (Lava)</option>
+                    <option value="ocean">🌊 海洋 (Ocean)</option>
+                    <option value="midnight">🌌 午夜 (Midnight)</option>
+                    <option value="grayscale">⚫ 灰階 (Grayscale)</option>
+                </select>
+            </div>
+            
+            <div class="toggle-row">
+                <span style="font-size:0.85rem; color:#bbb;">底圖顯示 (Show Map)</span>
+                <label class="switch">
+                    <input type="checkbox" id="bgToggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="toggle-row">
+                <span style="font-size:0.85rem; color:#bbb;">明顯分層 (Stepping)</span>
+                <label class="switch">
+                    <input type="checkbox" id="stepToggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <!-- 3. 新功能：向量與粒子 -->
+        <div class="section" style="border-color: var(--accent-color);">
+            <h2 style="color: var(--accent-color);">✨ 進階視覺 (Vector & Flow)</h2>
+            
+            <div class="toggle-row">
+                <span style="font-size:0.85rem; color:#bbb;">顯示向量網格 (Vector Grid)</span>
+                <label class="switch">
+                    <input type="checkbox" id="vectorToggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            
+            <div class="toggle-row">
+                <span style="font-size:0.85rem; color:#bbb;">啟用粒子流動 (Particles)</span>
+                <label class="switch">
+                    <input type="checkbox" id="particleToggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="control-group">
+                <label>粒子數量 (Count) <span id="pCountVal" class="value-display">1000</span></label>
+                <input type="range" id="pCountSlider" min="100" max="3000" step="100" value="1000">
+            </div>
+            
+             <div class="toggle-row">
+                <span style="font-size:0.85rem; color:#bbb;">保留軌跡 (Trails)</span>
+                <label class="switch">
+                    <input type="checkbox" id="trailToggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <!-- 4. 匯出 -->
+        <div class="section">
+            <h2>💾 匯出 (Export)</h2>
+            <div style="display:flex; gap:10px; margin-bottom:10px;">
+                <input type="number" id="exportW" value="1024" placeholder="W" style="width:50%">
+                <input type="number" id="exportH" value="1024" placeholder="H" style="width:50%">
+            </div>
+            <button id="exportBtn">📸 生成高畫質圖片</button>
+        </div>
+    </div>
+
+    <!-- 主畫布 -->
+    <div class="main-content">
+        <div id="canvas-wrapper">
+            <!-- P5 Canvas Here -->
+        </div>
+        
+        <!-- 探針顯示 -->
+        <div id="probeInfo" class="probe-info" style="display:none;">
+            X: 0 | Y: 0 | H: 0.00
+        </div>
+
+        <!-- Loading -->
+        <div id="loadingOverlay" class="loading-overlay">
+            <div class="loading-spinner"></div>
+            <div>處理高畫質運算中...</div>
+        </div>
+    </div>
+
+    <script>
+        // === 參數與狀態 ===
+        let params = {
+            seed: 'v1.1.0',
+            scale: 0.015,
+            octaves: 3,
+            persistence: 0.5,
+            lacunarity: 2.0,
+            speed: 0.005,
+            theme: 'terrain',
+            showBg: true,
+            stepping: false,
+            showVectors: false,
+            showParticles: false,
+            particleCount: 1000,
+            trails: true,
+            zOff: 0 // 時間維度
+        };
+
+        let mainCanvas;
+        let particles = [];
+        let flowField = []; // 儲存向量場角度
+        let cols, rows;
+        let scl = 20; // 向量網格的單元大小 (px)
+        const PREVIEW_SIZE = 600;
+
+        // === P5.js Setup ===
+        function setup() {
+            let wrapper = document.getElementById('canvas-wrapper');
+            mainCanvas = createCanvas(PREVIEW_SIZE, PREVIEW_SIZE);
+            mainCanvas.parent('canvas-wrapper');
+            
+            updateSeed();
+            initParticles();
+            initUI();
+            
+            background(0);
+        }
+
+        // === P5.js Draw ===
+        function draw() {
+            // 1. 如果開啟軌跡，使用半透明背景產生殘影；否則完全重繪
+            if (params.showParticles && params.trails) {
+                background(0, 20); // 淡出效果
+            } else if (params.showBg) {
+                // 如果需要繪製底圖，這裡不使用 background(0)，而是讓 renderBackground 填滿
+                // 但為了性能，我們在 renderBackground 內部處理
+            } else {
+                background(0); // 純黑背景
+            }
+
+            // 更新時間
+            params.zOff += params.speed;
+
+            // 2. 繪製底層噪聲圖 (Heatmap)
+            // 為了優化性能，如果只看粒子，可以關閉底圖，或者降低底圖刷新率
+            if (params.showBg) {
+                renderBackground();
+            }
+
+            // 3. 計算並繪製向量網格 / 更新流動場
+            if (params.showVectors || params.showParticles) {
+                updateFlowField();
+            }
+
+            // 4. 繪製粒子
+            if (params.showParticles) {
+                updateAndShowParticles();
+            }
+
+            // 5. 滑鼠探針 (UI)
+            updateProbe();
+        }
+
+        // === 核心：繪製底層噪聲 ===
+        function renderBackground() {
+            loadPixels();
+            let d = pixelDensity();
+            
+            // 優化：如果開了粒子且有軌跡，不要每幀重繪整個底圖，會蓋掉軌跡
+            // 但如果使用者想看底圖+粒子，我們需要策略。
+            // v1.1.0 策略：如果 Trails 開啟，底圖只繪製一次或淡出？
+            // 實際上，如果 Trails 開啟，底圖會嚴重干擾殘影。
+            // 讓我們先簡單處理：如果 Trails 開啟，強制不繪製底圖，或者畫在最底層被半透明蓋過
+            
+            if (params.showParticles && params.trails) {
+                // 在軌跡模式下，我們不繪製底圖，只繪製半透明黑層 (在 draw 開頭已做)
+                return; 
+            }
+
+            // 標準繪製
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    let noiseVal = getNoiseValue(x, y);
+                    
+                    // Stepping
+                    if (params.stepping) {
+                        noiseVal = Math.floor(noiseVal * 10) / 9;
+                    }
+
+                    let c = getThemeColor(noiseVal, params.theme);
+                    
+                    let index = (x + y * width) * 4;
+                    pixels[index] = red(c);
+                    pixels[index + 1] = green(c);
+                    pixels[index + 2] = blue(c);
+                    pixels[index + 3] = 255;
+                }
+            }
+            updatePixels();
+        }
+
+        // === 核心：計算向量場 (Flow Field) ===
+        function updateFlowField() {
+            cols = floor(width / scl);
+            rows = floor(height / scl);
+            flowField = new Array(cols * rows);
+
+            if (params.showVectors) {
+                stroke(255, 100);
+                strokeWeight(1);
+            }
+
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    let xPixel = x * scl;
+                    let yPixel = y * scl;
+                    
+                    // 獲取該網格中心的噪聲值
+                    let noiseVal = getNoiseValue(xPixel, yPixel);
+                    
+                    // 將 0-1 的噪聲值映射到 0-4PI (兩圈，增加旋轉感)
+                    let angle = noiseVal * TWO_PI * 2; // 兩圈比較有流動感
+                    
+                    // 存入流動場陣列 (給粒子用)
+                    let index = x + y * cols;
+                    flowField[index] = createVector(cos(angle), sin(angle));
+
+                    // 繪製向量網格 (如果開啟)
+                    if (params.showVectors) {
+                        push();
+                        translate(xPixel + scl/2, yPixel + scl/2);
+                        rotate(angle);
+                        let len = scl * 0.8;
+                        stroke(getThemeColor(noiseVal, params.theme)); // 讓箭頭也有顏色
+                        line(0, 0, len, 0);
+                        // 畫箭頭頭部
+                        // line(len, 0, len-3, -3);
+                        // line(len, 0, len-3, 3);
+                        pop();
+                    }
+                }
+            }
+        }
+
+        // === 核心：粒子系統 ===
+        function initParticles() {
+            particles = [];
+            for (let i = 0; i < params.particleCount; i++) {
+                particles.push(new Particle());
+            }
+        }
+
+        function updateAndShowParticles() {
+            for (let p of particles) {
+                p.follow(flowField);
+                p.update();
+                p.edges();
+                p.show();
+            }
+        }
+
+        class Particle {
+            constructor() {
+                this.pos = createVector(random(width), random(height));
+                this.vel = createVector(0, 0);
+                this.acc = createVector(0, 0);
+                this.maxSpeed = 2; // 粒子速度
+                this.prevPos = this.pos.copy();
+                
+                // 每個粒子有隨機顏色偏移，增加視覺豐富度
+                this.colorOffset = random(0.8, 1.2);
+            }
+
+            follow(vectors) {
+                let x = floor(this.pos.x / scl);
+                let y = floor(this.pos.y / scl);
+                let index = x + y * cols;
+                
+                // 安全檢查
+                if(index >= 0 && index < vectors.length && vectors[index]) {
+                    let force = vectors[index];
+                    this.applyForce(force);
+                }
+            }
+
+            applyForce(force) {
+                this.acc.add(force);
+            }
+
+            update() {
+                this.vel.add(this.acc);
+                this.vel.limit(this.maxSpeed);
+                this.pos.add(this.vel);
+                this.acc.mult(0);
+            }
+
+            show() {
+                // 根據當前位置的噪聲值決定顏色
+                let noiseVal = getNoiseValue(this.pos.x, this.pos.y);
+                let c = getThemeColor(noiseVal, params.theme);
+                
+                stroke(red(c), green(c), blue(c), params.trails ? 150 : 255);
+                strokeWeight(params.trails ? 1 : 2);
+                
+                if (params.trails) {
+                    line(this.pos.x, this.pos.y, this.prevPos.x, this.prevPos.y);
+                    this.updatePrev();
+                } else {
+                    point(this.pos.x, this.pos.y);
+                }
+            }
+
+            updatePrev() {
+                this.prevPos.x = this.pos.x;
+                this.prevPos.y = this.pos.y;
+            }
+
+            edges() {
+                if (this.pos.x > width) { this.pos.x = 0; this.updatePrev(); }
+                if (this.pos.x < 0) { this.pos.x = width; this.updatePrev(); }
+                if (this.pos.y > height) { this.pos.y = 0; this.updatePrev(); }
+                if (this.pos.y < 0) { this.pos.y = height; this.updatePrev(); }
+            }
+        }
+
+        // === 工具：取得分形噪聲值 ===
+        function getNoiseValue(x, y) {
+            let total = 0;
+            let amplitude = 1;
+            let frequency = params.scale;
+            let maxValue = 0;
+
+            // 使用簡單的疊加算法
+            for (let i = 0; i < params.octaves; i++) {
+                total += noise(x * frequency, y * frequency, params.zOff) * amplitude;
+                maxValue += amplitude;
+                amplitude *= params.persistence;
+                frequency *= params.lacunarity;
+            }
+            
+            return total / maxValue;
+        }
+
+        // === 工具：顏色主題 ===
+        function getThemeColor(val, theme) {
+            // 午夜 Neon Theme
+            if (theme === 'midnight') {
+                 if (val < 0.3) return color(10, 0, 30);
+                 if (val < 0.5) return lerpColor(color(10, 0, 30), color(100, 0, 150), map(val,0.3,0.5,0,1));
+                 if (val < 0.7) return lerpColor(color(100, 0, 150), color(0, 200, 255), map(val,0.5,0.7,0,1));
+                 return lerpColor(color(0, 200, 255), color(255, 255, 255), map(val,0.7,1,0,1));
+            }
+            // 灰階
+            if (theme === 'grayscale') return color(val * 255);
+            
+            // 地形
+            if (theme === 'terrain') {
+                if (val < 0.3) return color(10, 30, 80);
+                if (val < 0.45) return color(30, 80, 200);
+                if (val < 0.5) return color(210, 180, 140);
+                if (val < 0.65) return color(34, 139, 34);
+                if (val < 0.8) return color(100, 100, 100);
+                return color(255);
+            }
+            
+            // 熔岩
+            if (theme === 'lava') {
+                if (val < 0.3) return color(20, 5, 5);
+                if (val < 0.6) return lerpColor(color(20, 5, 5), color(255, 60, 0), map(val, 0.3, 0.6, 0, 1));
+                return lerpColor(color(255, 60, 0), color(255, 255, 0), map(val, 0.6, 1, 0, 1));
+            }
+            
+            // 海洋
+            if (theme === 'ocean') {
+                 if (val < 0.5) return lerpColor(color(0,0,50), color(0,100,200), map(val,0,0.5,0,1));
+                 return lerpColor(color(0,100,200), color(150,255,255), map(val,0.5,1,0,1));
+            }
+
+            return color(255);
+        }
+
+        // === UI 交互 ===
+        function updateProbe() {
+            if (mouseX >= 0 && mouseX < width && mouseY >= 0 && mouseY < height) {
+                let n = getNoiseValue(mouseX, mouseY).toFixed(2);
+                let el = document.getElementById('probeInfo');
+                el.style.display = 'block';
+                el.innerHTML = `X: ${floor(mouseX)} | Y: ${floor(mouseY)} | Value: <span style="color:white">${n}</span>`;
+            } else {
+                document.getElementById('probeInfo').style.display = 'none';
+            }
+        }
+
+        function initUI() {
+            // Helper
+            const bind = (id, key, displayId) => {
+                document.getElementById(id).addEventListener('input', (e) => {
+                    let val = parseFloat(e.target.value);
+                    params[key] = val;
+                    if (displayId) document.getElementById(displayId).innerText = val;
+                });
+            };
+
+            // Core
+            bind('scaleSlider', 'scale', 'scaleVal');
+            bind('octavesSlider', 'octaves', 'octavesVal');
+            bind('speedSlider', 'speed', 'speedVal');
+            
+            // Toggles
+            const bindCheck = (id, key) => {
+                document.getElementById(id).addEventListener('change', (e) => params[key] = e.target.checked);
+            };
+            bindCheck('bgToggle', 'showBg');
+            bindCheck('stepToggle', 'stepping');
+            bindCheck('vectorToggle', 'showVectors');
+            bindCheck('trailToggle', 'trails');
+
+            // 粒子開關特別處理
+            document.getElementById('particleToggle').addEventListener('change', (e) => {
+                params.showParticles = e.target.checked;
+                if(params.showParticles && particles.length === 0) initParticles();
+            });
+
+            // 粒子數量
+            document.getElementById('pCountSlider').addEventListener('input', (e) => {
+                params.particleCount = parseInt(e.target.value);
+                document.getElementById('pCountVal').innerText = params.particleCount;
+                initParticles(); // 重置粒子
+            });
+
+            // Theme
+            document.getElementById('themeSelect').addEventListener('change', (e) => params.theme = e.target.value);
+
+            // Seed
+            const updateSeed = () => {
+                let str = document.getElementById('seedInput').value;
+                let val = 0;
+                for(let i=0; i<str.length; i++) val += str.charCodeAt(i);
+                noiseSeed(val);
+                params.zOff = 0;
+                initParticles(); // 重置粒子防止卡在奇怪地方
+                background(0); // 清空畫面
+            };
+            
+            document.getElementById('seedInput').addEventListener('input', updateSeed);
+            document.getElementById('randomSeedBtn').addEventListener('click', () => {
+                document.getElementById('seedInput').value = Math.floor(Math.random()*100000);
+                updateSeed();
+            });
+
+            // Export
+            document.getElementById('exportBtn').addEventListener('click', exportImage);
+        }
+
+        function updateSeed() {
+             let str = document.getElementById('seedInput').value;
+             let val = 0;
+             for(let i=0; i<str.length; i++) val += str.charCodeAt(i);
+             noiseSeed(val);
+        }
+
+        // === 匯出邏輯 (簡化版) ===
+        function exportImage() {
+            let w = parseInt(document.getElementById('exportW').value);
+            let h = parseInt(document.getElementById('exportH').value);
+            
+            document.getElementById('loadingOverlay').style.display = 'flex';
+            
+            setTimeout(() => {
+                let pg = createGraphics(w, h);
+                pg.pixelDensity(1);
+                pg.background(0);
+                
+                // 為了匯出，我們只畫底圖，因為粒子是動態的，很難捕捉"一瞬間"的流動感成靜態圖
+                // 除非我們模擬跑幾百幀。v1.1.0 先只支援匯出高清底圖。
+                
+                pg.loadPixels();
+                for (let y = 0; y < h; y++) {
+                    for (let x = 0; x < w; x++) {
+                        // 調整 scale 比例以符合預覽的視野
+                        let nx = x * (PREVIEW_SIZE/w);
+                        let ny = y * (PREVIEW_SIZE/h);
+                        
+                        let n = getNoiseValue(nx, ny); // 注意這裡用 nx, ny
+                        if (params.stepping) n = Math.floor(n*10)/9;
+                        
+                        let c = getThemeColor(n, params.theme);
+                        pg.set(x, y, c);
+                    }
+                }
+                pg.updatePixels();
+                
+                save(pg, `noise_${params.seed}_${params.theme}`, 'png');
+                pg.remove();
+                document.getElementById('loadingOverlay').style.display = 'none';
+            }, 100);
+        }
+
+    </script>
+</body>
+</html>
