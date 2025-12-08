@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>柏林噪聲模擬器 v1.0.0 (Perlin Noise Simulator)</title>
+    <!-- 引入 p5.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --panel-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --accent-color: #4CAF50;
+            --secondary-color: #2196F3;
+            --danger-color: #f44336;
+            --border-color: #333;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 左側控制面板 */
+        .sidebar {
+            width: 340px;
+            background-color: var(--panel-bg);
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
+
+        .section {
+            background: rgba(255,255,255,0.03);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        h1 {
+            font-size: 1.2rem;
+            margin: 0 0 20px 0;
+            color: var(--accent-color);
+            text-align: center;
+            border-bottom: 2px solid var(--accent-color);
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            font-size: 0.9rem;
+            margin: 0 0 10px 0;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* 表單控制項樣式 */
+        .control-group {
+            margin-bottom: 12px;
+        }
+
+        label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            margin-bottom: 5px;
+        }
+
+        .value-display {
+            color: var(--secondary-color);
+            font-weight: bold;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: var(--accent-color);
+        }
+
+        input[type="number"], input[type="text"], select {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            color: white;
+            padding: 5px;
+            border-radius: 4px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
+        input[type="number"]:focus, input[type="text"]:focus, select:focus {
+            border-color: var(--accent-color);
+            outline: none;
+        }
+
+        /* 按鈕樣式 */
+        button {
+            background-color: var(--secondary-color);
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+            width: 100%;
+        }
+
+        button:hover {
+            filter: brightness(1.1);
+        }
+
+        button.outline {
+            background: transparent;
+            border: 1px solid var(--secondary-color);
+            color: var(--secondary-color);
+        }
+        
+        button.outline:hover {
+            background: rgba(33, 150, 243, 0.1);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        /* 主要畫布區域 */
+        .main-content {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-image: 
+                linear-gradient(45deg, #1a1a1a 25%, transparent 25%), 
+                linear-gradient(-45deg, #1a1a1a 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #1a1a1a 75%), 
+                linear-gradient(-45deg, transparent 75%, #1a1a1a 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            position: relative;
+        }
+
+        #canvas-container {
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            border: 2px solid #444;
+            max-width: 90%;
+            max-height: 90%;
+            display: flex;
+        }
+
+        /* 標籤提示 */
+        .preset-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.7rem;
+            color: #666;
+            margin-top: 2px;
+        }
+
+        /* 匯出區域 */
+        .export-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        /* 切換開關 */
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            display: none;
+            flex-direction: column;
+        }
+        
+        /* Tooltip */
+        .tooltip-icon {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            background: #555;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 14px;
+            font-size: 10px;
+            cursor: help;
+            margin-left: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 側邊欄：控制面板 -->
+    <div class="sidebar">
+        <h1>柏林噪聲模擬器 v1.0.0</h1>
+
+        <!-- 1. 種子控制 -->
+        <div class="section">
+            <h2>種子 (Seed)</h2>
+            <div class="btn-group">
+                <input type="text" id="seedInput" value="12345" placeholder="輸入文字或數字">
+                <button id="randomSeedBtn" style="width: 40%;" title="隨機生成">🎲 隨機</button>
+            </div>
+        </div>
+
+        <!-- 2. 核心參數 -->
+        <div class="section">
+            <h2>核心參數</h2>
+            
+            <!-- 網格縮放 -->
+            <div class="control-group">
+                <label>
+                    <span>縮放 (Scale) <span class="tooltip-icon" title="控制噪聲圖案的大小。數值越小，地形越宏觀；數值越大，越細碎。">?</span></span>
+                    <span id="scaleVal" class="value-display">0.015</span>
+                </label>
+                <input type="range" id="scaleSlider" min="0.001" max="0.1" step="0.001" value="0.015">
+                <div class="preset-labels">
+                    <span>宏觀</span>
+                    <span>標準</span>
+                    <span>細碎</span>
+                </div>
+            </div>
+
+            <!-- 八度層數 -->
+            <div class="control-group">
+                <label>
+                    <span>八度層數 (Octaves) <span class="tooltip-icon" title="疊加的噪聲層數。層數越多，細節越豐富，但計算量越大。">?</span></span>
+                    <span id="octavesVal" class="value-display">3</span>
+                </label>
+                <input type="range" id="octavesSlider" min="1" max="10" step="1" value="3">
+            </div>
+
+            <!-- 持續度 -->
+            <div class="control-group">
+                <label>
+                    <span>持續度 (Persistence) <span class="tooltip-icon" title="控制每一層細節的振幅權重。數值越高，細節對比度越強。">?</span></span>
+                    <span id="persVal" class="value-display">0.5</span>
+                </label>
+                <input type="range" id="persSlider" min="0.0" max="1.0" step="0.05" value="0.5">
+            </div>
+
+            <!-- 間隙度 -->
+            <div class="control-group">
+                <label>
+                    <span>間隙度 (Lacunarity) <span class="tooltip-icon" title="控制每一層細節的頻率倍數。">?</span></span>
+                    <span id="lacVal" class="value-display">2.0</span>
+                </label>
+                <input type="range" id="lacSlider" min="1.0" max="4.0" step="0.1" value="2.0">
+            </div>
+        </div>
+
+        <!-- 3. 動畫與視覺化 -->
+        <div class="section">
+            <h2>視覺與動畫</h2>
+            
+            <!-- 動畫速度 -->
+            <div class="control-group">
+                <label>
+                    <span>動畫速度 (Time Speed)</span>
+                    <span id="speedVal" class="value-display">0.01</span>
+                </label>
+                <input type="range" id="speedSlider" min="0" max="0.05" step="0.001" value="0.01">
+            </div>
+
+            <!-- 主題選擇 -->
+            <div class="control-group">
+                <label>色彩主題 (Theme)</label>
+                <select id="themeSelect">
+                    <option value="terrain">⛰️ 地形高度圖 (Terrain)</option>
+                    <option value="lava">🔥 熔岩火焰 (Lava)</option>
+                    <option value="ocean">🌊 深海熱圖 (Ocean)</option>
+                    <option value="grayscale">⚫ 灰階 (Grayscale)</option>
+                </select>
+            </div>
+
+            <!-- 分層模式切換 -->
+            <div class="toggle-container">
+                <input type="checkbox" id="stepToggle">
+                <label for="stepToggle">啟用分層步進 (Stepping)</label>
+            </div>
+            
+            <div class="control-group" id="stepCountGroup" style="display:none; margin-top:10px;">
+                 <label>
+                    <span>分層數量</span>
+                    <span id="stepCountVal" class="value-display">10</span>
+                </label>
+                <input type="range" id="stepSlider" min="2" max="20" step="1" value="10">
+            </div>
+        </div>
+
+        <!-- 4. 匯出 -->
+        <div class="section">
+            <h2>匯出圖片</h2>
+            <div class="export-grid">
+                <div>
+                    <label>寬度 (px)</label>
+                    <input type="number" id="exportWidth" value="1024" min="64" max="4096">
+                </div>
+                <div>
+                    <label>高度 (px)</label>
+                    <input type="number" id="exportHeight" value="1024" min="64" max="4096">
+                </div>
+            </div>
+            <div class="control-group">
+                <label>格式</label>
+                <select id="exportFormat">
+                    <option value="png">PNG (無損)</option>
+                    <option value="jpg">JPG (較小)</option>
+                </select>
+            </div>
+            <button id="exportBtn">⬇️ 生成並下載</button>
+        </div>
+        
+        <div style="font-size: 0.8rem; color: #666; text-align: center;">
+            <p>Designed for GitHub Pages</p>
+        </div>
+    </div>
+
+    <!-- 主內容：畫布預覽 -->
+    <div class="main-content">
+        <div id="canvas-container">
+            <!-- p5.js Canvas 會插入這裡 -->
+        </div>
+        
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="loading-overlay">
+            <div style="font-size: 2rem; margin-bottom: 20px;">⚙️</div>
+            <div id="loadingText">正在生成高解析度圖片...</div>
+        </div>
+    </div>
+
+    <script>
+        // === 全域變數與狀態 ===
+        let params = {
+            seed: 12345,
+            scale: 0.015,
+            octaves: 3,
+            persistence: 0.5,
+            lacunarity: 2.0,
+            speed: 0.01,
+            theme: 'terrain',
+            stepping: false,
+            stepCount: 10,
+            timeOffset: 0
+        };
+
+        let mainCanvas;
+        let previewSize = 512; // 預覽畫布大小限制，確保網頁流暢
+
+        // === P5.js Setup ===
+        function setup() {
+            // 計算適合的預覽大小
+            let container = document.getElementById('main-content');
+            // 創建 512x512 的預覽畫布
+            mainCanvas = createCanvas(previewSize, previewSize);
+            mainCanvas.parent('canvas-container');
+            
+            // 初始化 UI 事件監聽器
+            initUI();
+            
+            // 設置初始種子
+            updateSeed();
+            
+            // 讓畫布像素化，適合看到像素風格（如果縮放很大）
+            noSmooth();
+        }
+
+        // === P5.js Draw Loop (動畫循環) ===
+        function draw() {
+            background(0);
+            
+            // 如果有動畫速度，增加時間偏移
+            if (params.speed > 0) {
+                params.timeOffset += params.speed;
+            }
+
+            // 載入像素數據
+            loadPixels();
+
+            // 遍歷所有像素
+            // 性能優化：對於預覽，我們可以不計算每個像素的複雜分形
+            // 但為了準確性，我們還是計算它。如果很卡，可以考慮降低 pixelDensity
+            
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    
+                    // 1. 生成分形噪聲值 (0.0 - 1.0)
+                    let noiseVal = fractalNoise(x, y, params.timeOffset, params.scale, params.octaves, params.persistence, params.lacunarity);
+                    
+                    // 2. 處理分層 (Stepping)
+                    if (params.stepping) {
+                        noiseVal = Math.floor(noiseVal * params.stepCount) / (params.stepCount - 1);
+                        // 確保不超過 1
+                        noiseVal = Math.min(noiseVal, 1); 
+                    }
+
+                    // 3. 顏色映射
+                    let c = getThemeColor(noiseVal, params.theme);
+                    
+                    // 4. 設定像素
+                    let index = (x + y * width) * 4;
+                    pixels[index] = red(c);
+                    pixels[index + 1] = green(c);
+                    pixels[index + 2] = blue(c);
+                    pixels[index + 3] = 255; // Alpha
+                }
+            }
+            
+            updatePixels();
+            
+            // 如果暫停（速度為0），則不需要不斷重繪節省資源，除非參數改變
+            // 這裡為了簡單保持循環
+        }
+
+        // === 核心演算法：分形噪聲 (Fractal Noise) ===
+        // 這實現了步驟 6：疊加八度
+        function fractalNoise(x, y, z, scale, octaves, persistence, lacunarity) {
+            let total = 0;
+            let amplitude = 1;
+            let frequency = scale;
+            let maxValue = 0;  // 用於歸一化
+
+            for (let i = 0; i < octaves; i++) {
+                // p5.js 的 noise() 接受 x, y, z。這裡我們用 z 做時間維度
+                // noise 輸出 0-1
+                total += noise(x * frequency, y * frequency, z) * amplitude;
+                
+                maxValue += amplitude;
+                
+                amplitude *= persistence;
+                frequency *= lacunarity;
+            }
+
+            return total / maxValue; // 將結果歸一化到 0-1 之間
+        }
+
+        // === 顏色映射函數 ===
+        function getThemeColor(val, theme) {
+            // val 是 0.0 到 1.0
+            
+            if (theme === 'grayscale') {
+                return color(val * 255);
+            }
+            else if (theme === 'terrain') {
+                // 地形：深海 -> 淺海 -> 沙 -> 草 -> 林 -> 岩 -> 雪
+                if (val < 0.30) return lerpColor(color(10, 30, 80), color(30, 80, 200), map(val, 0, 0.3, 0, 1)); // 深海
+                if (val < 0.45) return lerpColor(color(30, 80, 200), color(50, 150, 220), map(val, 0.3, 0.45, 0, 1)); // 淺海
+                if (val < 0.50) return lerpColor(color(210, 180, 140), color(238, 214, 175), map(val, 0.45, 0.5, 0, 1)); // 沙灘
+                if (val < 0.65) return lerpColor(color(34, 139, 34), color(85, 107, 47), map(val, 0.5, 0.65, 0, 1)); // 森林
+                if (val < 0.80) return lerpColor(color(100, 100, 100), color(160, 160, 160), map(val, 0.65, 0.8, 0, 1)); // 岩石
+                return color(255, 250, 250); // 雪
+            }
+            else if (theme === 'lava') {
+                // 熔岩：黑 -> 紅 -> 橙 -> 黃 -> 白
+                if (val < 0.3) return color(20, 5, 5); // 冷卻岩石
+                if (val < 0.5) return lerpColor(color(20, 5, 5), color(180, 20, 0), map(val, 0.3, 0.5, 0, 1));
+                if (val < 0.7) return lerpColor(color(180, 20, 0), color(255, 140, 0), map(val, 0.5, 0.7, 0, 1));
+                if (val < 0.9) return lerpColor(color(255, 140, 0), color(255, 255, 0), map(val, 0.7, 0.9, 0, 1));
+                return color(255, 255, 255);
+            }
+            else if (theme === 'ocean') {
+                // 海洋熱圖：黑/深紫 -> 藍 -> 青 -> 綠 -> 黃 -> 紅
+                // 類似科學視覺化
+                if (val < 0.2) return lerpColor(color(0,0,50), color(0,0,150), map(val,0,0.2,0,1));
+                if (val < 0.4) return lerpColor(color(0,0,150), color(0,100,255), map(val,0.2,0.4,0,1));
+                if (val < 0.6) return lerpColor(color(0,100,255), color(0,255,200), map(val,0.4,0.6,0,1));
+                if (val < 0.8) return lerpColor(color(0,255,200), color(255,255,0), map(val,0.6,0.8,0,1));
+                return lerpColor(color(255,255,0), color(255,0,0), map(val,0.8,1.0,0,1));
+            }
+            return color(255);
+        }
+
+        // === UI 交互邏輯 ===
+        function initUI() {
+            // Helper function to bind input to param and display
+            function bind(id, paramKey, displayId = null, isFloat = true) {
+                const el = document.getElementById(id);
+                el.addEventListener('input', () => {
+                    let val = isFloat ? parseFloat(el.value) : parseInt(el.value);
+                    params[paramKey] = val;
+                    if (displayId) {
+                        document.getElementById(displayId).innerText = val;
+                    }
+                });
+            }
+
+            bind('scaleSlider', 'scale', 'scaleVal');
+            bind('octavesSlider', 'octaves', 'octavesVal', false);
+            bind('persSlider', 'persistence', 'persVal');
+            bind('lacSlider', 'lacunarity', 'lacVal');
+            bind('speedSlider', 'speed', 'speedVal');
+            bind('stepSlider', 'stepCount', 'stepCountVal', false);
+
+            // 種子
+            document.getElementById('seedInput').addEventListener('input', (e) => {
+                // 將字串雜湊為數字
+                let val = 0;
+                let str = e.target.value;
+                for (let i = 0; i < str.length; i++) {
+                    val += str.charCodeAt(i);
+                }
+                params.seed = val;
+                updateSeed();
+            });
+
+            document.getElementById('randomSeedBtn').addEventListener('click', () => {
+                let r = Math.floor(Math.random() * 100000);
+                document.getElementById('seedInput').value = r;
+                params.seed = r;
+                updateSeed();
+            });
+
+            // 主題
+            document.getElementById('themeSelect').addEventListener('change', (e) => {
+                params.theme = e.target.value;
+            });
+
+            // 步進開關
+            const stepToggle = document.getElementById('stepToggle');
+            const stepGroup = document.getElementById('stepCountGroup');
+            stepToggle.addEventListener('change', (e) => {
+                params.stepping = e.target.checked;
+                stepGroup.style.display = params.stepping ? 'block' : 'none';
+            });
+
+            // 匯出按鈕
+            document.getElementById('exportBtn').addEventListener('click', handleExport);
+        }
+
+        function updateSeed() {
+            noiseSeed(params.seed);
+            params.timeOffset = 0; // 重置時間
+        }
+
+        // === 匯出邏輯 ===
+        async function handleExport() {
+            const w = parseInt(document.getElementById('exportWidth').value);
+            const h = parseInt(document.getElementById('exportHeight').value);
+            const fmt = document.getElementById('exportFormat').value;
+
+            // 性能警告
+            if (w * h > 2048 * 2048) {
+                const proceed = confirm(`您選擇了非常高的解析度 (${w}x${h})。\n這可能需要幾秒鐘甚至更久，並可能導致瀏覽器暫時無回應。\n\n確定要繼續嗎？`);
+                if (!proceed) return;
+            }
+
+            // 顯示 Loading
+            const loading = document.getElementById('loadingOverlay');
+            loading.style.display = 'flex';
+
+            // 使用 setTimeout 讓 UI 有機會渲染 Loading 畫面
+            setTimeout(() => {
+                // 創建一個隱藏的 Graphics Buffer
+                let pg = createGraphics(w, h);
+                pg.noSmooth();
+                pg.loadPixels();
+
+                // 為了匯出，我們使用目前的時間偏移量，捕捉當前這一幀
+                // 注意：這裡我們在 buffer 上重繪一遍，不依賴 screen pixels
+                
+                // p5 的 noise 在 createGraphics 裡是獨立的嗎？
+                // 通常 noiseSeed 是全域的，所以應該沒問題。
+                
+                for (let y = 0; y < h; y++) {
+                    for (let x = 0; x < w; x++) {
+                        // 注意：因為解析度變了，"scale" 的視覺效果也會變
+                        // 如果想保持圖案比例一致，需要根據寬度比例調整 scale?
+                        // 通常 scale 是基於坐標的。如果 canvas 變大，我們希望看到"更多"地形，還是"放大"地形？
+                        // 柏林噪聲通常是基於坐標空間。如果 w 變大，我們會看到右邊更多的地形。
+                        // 如果希望保持視覺比例（Zoom），需要調整輸入的 x, y。
+                        // 這裡我們採用標準做法：畫布變大 = 視野變大。
+                        
+                        let noiseVal = fractalNoise(x, y, params.timeOffset, params.scale, params.octaves, params.persistence, params.lacunarity);
+                        
+                        if (params.stepping) {
+                            noiseVal = Math.floor(noiseVal * params.stepCount) / (params.stepCount - 1);
+                            noiseVal = Math.min(noiseVal, 1);
+                        }
+
+                        let c = getThemeColor(noiseVal, params.theme);
+                        
+                        // Graphics Buffer 的 set 操作比較慢，直接操作 pixels 陣列
+                        let index = (x + y * w) * 4;
+                        pg.pixels[index] = red(c);
+                        pg.pixels[index+1] = green(c);
+                        pg.pixels[index+2] = blue(c);
+                        pg.pixels[index+3] = 255;
+                    }
+                }
+                
+                pg.updatePixels();
+                
+                // 下載
+                let filename = `noise_seed${params.seed}_${params.theme}`;
+                save(pg, filename, fmt);
+                
+                // 清理
+                pg.remove();
+                
+                // 隱藏 Loading
+                loading.style.display = 'none';
+            }, 100);
+        }
+
+        // p5 map 函數覆蓋 (防止衝突)
+        // p5 自帶 map, lerpColor, noise, noiseSeed, etc.
+    </script>
+</body>
+</html>
