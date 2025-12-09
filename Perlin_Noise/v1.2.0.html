@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>柏林噪聲模擬器 v1.2.0 (Perlin Noise Simulator)</title>
+    <!-- 引入 p5.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --panel-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --accent-color: #00E5FF; /* 青色 */
+            --secondary-color: #2979FF;
+            --border-color: #333;
+            --panel-border: rgba(255,255,255,0.08);
+            --info-color: #FFC107; /* 提示黃色 */
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 左側控制面板 */
+        .sidebar {
+            width: 340px;
+            background-color: var(--panel-bg);
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.4);
+            z-index: 20;
+        }
+
+        /* 滾動條樣式 */
+        .sidebar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .sidebar::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 4px;
+        }
+
+        .section {
+            background: rgba(255,255,255,0.03);
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid var(--panel-border);
+            transition: border-color 0.3s;
+        }
+        
+        .section:hover {
+            border-color: rgba(255,255,255,0.15);
+        }
+
+        h1 {
+            font-size: 1.2rem;
+            margin: 0 0 15px 0;
+            color: white;
+            text-align: center;
+            letter-spacing: 1px;
+            text-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+        }
+        
+        h1 span {
+            color: var(--accent-color);
+            font-size: 0.8em;
+            display: block;
+            margin-top: 5px;
+        }
+
+        h2 {
+            font-size: 0.85rem;
+            margin: 0 0 12px 0;
+            color: var(--accent-color);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* 表單控制項 */
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+            margin-bottom: 6px;
+            color: #bbb;
+        }
+
+        .value-display {
+            color: var(--accent-color);
+            font-weight: bold;
+            font-family: monospace;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: var(--accent-color);
+            height: 4px;
+            background: #444;
+            border-radius: 2px;
+            appearance: none;
+        }
+        
+        /* Tooltip Style */
+        .tooltip-container {
+            position: relative;
+            display: inline-block;
+        }
+        .tooltip-icon {
+            display: inline-flex;
+            width: 16px;
+            height: 16px;
+            background: var(--info-color);
+            color: #121212;
+            border-radius: 50%;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            cursor: help;
+            margin-left: 5px;
+            transition: transform 0.2s;
+        }
+        .tooltip-icon:hover {
+            transform: scale(1.1);
+        }
+        .tooltip-text {
+            visibility: hidden;
+            width: 250px;
+            background-color: #2c2c2c;
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 8px 12px;
+            position: absolute;
+            z-index: 10;
+            bottom: 100%;
+            left: 50%;
+            margin-left: -125px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.8rem;
+            line-height: 1.4;
+            border: 1px solid var(--info-color);
+        }
+        .tooltip-text::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: var(--info-color) transparent transparent transparent;
+        }
+        .tooltip-container:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* 主畫布區域 */
+        .main-content {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #000;
+            background-image: 
+                radial-gradient(#333 1px, transparent 1px);
+            background-size: 30px 30px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #canvas-wrapper {
+            position: relative;
+            box-shadow: 0 0 50px rgba(0,0,0,0.7);
+            border: 1px solid #333;
+            border-radius: 4px;
+            overflow: hidden;
+            max-width: 95vw;
+            max-height: 95vh;
+        }
+
+        /* 探針資訊 */
+        .probe-info {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid var(--accent-color);
+            color: var(--accent-color);
+            font-family: monospace;
+            font-size: 0.9rem;
+            pointer-events: none;
+            backdrop-filter: blur(4px);
+        }
+
+        /* Loading */
+        .loading-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            color: var(--accent-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            display: none;
+            flex-direction: column;
+            backdrop-filter: blur(5px);
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(0, 229, 255, 0.3);
+            border-top: 4px solid var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+        
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <!-- 側邊欄 -->
+    <div class="sidebar">
+        <h1>NOISE LAB <span>v1.2.0</span></h1>
+
+        <!-- 1. 核心生成 -->
+        <div class="section">
+            <h2>⚙️ 核心生成 (Core)</h2>
+            
+            <div class="control-group">
+                <label>種子代碼 (Seed)</label>
+                <div style="display:flex; gap:5px;">
+                    <input type="text" id="seedInput" value="v1.2.0">
+                    <button id="randomSeedBtn" style="width: 40px;">🎲</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>縮放 (Scale) <span id="scaleVal" class="value-display">0.015</span></label>
+                <input type="range" id="scaleSlider" min="0.002" max="0.1" step="0.001" value="0.015">
+            </div>
+
+            <!-- Octaves with Tooltip -->
+            <div class="control-group">
+                <label>
+                    八度層數 (Octaves)
+                    <div class="tooltip-container">
+                        <span class="tooltip-icon">?</span>
+                        <span class="tooltip-text">
+                            用於生成噪聲的分層數量。層數越多，細節越豐富，圖形越自然，但計算成本越高。
+                        </span>
+                    </div>
+                    <span id="octavesVal" class="value-display">3</span>
+                </label>
+                <input type="range" id="octavesSlider" min="1" max="8" step="1" value="3">
+            </div>
+            
+            <!-- Persistence with Tooltip -->
+            <div class="control-group">
+                <label>
+                    持續度 (Persistence)
+                    <div class="tooltip-container">
+                        <span class="tooltip-icon">?</span>
+                        <span class="tooltip-text">
+                            控制後續細節層的影響力衰減速度 (0-1)。值越高，細節層影響越大，地形會更尖銳、高低落差大。
+                        </span>
+                    </div>
+                    <span id="persistenceVal" class="value-display">0.50</span>
+                </label>
+                <input type="range" id="persistenceSlider" min="0.1" max="1.0" step="0.01" value="0.5">
+            </div>
+
+            <!-- Lacunarity with Tooltip -->
+            <div class="control-group">
+                <label>
+                    間隙度 (Lacunarity)
+                    <div class="tooltip-container">
+                        <span class="tooltip-icon">?</span>
+                        <span class="tooltip-text">
+                            控制後續細節層的頻率增加速度 (>1)。值越高，每一層之間的細節尺度差異越大。通常設為 2.0。
+                        </span>
+                    </div>
+                    <span id="lacunarityVal" class="value-display">2.00</span>
+                </label>
+                <input type="range" id="lacunaritySlider" min="1.5" max="3.0" step="0.01" value="2.0">
+            </div>
+
+            <div class="control-group">
+                <label>動畫速度 (Flow Speed) <span id="speedVal" class="value-display">0.005</span></label>
+                <input type="range" id="speedSlider" min="0" max="0.03" step="0.001" value="0.005">
+            </div>
+        </div>
+
+        <!-- 2. 視覺渲染 -->
+        <div class="section">
+            <h2>🎨 視覺渲染 (Render)</h2>
+            
+            <div class="control-group">
+                <label>主題 (Theme)</label>
+                <select id="themeSelect">
+                    <option value="terrain">⛰️ 地形 (Terrain)</option>
+                    <option value="ocean">🌊 海洋 (Ocean)</option>
+                    <option value="lava">🔥 熔岩 (Lava)</option>
+                    <option value="midnight">🌌 午夜 (Midnight)</option>
+                    <option value="rainbow">🌈 彩虹 (Rainbow)</option>
+                    <option value="grayscale">⚫ 灰階 (Grayscale)</option>
+                </select>
+            </div>
+            
+            <div class="toggle-row">
+                <span style="font-size:0.85rem; color:#bbb;">底圖顯示 (Show Map)</span>
+                <label class="switch">
+                    <input type="checkbox" id="bgToggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="control-group">
+                 <label>分層數量 (Step Count) <span id="stepCountVal" class="value-display">10</span></label>
+                 <input type="range" id="stepCountSlider" min="2" max="50" step="1" value="10">
+            </div>
+            <div class="toggle-row">
+                <span style="font-size:0.85rem; color:#bbb;">啟用分層 (Stepping)</span>
+                <label class="switch">
+                    <input type="checkbox" id="stepToggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <!-- 3. 新功能：向量與粒子 -->
+        <div class="section" style="border-color: var(--accent-color);">
+            <h2 style="color: var(--accent-color);">✨ 進階視覺 (Vector & Flow)</h2>
+            
+            <div class="toggle-row">
+                <span style="font-size:0.85rem; color:#bbb;">顯示向量網格 (Vector Grid)</span>
+                <label class="switch">
+                    <input type="checkbox" id="vectorToggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            
+            <div class="control-group">
+                <label>向量網格大小 (Grid Size) <span id="gridSizeVal" class="value-display">20</span></label>
+                <input type="range" id="gridSizeSlider" min="10" max="50" step="5" value="20">
+            </div>
+
+            <div class="toggle-row">
+                <span style="font-size:0.85rem; color:#bbb;">啟用粒子流動 (Particles)</span>
+                <label class="switch">
+                    <input type="checkbox" id="particleToggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="control-group">
+                <label>粒子數量 (Count) <span id="pCountVal" class="value-display">1000</span></label>
+                <input type="range" id="pCountSlider" min="100" max="3000" step="100" value="1000">
+            </div>
+            
+             <div class="toggle-row">
+                <span style="font-size:0.85rem; color:#bbb;">保留軌跡 (Trails)</span>
+                <label class="switch">
+                    <input type="checkbox" id="trailToggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <!-- 4. 匯出 -->
+        <div class="section">
+            <h2>💾 匯出 (Export)</h2>
+            <div style="display:flex; gap:10px; margin-bottom:10px;">
+                <input type="number" id="exportW" value="1024" placeholder="W" style="width:50%">
+                <input type="number" id="exportH" value="1024" placeholder="H" style="width:50%">
+            </div>
+            <button id="exportBtn">📸 生成高畫質圖片</button>
+        </div>
+    </div>
+
+    <!-- 主畫布 -->
+    <div class="main-content">
+        <div id="canvas-wrapper">
+            <!-- P5 Canvas Here -->
+        </div>
+        
+        <!-- 探針顯示 -->
+        <div id="probeInfo" class="probe-info" style="display:none;">
+            X: 0 | Y: 0 | Value: <span style="color:white">0.00</span>
+        </div>
+
+        <!-- Loading -->
+        <div id="loadingOverlay" class="loading-overlay">
+            <div class="loading-spinner"></div>
+            <div>處理高畫質運算中...</div>
+        </div>
+    </div>
+
+    <script>
+        // === 參數與狀態 ===
+        let params = {
+            seed: 'v1.2.0',
+            scale: 0.015,
+            octaves: 3,
+            persistence: 0.5,
+            lacunarity: 2.0,
+            speed: 0.005,
+            theme: 'terrain',
+            showBg: true,
+            stepping: false,
+            stepCount: 10,
+            showVectors: false,
+            gridSize: 20,
+            showParticles: false,
+            particleCount: 1000,
+            trails: true,
+            zOff: 0
+        };
+
+        let mainCanvas;
+        let particles = [];
+        let flowField = []; 
+        let cols, rows;
+        const PREVIEW_SIZE = 600;
+
+        // === P5.js Setup ===
+        function setup() {
+            let wrapper = document.getElementById('canvas-wrapper');
+            mainCanvas = createCanvas(PREVIEW_SIZE, PREVIEW_SIZE);
+            mainCanvas.parent('canvas-wrapper');
+            
+            colorMode(RGB, 255); 
+            
+            // Fix: updateSeed 已經是全域函數，這裡可以安全調用
+            updateSeed(); 
+            initParticles();
+            initUI();
+            
+            background(0);
+        }
+
+        // === P5.js Draw ===
+        function draw() {
+            if (params.showParticles && params.trails) {
+                background(0, 20); 
+            } else if (params.showBg) {
+                // Background handled by renderBackground
+            } else {
+                background(0); 
+            }
+
+            params.zOff += params.speed;
+
+            if (params.showBg && !(params.showParticles && params.trails)) {
+                renderBackground(width, height, getNoiseValue);
+            }
+
+            if (params.showVectors || params.showParticles) {
+                updateFlowField();
+            }
+
+            if (params.showParticles) {
+                updateAndShowParticles();
+            }
+
+            updateProbe();
+        }
+
+        // === 全域功能函數: 更新種子 ===
+        // 將 updateSeed 移到全域範圍，解決 setup() 找不到函數的問題
+        function updateSeed() {
+            let str = document.getElementById('seedInput').value;
+            let val = 0;
+            for(let i=0; i<str.length; i++) val += str.charCodeAt(i);
+            
+            noiseSeed(val);
+            randomSeed(val); // 也重置隨機數種子
+            
+            params.zOff = 0;
+            initParticles(); // 重置粒子位置
+            background(0);   // 清空畫面
+        }
+
+        function renderBackground(w, h, noiseFunc) {
+            loadPixels();
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    let noiseVal = noiseFunc(x, y);
+                    if (params.stepping) {
+                        noiseVal = floor(noiseVal * params.stepCount) / (params.stepCount - 1);
+                    }
+                    let c = getThemeColor(noiseVal, params.theme);
+                    let index = (x + y * width) * 4;
+                    pixels[index] = red(c);
+                    pixels[index + 1] = green(c);
+                    pixels[index + 2] = blue(c);
+                    pixels[index + 3] = 255;
+                }
+            }
+            updatePixels();
+        }
+
+        function updateFlowField() {
+            let scl = params.gridSize;
+            cols = floor(width / scl);
+            rows = floor(height / scl);
+            flowField = new Array(cols * rows);
+
+            if (params.showVectors) {
+                noFill();
+                stroke(255, 150); 
+                strokeWeight(1);
+            }
+
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    let xPixel = x * scl;
+                    let yPixel = y * scl;
+                    let noiseVal = getNoiseValue(xPixel, yPixel);
+                    let angle = map(noiseVal, 0, 1, 0, TWO_PI * 2); 
+                    
+                    let index = x + y * cols;
+                    flowField[index] = p5.Vector.fromAngle(angle);
+
+                    if (params.showVectors) {
+                        push();
+                        translate(xPixel + scl/2, yPixel + scl/2);
+                        rotate(angle);
+                        let len = scl * 0.8;
+                        stroke(getThemeColor(noiseVal, params.theme)); 
+                        line(0, 0, len, 0);
+                        pop();
+                    }
+                }
+            }
+        }
+
+        function initParticles() {
+            particles = [];
+            for (let i = 0; i < params.particleCount; i++) {
+                particles.push(new Particle());
+            }
+        }
+
+        function updateAndShowParticles() {
+            for (let p of particles) {
+                p.follow(flowField);
+                p.update();
+                p.edges();
+                p.show();
+            }
+        }
+
+        class Particle {
+            constructor() {
+                this.pos = createVector(random(width), random(height));
+                this.vel = createVector(0, 0);
+                this.acc = createVector(0, 0);
+                this.maxSpeed = 2; 
+                this.prevPos = this.pos.copy();
+            }
+
+            follow(vectors) {
+                let scl = params.gridSize;
+                let x = floor(this.pos.x / scl);
+                let y = floor(this.pos.y / scl);
+                let index = x + y * cols;
+                
+                if(index >= 0 && index < vectors.length && vectors[index]) {
+                    let force = vectors[index].copy().mult(0.5);
+                    this.applyForce(force);
+                }
+            }
+
+            applyForce(force) {
+                this.acc.add(force);
+            }
+
+            update() {
+                this.vel.add(this.acc);
+                this.vel.limit(this.maxSpeed);
+                this.pos.add(this.vel);
+                this.acc.mult(0);
+            }
+
+            show() {
+                let noiseVal = getNoiseValue(this.pos.x, this.pos.y);
+                let c = getThemeColor(noiseVal, params.theme);
+                
+                stroke(red(c), green(c), blue(c), params.trails ? 150 : 255);
+                strokeWeight(params.trails ? 1 : 2);
+                
+                if (params.trails) {
+                    line(this.pos.x, this.pos.y, this.prevPos.x, this.prevPos.y);
+                    this.updatePrev();
+                } else {
+                    point(this.pos.x, this.pos.y);
+                }
+            }
+
+            updatePrev() {
+                this.prevPos.x = this.pos.x;
+                this.prevPos.y = this.pos.y;
+            }
+
+            edges() {
+                if (this.pos.x > width) { this.pos.x = 0; this.updatePrev(); }
+                if (this.pos.x < 0) { this.pos.x = width; this.updatePrev(); }
+                if (this.pos.y > height) { this.pos.y = 0; this.updatePrev(); }
+                if (this.pos.y < 0) { this.pos.y = height; this.updatePrev(); }
+            }
+        }
+
+        function getNoiseValue(x, y) {
+            let total = 0;
+            let amplitude = 1;
+            let frequency = params.scale;
+            let maxValue = 0;
+
+            for (let i = 0; i < params.octaves; i++) {
+                total += noise(x * frequency, y * frequency, params.zOff * frequency) * amplitude; 
+                maxValue += amplitude;
+                amplitude *= params.persistence;
+                frequency *= params.lacunarity;
+            }
+            
+            return total / maxValue;
+        }
+
+        function getThemeColor(val, theme) {
+            if (theme === 'rainbow') {
+                colorMode(HSB, 360, 100, 100);
+                let h = map(val, 0, 1, 0, 360);
+                let c = color(h, 90, 90);
+                colorMode(RGB, 255);
+                return c;
+            }
+            if (theme === 'midnight') {
+                 colorMode(RGB, 255);
+                 if (val < 0.3) return color(10, 0, 30);
+                 if (val < 0.5) return lerpColor(color(10, 0, 30), color(100, 0, 150), map(val,0.3,0.5,0,1));
+                 if (val < 0.7) return lerpColor(color(100, 0, 150), color(0, 200, 255), map(val,0.5,0.7,0,1));
+                 return lerpColor(color(0, 200, 255), color(255, 255, 255), map(val,0.7,1,0,1));
+            }
+            if (theme === 'grayscale') { colorMode(RGB, 255); return color(val * 255); }
+            if (theme === 'terrain') {
+                colorMode(RGB, 255);
+                if (val < 0.3) return color(10, 30, 80); 
+                if (val < 0.45) return color(30, 80, 200); 
+                if (val < 0.5) return color(210, 180, 140); 
+                if (val < 0.65) return color(34, 139, 34); 
+                if (val < 0.8) return color(100, 100, 100); 
+                return color(255); 
+            }
+            if (theme === 'lava') {
+                colorMode(RGB, 255);
+                if (val < 0.3) return color(20, 5, 5);
+                if (val < 0.6) return lerpColor(color(20, 5, 5), color(255, 60, 0), map(val, 0.3, 0.6, 0, 1));
+                return lerpColor(color(255, 60, 0), color(255, 255, 0), map(val, 0.6, 1, 0, 1));
+            }
+            if (theme === 'ocean') {
+                 colorMode(RGB, 255);
+                 if (val < 0.5) return lerpColor(color(0,0,50), color(0,100,200), map(val,0,0.5,0,1));
+                 return lerpColor(color(0,100,200), color(150,255,255), map(val,0.5,1,0,1));
+            }
+            colorMode(RGB, 255);
+            return color(255);
+        }
+
+        function updateProbe() {
+            if (mouseX >= 0 && mouseX < width && mouseY >= 0 && mouseY < height) {
+                let n = getNoiseValue(mouseX, mouseY);
+                let el = document.getElementById('probeInfo');
+                el.style.display = 'block';
+                el.innerHTML = `X: ${floor(mouseX)} | Y: ${floor(mouseY)} | Value: <span style="color:white">${n.toFixed(3)}</span>`;
+            } else {
+                document.getElementById('probeInfo').style.display = 'none';
+            }
+        }
+
+        function initUI() {
+            const bindSlider = (id, key, displayId) => {
+                document.getElementById(id).addEventListener('input', (e) => {
+                    let val = parseFloat(e.target.value);
+                    params[key] = val;
+                    if (displayId) {
+                        document.getElementById(displayId).innerText = (val % 1 === 0) ? val : val.toFixed(2);
+                    }
+                    if (key === 'particleCount') initParticles();
+                });
+            };
+
+            bindSlider('scaleSlider', 'scale', 'scaleVal');
+            bindSlider('octavesSlider', 'octaves', 'octavesVal');
+            bindSlider('persistenceSlider', 'persistence', 'persistenceVal');
+            bindSlider('lacunaritySlider', 'lacunarity', 'lacunarityVal');
+            bindSlider('speedSlider', 'speed', 'speedVal');
+            bindSlider('stepCountSlider', 'stepCount', 'stepCountVal');
+            bindSlider('gridSizeSlider', 'gridSize', 'gridSizeVal');
+            bindSlider('pCountSlider', 'particleCount', 'pCountVal');
+            
+            const bindCheck = (id, key) => {
+                document.getElementById(id).addEventListener('change', (e) => {
+                    params[key] = e.target.checked;
+                    if (key === 'trails' && !e.target.checked) {
+                         background(0);
+                    }
+                    if(key === 'showParticles' && e.target.checked) initParticles();
+                });
+            };
+            bindCheck('bgToggle', 'showBg');
+            bindCheck('stepToggle', 'stepping');
+            bindCheck('vectorToggle', 'showVectors');
+            bindCheck('trailToggle', 'trails');
+
+            document.getElementById('themeSelect').addEventListener('change', (e) => params.theme = e.target.value);
+
+            // Seed logic modified to use the global updateSeed function
+            document.getElementById('seedInput').addEventListener('input', updateSeed);
+            document.getElementById('randomSeedBtn').addEventListener('click', () => {
+                document.getElementById('seedInput').value = Math.floor(Math.random()*100000).toString();
+                updateSeed();
+            });
+            
+            document.getElementById('exportBtn').addEventListener('click', exportImage);
+        }
+
+        function exportImage() {
+            let w = parseInt(document.getElementById('exportW').value);
+            let h = parseInt(document.getElementById('exportH').value);
+            
+            if (isNaN(w) || isNaN(h) || w < 100 || h < 100) {
+                console.error("無效的匯出尺寸。");
+                return;
+            }
+
+            document.getElementById('loadingOverlay').style.display = 'flex';
+            
+            setTimeout(() => {
+                let pg = createGraphics(w, h);
+                pg.pixelDensity(1);
+                pg.background(0);
+                pg.loadPixels();
+                
+                const highResNoiseFunc = (x, y) => {
+                    let nx = x * (PREVIEW_SIZE/w);
+                    let ny = y * (PREVIEW_SIZE/h);
+                    
+                    let total = 0;
+                    let amplitude = 1;
+                    let frequency = params.scale;
+                    let maxValue = 0;
+
+                    for (let i = 0; i < params.octaves; i++) {
+                        total += noise(nx * frequency, ny * frequency, params.zOff * frequency) * amplitude;
+                        maxValue += amplitude;
+                        amplitude *= params.persistence;
+                        frequency *= params.lacunarity;
+                    }
+                    return total / maxValue;
+                };
+
+                for (let y = 0; y < h; y++) {
+                    for (let x = 0; x < w; x++) {
+                        let n = highResNoiseFunc(x, y); 
+                        if (params.stepping) n = floor(n * params.stepCount) / (params.stepCount - 1);
+                        let c = getThemeColor(n, params.theme);
+                        pg.set(x, y, c);
+                    }
+                }
+                pg.updatePixels();
+                
+                save(pg, `noise_${params.seed}_${params.theme}_${w}x${h}`, 'png');
+                pg.remove(); 
+                document.getElementById('loadingOverlay').style.display = 'none';
+            }, 100); 
+        }
+    </script>
+</body>
+</html>
