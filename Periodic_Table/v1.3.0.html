@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>元素週期表 PRO v1.3.0 (實用版)</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel (for JSX) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #c7c7c7; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+        
+        .glass {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+        }
+        
+        body {
+            overscroll-behavior: none; /* Prevent bounce on Mac */
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // ==========================================
+        // 0. Icons (Inline SVG for standalone HTML)
+        // ==========================================
+        const Icons = {
+            Menu: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>,
+            X: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 18 18"/></svg>,
+            Search: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>,
+            Layers: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>,
+            Info: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>,
+            Activity: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>,
+            Thermometer: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/></svg>,
+            Flame: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.1.2-2.2.6-3.3.3.9.8 1.8 1.9 2.8Z"/></svg>,
+            Snowflake: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="2" x2="22" y1="12" y2="12"/><line x1="12" x2="12" y1="2" y2="22"/><path d="m20 16-4-4 4-4"/><path d="m4 8 4 4-4 4"/><path d="m16 4-4 4-4-4"/><path d="m8 20 4-4 4 4"/></svg>,
+            Zap: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
+            Droplets: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.8-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/></svg>,
+            Square: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>,
+            Circle: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/></svg>,
+            Calculator: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg>,
+            Trash2: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>,
+            Atom: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><path d="M20.2 20.2c2.04-2.03.02-7.36-4.5-11.9-4.54-4.52-9.87-6.54-11.9-4.5-2.04 2.03-.02 7.36 4.5 11.9 4.54 4.52 9.87 6.54 11.9 4.5Z"/><path d="M15.7 15.7c4.52-4.54 6.54-9.87 4.5-11.9-2.03-2.04-7.36-.02-11.9 4.5-4.52 4.54-6.54 9.87-4.5 11.9 2.03 2.04 7.36.02 11.9-4.5Z"/></svg>
+        };
+
+        // ==========================================
+        // 1. Configuration & Constants
+        // ==========================================
+
+        const INFO_LAYERS = {
+            ATOMIC_NUMBER: { id: 'atomicNumber', label: '原子序', type: 'text' },
+            ATOMIC_MASS: { id: 'atomicMass', label: '原子量', type: 'text' },
+            EN_TEXT: { id: 'electronegativity', label: '電負度', type: 'text' },
+            STATE_ICON: { id: 'state', label: '物態圖標', type: 'icon' },
+        };
+
+        const HEATMAP_MODES = {
+            NONE: { id: 'none', label: '標準分類 (族群)', property: 'category' },
+            DENSITY: { id: 'density', label: '密度 (g/cm³)', property: 'density', min: 0, max: 22.6, colorScale: 'blue' },
+            MELTING: { id: 'meltingPoint', label: '熔點 (°C)', property: 'meltingPoint', min: -273, max: 3600, colorScale: 'red' },
+            BOILING: { id: 'boilingPoint', label: '沸點 (°C)', property: 'boilingPoint', min: -269, max: 5600, colorScale: 'orange' },
+            ELECTRONEGATIVITY: { id: 'electronegativity', label: '電負度', property: 'electronegativity', min: 0.7, max: 4.0, colorScale: 'viridis' },
+            ATOMIC_RADIUS: { id: 'atomicRadius', label: '原子半徑 (pm)', property: 'atomicRadius', min: 25, max: 265, colorScale: 'green' },
+        };
+
+        const CATEGORY_COLORS = {
+            'nonmetal': 'bg-blue-100 text-blue-900 border-blue-200',
+            'noble gas': 'bg-purple-100 text-purple-900 border-purple-200',
+            'alkali metal': 'bg-red-100 text-red-900 border-red-200',
+            'alkaline earth metal': 'bg-orange-100 text-orange-900 border-orange-200',
+            'metalloid': 'bg-teal-100 text-teal-900 border-teal-200',
+            'halogen': 'bg-cyan-100 text-cyan-900 border-cyan-200',
+            'transition metal': 'bg-yellow-100 text-yellow-900 border-yellow-200',
+            'post-transition metal': 'bg-indigo-100 text-indigo-900 border-indigo-200',
+            'lanthanide': 'bg-pink-100 text-pink-900 border-pink-200',
+            'actinide': 'bg-rose-100 text-rose-900 border-rose-200',
+            'unknown': 'bg-gray-100 text-gray-900 border-gray-200'
+        };
+
+        const MODAL_HEADER_COLORS = {
+            'nonmetal': 'bg-blue-600',
+            'noble gas': 'bg-purple-600',
+            'alkali metal': 'bg-red-600',
+            'alkaline earth metal': 'bg-orange-600',
+            'metalloid': 'bg-teal-600',
+            'halogen': 'bg-cyan-600',
+            'transition metal': 'bg-yellow-600',
+            'post-transition metal': 'bg-indigo-600',
+            'lanthanide': 'bg-pink-600',
+            'actinide': 'bg-rose-600',
+            'unknown': 'bg-gray-600'
+        };
+
+        // ==========================================
+        // 2. Data
+        // ==========================================
+        const RAW_DATA = `
+1|H|氫|Hydrogen|1.008|0.00008988|-259.1|-252.9|2.20|53|1|1|nonmetal
+2|He|氦|Helium|4.0026|0.0001786|-272.2|-268.9|null|31|1|18|noble gas
+3|Li|鋰|Lithium|6.94|0.534|180.5|1342|0.98|167|2|1|alkali metal
+4|Be|鈹|Beryllium|9.0122|1.85|1287|2469|1.57|112|2|2|alkaline earth metal
+5|B|硼|Boron|10.81|2.34|2075|4000|2.04|87|2|13|metalloid
+6|C|碳|Carbon|12.011|2.267|3550|4827|2.55|67|2|14|nonmetal
+7|N|氮|Nitrogen|14.007|0.00125|-210.1|-195.8|3.04|56|2|15|nonmetal
+8|O|氧|Oxygen|15.999|0.001429|-218.8|-183.0|3.44|48|2|16|nonmetal
+9|F|氟|Fluorine|18.998|0.001696|-219.6|-188.1|3.98|42|2|17|halogen
+10|Ne|氖|Neon|20.180|0.00090|-248.6|-246.1|null|38|2|18|noble gas
+11|Na|鈉|Sodium|22.990|0.968|97.7|883|0.93|190|3|1|alkali metal
+12|Mg|鎂|Magnesium|24.305|1.738|650|1090|1.31|145|3|2|alkaline earth metal
+13|Al|鋁|Aluminium|26.982|2.70|660.3|2519|1.61|118|3|13|post-transition metal
+14|Si|矽|Silicon|28.085|2.33|1414|3265|1.90|111|3|14|metalloid
+15|P|磷|Phosphorus|30.974|1.823|44.15|280.5|2.19|98|3|15|nonmetal
+16|S|硫|Sulfur|32.06|1.96|115.2|444.6|2.58|88|3|16|nonmetal
+17|Cl|氯|Chlorine|35.45|0.0032|-101.5|-34.04|3.16|79|3|17|halogen
+18|Ar|氬|Argon|39.948|0.00178|-189.3|-185.8|null|71|3|18|noble gas
+19|K|鉀|Potassium|39.098|0.862|63.38|759|0.82|243|4|1|alkali metal
+20|Ca|鈣|Calcium|40.078|1.55|842|1484|1.00|194|4|2|alkaline earth metal
+21|Sc|鈧|Scandium|44.956|2.985|1541|2836|1.36|184|4|3|transition metal
+22|Ti|鈦|Titanium|47.867|4.506|1668|3287|1.54|176|4|4|transition metal
+23|V|釩|Vanadium|50.942|6.11|1910|3407|1.63|171|4|5|transition metal
+24|Cr|鉻|Chromium|51.996|7.19|1907|2671|1.66|166|4|6|transition metal
+25|Mn|錳|Manganese|54.938|7.21|1246|2061|1.55|161|4|7|transition metal
+26|Fe|鐵|Iron|55.845|7.874|1538|2862|1.83|156|4|8|transition metal
+27|Co|鈷|Cobalt|58.933|8.90|1495|2927|1.88|152|4|9|transition metal
+28|Ni|鎳|Nickel|58.693|8.908|1455|2913|1.91|149|4|10|transition metal
+29|Cu|銅|Copper|63.546|8.96|1084.6|2562|1.90|145|4|11|transition metal
+30|Zn|鋅|Zinc|65.38|7.14|419.5|907|1.65|142|4|12|transition metal
+31|Ga|鎵|Gallium|69.723|5.91|29.76|2204|1.81|136|4|13|post-transition metal
+32|Ge|鍺|Germanium|72.630|5.323|938.25|2833|2.01|125|4|14|metalloid
+33|As|砷|Arsenic|74.922|5.727|817|614|2.18|114|4|15|metalloid
+34|Se|硒|Selenium|78.96|4.81|221|685|2.55|103|4|16|nonmetal
+35|Br|溴|Bromine|79.904|3.1028|-7.2|58.8|2.96|120|4|17|halogen
+36|Kr|氪|Krypton|83.798|0.00375|-157.4|-153.2|3.00|98|4|18|noble gas
+37|Rb|銣|Rubidium|85.468|1.532|39.30|688|0.82|265|5|1|alkali metal
+38|Sr|鍶|Strontium|87.62|2.64|777|1382|0.95|219|5|2|alkaline earth metal
+39|Y|釔|Yttrium|88.906|4.472|1526|3336|1.22|212|5|3|transition metal
+40|Zr|鋯|Zirconium|91.224|6.52|1855|4409|1.33|206|5|4|transition metal
+41|Nb|鈮|Niobium|92.906|8.57|2477|4744|1.6|198|5|5|transition metal
+42|Mo|鉬|Molybdenum|95.95|10.28|2623|4639|2.16|190|5|6|transition metal
+43|Tc|鎝|Technetium|98|11|2157|4265|1.9|183|5|7|transition metal
+44|Ru|釕|Ruthenium|101.07|12.45|2334|4150|2.2|178|5|8|transition metal
+45|Rh|銠|Rhodium|102.91|12.41|1964|3695|2.28|173|5|9|transition metal
+46|Pd|鈀|Palladium|106.42|12.02|1555|2963|2.20|169|5|10|transition metal
+47|Ag|銀|Silver|107.87|10.49|961.8|2162|1.93|165|5|11|transition metal
+48|Cd|鎘|Cadmium|112.41|8.65|321.07|767|1.69|161|5|12|transition metal
+49|In|銦|Indium|114.82|7.31|156.60|2072|1.78|156|5|13|post-transition metal
+50|Sn|錫|Tin|118.71|7.31|231.93|2602|1.96|145|5|14|post-transition metal
+51|Sb|銻|Antimony|121.76|6.697|630.63|1587|2.05|133|5|15|metalloid
+52|Te|碲|Tellurium|127.60|6.24|449.51|988|2.1|123|5|16|metalloid
+53|I|碘|Iodine|126.90|4.933|113.7|184.3|2.66|115|5|17|halogen
+54|Xe|氙|Xenon|131.29|0.0059|-111.7|-108.1|2.6|108|5|18|noble gas
+55|Cs|銫|Cesium|132.91|1.93|28.44|671|0.79|298|6|1|alkali metal
+56|Ba|鋇|Barium|137.33|3.51|727|1897|0.89|253|6|2|alkaline earth metal
+57|La|鑭|Lanthanum|138.91|6.162|920|3464|1.1|null|8|3|lanthanide
+58|Ce|鈰|Cerium|140.12|6.770|795|3443|1.12|null|8|4|lanthanide
+59|Pr|鐠|Praseodymium|140.91|6.77|935|3520|1.13|247|8|5|lanthanide
+60|Nd|釹|Neodymium|144.24|7.01|1024|3074|1.14|206|8|6|lanthanide
+61|Pm|鉕|Promethium|145|7.26|1042|3000|1.13|205|8|7|lanthanide
+62|Sm|釤|Samarium|150.36|7.52|1072|1794|1.17|238|8|8|lanthanide
+63|Eu|銪|Europium|151.96|5.244|822|1529|1.2|231|8|9|lanthanide
+64|Gd|釓|Gadolinium|157.25|7.90|1312|3273|1.2|233|8|10|lanthanide
+65|Tb|鋱|Terbium|158.93|8.23|1356|3230|1.2|225|8|11|lanthanide
+66|Dy|鏑|Dysprosium|162.50|8.540|1412|2567|1.22|228|8|12|lanthanide
+67|Ho|鈥|Holmium|164.93|8.79|1472|2700|1.23|226|8|13|lanthanide
+68|Er|鉺|Erbium|167.26|9.066|1529|2868|1.24|226|8|14|lanthanide
+69|Tm|銩|Thulium|168.93|9.32|1545|1950|1.25|222|8|15|lanthanide
+70|Yb|鐿|Ytterbium|173.05|6.90|824|1196|1.1|222|8|16|lanthanide
+71|Lu|鎦|Lutetium|174.97|9.841|1663|3402|1.27|217|8|17|lanthanide
+72|Hf|鉿|Hafnium|178.49|13.31|2233|4603|1.3|208|6|4|transition metal
+73|Ta|鉭|Tantalum|180.95|16.69|3017|5458|1.5|200|6|5|transition metal
+74|W|鎢|Tungsten|183.84|19.25|3422|5930|2.36|193|6|6|transition metal
+75|Re|錸|Rhenium|186.21|21.02|3186|5596|1.9|188|6|7|transition metal
+76|Os|鋨|Osmium|190.23|22.59|3033|5012|2.2|185|6|8|transition metal
+77|Ir|銥|Iridium|192.22|22.56|2446|4428|2.20|180|6|9|transition metal
+78|Pt|鉑|Platinum|195.08|21.45|1768|3825|2.28|177|6|10|transition metal
+79|Au|金|Gold|196.97|19.30|1064.2|2970|2.54|174|6|11|transition metal
+80|Hg|汞|Mercury|200.59|13.534|-38.83|356.7|2.00|171|6|12|transition metal
+81|Tl|鉈|Thallium|204.38|11.85|304|1473|1.62|156|6|13|post-transition metal
+82|Pb|鉛|Lead|207.2|11.34|327.46|1749|2.33|154|6|14|post-transition metal
+83|Bi|鉍|Bismuth|208.98|9.78|271.3|1564|2.02|143|6|15|post-transition metal
+84|Po|釙|Polonium|209|9.196|254|962|2.0|135|6|16|post-transition metal
+85|At|砈|Astatine|210|null|302|337|2.2|null|6|17|metalloid
+86|Rn|氡|Radon|222|0.00973|-71|-61.7|2.2|120|6|18|noble gas
+87|Fr|鍅|Francium|223|1.87|27|677|0.7|null|7|1|alkali metal
+88|Ra|鐳|Radium|226|5.50|700|1737|0.9|null|7|2|alkaline earth metal
+89|Ac|錒|Actinium|227|10.07|1050|3198|1.1|null|9|3|actinide
+90|Th|釷|Thorium|232.04|11.72|1750|4788|1.3|null|9|4|actinide
+91|Pa|鏷|Protactinium|231.04|15.37|1568|4027|1.5|null|9|5|actinide
+92|U|鈾|Uranium|238.03|19.1|1132|4131|1.38|null|9|6|actinide
+93|Np|錼|Neptunium|237|20.45|644|3902|1.36|null|9|7|actinide
+94|Pu|鈽|Plutonium|244|19.82|640|3228|1.28|null|9|8|actinide
+95|Am|鋂|Americium|243|13.67|1176|2607|1.13|null|9|9|actinide
+96|Cm|鋦|Curium|247|13.51|1340|3110|1.28|null|9|10|actinide
+97|Bk|鉳|Berkelium|247|14.78|986|null|1.3|null|9|11|actinide
+98|Cf|鉲|Californium|251|15.1|900|null|1.3|null|9|12|actinide
+99|Es|鑀|Einsteinium|252|8.84|860|null|1.3|null|9|13|actinide
+100|Fm|鐨|Fermium|257|null|1527|null|1.3|null|9|14|actinide
+101|Md|鍆|Mendelevium|258|null|827|null|1.3|null|9|15|actinide
+102|No|鍩|Nobelium|259|null|827|null|1.3|null|9|16|actinide
+103|Lr|鐒|Lawrencium|262|null|1627|null|1.3|null|9|17|actinide
+104|Rf|鑪|Rutherfordium|267|23.2|2100|5500|null|null|7|4|transition metal
+105|Db|𨧀|Dubnium|268|29.3|null|null|null|null|7|5|transition metal
+106|Sg|𨭎|Seaborgium|271|35.0|null|null|null|null|7|6|transition metal
+107|Bh|𨨏|Bohrium|272|37.1|null|null|null|null|7|7|transition metal
+108|Hs|𨭆|Hassium|270|40.7|null|null|null|null|7|8|transition metal
+109|Mt|䥑|Meitnerium|276|37.4|null|null|null|null|7|9|unknown
+110|Ds|鐽|Darmstadtium|281|34.8|null|null|null|null|7|10|unknown
+111|Rg|錀|Roentgenium|280|28.7|null|null|null|null|7|11|unknown
+112|Cn|鎶|Copernicium|285|23.7|null|357|null|null|7|12|unknown
+113|Nh|鉨|Nihonium|284|16|400|1100|null|null|7|13|unknown
+114|Fl|鈇|Flerovium|289|14|60|150|null|null|7|14|unknown
+115|Mc|鏌|Moscovium|288|13.5|400|1100|null|null|7|15|unknown
+116|Lv|鉝|Livermorium|293|12.9|400|800|null|null|7|16|unknown
+117|Ts|鿬|Tennessine|294|7.2|400|550|null|null|7|17|unknown
+118|Og|鿫|Oganesson|294|5.0|50|80|null|null|7|18|unknown
+`;
+
+        const parseElements = () => {
+            return RAW_DATA.trim().split('\n').map(line => {
+                const [num, sym, zh, en, mass, den, melt, boil, enVal, rad, per, grp, cat] = line.split('|');
+                const parseNum = (v) => v === 'null' ? null : parseFloat(v);
+                return {
+                    number: parseInt(num),
+                    symbol: sym,
+                    nameZh: zh,
+                    nameEn: en,
+                    atomicMass: parseNum(mass),
+                    density: parseNum(den),
+                    meltingPoint: parseNum(melt),
+                    boilingPoint: parseNum(boil),
+                    electronegativity: parseNum(enVal),
+                    atomicRadius: parseNum(rad),
+                    period: parseInt(per),
+                    group: parseInt(grp),
+                    category: cat
+                };
+            });
+        };
+
+        const elementsData = parseElements();
+
+        // ==========================================
+        // 3. Logic & Helper Functions
+        // ==========================================
+
+        const getHeatmapColor = (value, mode) => {
+            if (value === null || value === undefined) return 'bg-gray-100 text-gray-300';
+            if (mode.id === 'none') return ''; 
+
+            const { min, max, colorScale } = mode;
+            const ratio = Math.max(0, Math.min(1, (value - min) / (max - min)));
+
+            if (colorScale === 'blue') {
+                const lightness = 95 - (ratio * 75); 
+                return { backgroundColor: `hsl(210, 85%, ${lightness}%)`, color: lightness < 50 ? 'white' : 'black' };
+            }
+            if (colorScale === 'red') {
+                const hue = 50 - (ratio * 50); 
+                const lightness = 95 - (ratio * 55);
+                return { backgroundColor: `hsl(${hue}, 95%, ${lightness}%)`, color: lightness < 50 ? 'white' : 'black' };
+            }
+            if (colorScale === 'viridis') {
+                const hue = 260 - (ratio * 260); 
+                return { backgroundColor: `hsl(${hue}, 75%, 60%)`, color: 'white' };
+            }
+            if (colorScale === 'orange') {
+                const lightness = 95 - (ratio * 60);
+                return { backgroundColor: `hsl(30, 100%, ${lightness}%)`, color: lightness < 50 ? 'white' : 'black' };
+            }
+            if (colorScale === 'green') {
+                const lightness = 95 - (ratio * 70);
+                return { backgroundColor: `hsl(140, 80%, ${lightness}%)`, color: lightness < 50 ? 'white' : 'black' };
+            }
+            return {};
+        };
+
+        const calculateState = (element, temperatureKelvin) => {
+            const tempC = temperatureKelvin - 273.15;
+            const { meltingPoint, boilingPoint } = element;
+            if (meltingPoint === null && boilingPoint === null) return 'unknown';
+            const mp = meltingPoint !== null ? meltingPoint : -273;
+            const bp = boilingPoint !== null ? boilingPoint : 99999;
+            if (tempC < mp) return 'solid';
+            if (tempC >= mp && tempC < bp) return 'liquid';
+            return 'gas';
+        };
+
+        // Simplified Shell Configuration (Approximation for display)
+        const getShells = (atomicNumber) => {
+            const shells = [];
+            let remaining = atomicNumber;
+            // Standard capacities: 2, 8, 18, 32... 2n^2
+            // However, filling order is complex (Aufbau). This is a simplified display for main group/common visuals
+            // This is a rough approximation for the visualizer
+            const caps = [2, 8, 18, 32, 50, 72, 98];
+            
+            // Better approximation based on periods for main groups, but for visualization let's just use the known filling for light elements
+            // or just use a generic capacity filler for the "visual" effect if data is missing.
+            // Since we don't have config data, let's just show the max shell capacity filling for the visual
+            // OR we skip specific electron config numbers and just draw the rings based on Period.
+            return { count: 0 }; // Placeholder if we don't implement full logic
+        };
+
+        const getPeriodShells = (element) => {
+             // Return array of electron counts per shell? Too complex without data.
+             // Let's return just the number of shells (Period)
+             return element.period;
+        };
+
+        // ==========================================
+        // 4. Components
+        // ==========================================
+
+        const ElementCell = ({ element, activeLayers, heatmapMode, onSelect, currentTemp, highlightCategory, calcMode, onCalcAdd }) => {
+            const modeConfig = HEATMAP_MODES[heatmapMode];
+            let style = {};
+            let className = "relative p-0.5 sm:p-1 border flex flex-col justify-center items-center cursor-pointer transition-all hover:scale-125 hover:z-50 hover:shadow-lg rounded-sm select-none ";
+
+            if (heatmapMode === 'NONE') {
+                if (highlightCategory && element.category !== highlightCategory) {
+                    className += "bg-gray-50 text-gray-300 border-gray-100 ";
+                } else {
+                    className += CATEGORY_COLORS[element.category] || 'bg-gray-100 text-gray-500 border-gray-200';
+                }
+            } else {
+                const colorStyle = getHeatmapColor(element[modeConfig.property], modeConfig);
+                if (colorStyle.backgroundColor) {
+                    style = colorStyle;
+                    className += "border-transparent ";
+                } else {
+                    className += colorStyle; 
+                }
+            }
+
+            // Calc mode styling
+            if (calcMode) {
+                className += " active:scale-95 active:ring-2 active:ring-indigo-400";
+            }
+
+            const dynamicState = calculateState(element, currentTemp);
+
+            const gridStyle = {
+                ...style,
+                gridColumn: element.group,
+                gridRow: element.period,
+            };
+
+            const handleClick = () => {
+                if (calcMode) {
+                    onCalcAdd(element);
+                } else {
+                    onSelect(element);
+                }
+            };
+
+            return (
+                <div className={className} style={gridStyle} onClick={handleClick}>
+                    <div className="text-[7px] sm:text-[9px] absolute top-0.5 left-1 opacity-60 font-mono leading-none">
+                        {activeLayers.ATOMIC_NUMBER && element.number}
+                    </div>
+                    <div className={`font-bold leading-none ${element.symbol.length > 2 ? 'text-xs sm:text-sm' : 'text-sm sm:text-lg md:text-xl'}`}>
+                        {element.symbol}
+                    </div>
+                    <div className="text-[8px] sm:text-[9px] transform scale-90 sm:scale-100 truncate w-full text-center opacity-90 hidden sm:block">
+                        {element.nameZh}
+                    </div>
+                    {activeLayers.EN_TEXT && element.electronegativity && (
+                        <div className="hidden md:block absolute top-0.5 right-0.5 text-[7px] font-mono text-gray-700 bg-white/50 px-0.5 rounded backdrop-blur-sm">
+                            {element.electronegativity}
+                        </div>
+                    )}
+                    {activeLayers.ATOMIC_MASS && element.atomicMass && (
+                        <div className="hidden lg:block text-[8px] opacity-70 mt-[-2px] transform scale-75 font-mono">
+                            {Math.round(element.atomicMass * 100) / 100}
+                        </div>
+                    )}
+                    {activeLayers.STATE_ICON && dynamicState !== 'unknown' && (
+                        <div className={`absolute bottom-0.5 right-0.5 w-1.5 h-1.5 sm:w-2 sm:h-2 shadow-sm ${
+                            dynamicState === 'gas' ? 'bg-green-400 border border-white rounded-full' : 
+                            dynamicState === 'liquid' ? 'bg-blue-500 border border-white rounded-full' : 
+                            dynamicState === 'solid' ? 'bg-gray-400 border border-white rounded-[1px]' : 'hidden'
+                        }`} title={dynamicState} />
+                    )}
+                </div>
+            );
+        };
+
+        const DetailModal = ({ element, onClose, currentTemp }) => {
+            if (!element) return null;
+            const headerColorClass = MODAL_HEADER_COLORS[element.category] || 'bg-gray-800';
+            const currentState = calculateState(element, currentTemp);
+            const shells = getPeriodShells(element);
+
+            return (
+                <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+                    <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-zoom-in" onClick={e => e.stopPropagation()}>
+                        <div className={`p-6 flex justify-between items-start text-white ${headerColorClass}`}>
+                            <div>
+                                <div className="flex items-baseline gap-4">
+                                    <span className="text-6xl font-bold font-mono tracking-tighter">{element.symbol}</span>
+                                    <span className="text-4xl font-bold">{element.nameZh}</span>
+                                </div>
+                                <div className="text-xl opacity-90 font-medium mt-1">{element.nameEn || 'Unknown'}</div>
+                                <div className="mt-3 flex gap-2 flex-wrap">
+                                    <span className="px-2 py-1 rounded text-sm font-mono border border-white/30 bg-white/20">NO. {element.number}</span>
+                                    <span className="px-2 py-1 rounded text-sm uppercase tracking-wide border border-white/30 bg-white/20">{element.category}</span>
+                                </div>
+                            </div>
+                            <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-full transition-colors"><Icons.X size={28} /></button>
+                        </div>
+                        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="space-y-4">
+                                <h3 className="text-lg font-bold border-b pb-2 flex items-center gap-2 text-indigo-900"><Icons.Thermometer size={20} className="text-indigo-600" /> 物理性質</h3>
+                                <div className="grid grid-cols-2 gap-y-4 text-sm">
+                                    <div className="text-gray-500">原子量</div>
+                                    <div className="font-mono font-medium text-gray-900">{element.atomicMass ? `${element.atomicMass} u` : 'N/A'}</div>
+                                    <div className="text-gray-500">密度 (STP)</div>
+                                    <div className="font-mono font-medium text-gray-900">{element.density ? `${element.density} g/cm³` : 'N/A'}</div>
+                                    <div className="text-gray-500">熔點</div>
+                                    <div className="font-mono font-medium text-gray-900">{element.meltingPoint ? `${element.meltingPoint} °C` : 'N/A'}</div>
+                                    <div className="text-gray-500">沸點</div>
+                                    <div className="font-mono font-medium text-gray-900">{element.boilingPoint ? `${element.boilingPoint} °C` : 'N/A'}</div>
+                                    <div className="text-gray-500">模擬狀態</div>
+                                    <div className="capitalize font-bold text-indigo-600 flex items-center gap-2">
+                                        {currentState === 'solid' && <><Icons.Square size={14} className="fill-current"/> 固體 Solid</>}
+                                        {currentState === 'liquid' && <><Icons.Droplets size={14} /> 液體 Liquid</>}
+                                        {currentState === 'gas' && <><Icons.Circle size={14} /> 氣體 Gas</>}
+                                        {currentState === 'unknown' && '未知 Unknown'}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="space-y-4">
+                                <h3 className="text-lg font-bold border-b pb-2 flex items-center gap-2 text-pink-900"><Icons.Zap size={20} className="text-pink-600" /> 化學與結構</h3>
+                                <div className="grid grid-cols-2 gap-y-4 text-sm">
+                                    <div className="text-gray-500">電負度</div>
+                                    <div className="font-mono font-medium text-gray-900">{element.electronegativity || 'N/A'}</div>
+                                    <div className="text-gray-500">原子半徑</div>
+                                    <div className="font-mono font-medium text-gray-900">{element.atomicRadius ? `${element.atomicRadius} pm` : 'N/A'}</div>
+                                    <div className="text-gray-500">電子層數 (Shells)</div>
+                                    <div className="font-medium text-gray-900 flex items-center gap-2">
+                                        <Icons.Layers size={14}/> {shells} 層
+                                    </div>
+                                    <div className="text-gray-500">週期 / 族</div>
+                                    <div className="font-medium text-gray-900">P{element.period > 7 ? (element.period === 8 ? '6 (Lan)' : '7 (Act)') : element.period} / G{element.group}</div>
+                                </div>
+                                {element.electronegativity && (
+                                    <div className="col-span-2 mt-2 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                        <div className="flex justify-between text-xs text-gray-500 mb-1"><span>電負度 (0)</span><span>(4.0)</span></div>
+                                        <div className="h-3 bg-gray-200 rounded-full overflow-hidden relative">
+                                            <div className="h-full bg-gradient-to-r from-blue-400 via-purple-400 to-red-500" style={{ width: `${(element.electronegativity / 4) * 100}%` }} />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const CalculatorPanel = ({ compound, onClear, onRemoveLast }) => {
+            // Logic to calculate mass
+            const formula = useMemo(() => {
+                if (compound.length === 0) return "尚未選擇元素";
+                
+                // Group by symbol
+                const counts = {};
+                compound.forEach(el => {
+                    counts[el.symbol] = (counts[el.symbol] || 0) + 1;
+                });
+                
+                // Format nicely: H2O
+                return Object.entries(counts).map(([sym, count]) => (
+                    <span key={sym}>
+                        {sym}<sub className="text-xs">{count > 1 ? count : ''}</sub>
+                    </span>
+                ));
+            }, [compound]);
+
+            const totalMass = useMemo(() => {
+                return compound.reduce((sum, el) => sum + (el.atomicMass || 0), 0);
+            }, [compound]);
+
+            return (
+                <div className="bg-indigo-900 text-white p-4 rounded-xl shadow-lg border border-indigo-700 animate-in slide-in-from-top-2">
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2 font-bold text-indigo-100">
+                            <Icons.Calculator size={18} /> 摩爾質量計算器
+                        </div>
+                        <div className="flex gap-2">
+                             <button onClick={onRemoveLast} className="p-1 hover:bg-white/20 rounded text-xs">倒退</button>
+                             <button onClick={onClear} className="p-1 hover:bg-red-500/50 rounded text-xs text-red-200 hover:text-white"><Icons.Trash2 size={14}/></button>
+                        </div>
+                    </div>
+                    <div className="bg-black/30 p-3 rounded-lg font-mono text-center">
+                         <div className="text-2xl font-bold tracking-widest min-h-[32px]">{formula}</div>
+                         <div className="text-sm text-indigo-300 mt-1 border-t border-white/10 pt-1">
+                            {totalMass.toFixed(4)} g/mol
+                         </div>
+                    </div>
+                    <div className="text-[10px] text-center mt-2 text-indigo-400">點擊週期表元素以加入化合物</div>
+                </div>
+            );
+        };
+
+        // ==========================================
+        // 5. Main App
+        // ==========================================
+
+        const PeriodicTableApp = () => {
+            const [activeLayers, setActiveLayers] = useState({
+                ATOMIC_NUMBER: true,
+                ATOMIC_MASS: true,
+                EN_TEXT: false,
+                STATE_ICON: true,
+            });
+
+            const [heatmapMode, setHeatmapMode] = useState('NONE');
+            const [selectedElement, setSelectedElement] = useState(null);
+            const [sidebarOpen, setSidebarOpen] = useState(false);
+            const [searchTerm, setSearchTerm] = useState('');
+            const [currentTemp, setCurrentTemp] = useState(298.15);
+            const [highlightCategory, setHighlightCategory] = useState(null);
+
+            // New: Calculator Mode State
+            const [calcMode, setCalcMode] = useState(false);
+            const [compound, setCompound] = useState([]);
+
+            const toggleLayer = (key) => setActiveLayers(p => ({ ...p, [key]: !p[key] }));
+
+            useEffect(() => {
+                const handleResize = () => {
+                    if (window.innerWidth >= 768) setSidebarOpen(true);
+                    else setSidebarOpen(false);
+                };
+                window.addEventListener('resize', handleResize);
+                handleResize(); 
+                return () => window.removeEventListener('resize', handleResize);
+            }, []);
+
+            // Calculator Handlers
+            const handleCalcAdd = (element) => {
+                setCompound(prev => [...prev, element]);
+            };
+            const handleCalcClear = () => setCompound([]);
+            const handleCalcRemoveLast = () => setCompound(prev => prev.slice(0, -1));
+            const toggleCalcMode = () => {
+                setCalcMode(!calcMode);
+                if (!calcMode) setSidebarOpen(false); // Close sidebar for better view on mobile
+            };
+
+            return (
+                <div className="min-h-screen bg-gray-50 text-gray-800 font-sans flex flex-col h-screen overflow-hidden">
+                    {/* Header */}
+                    <header className="bg-white border-b px-4 py-3 flex items-center justify-between shadow-sm z-30 shrink-0 h-14 sm:h-16">
+                        <div className="flex items-center gap-3">
+                            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="md:hidden p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-lg active:bg-gray-200">
+                                <Icons.Menu size={24} />
+                            </button>
+                            <div className="flex items-center gap-2">
+                                <Icons.Layers className="text-indigo-600 hidden sm:block" />
+                                <h1 className="text-lg sm:text-xl font-bold tracking-tight text-indigo-900">
+                                    元素週期表 <span className="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full align-middle ml-1">v1.3.0</span>
+                                </h1>
+                            </div>
+                        </div>
+
+                        {/* Calc Mode Indicator or Search */}
+                        {calcMode ? (
+                            <div className="hidden sm:flex items-center gap-2 text-sm font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100 animate-pulse">
+                                <Icons.Calculator size={16}/> 計算機模式開啟中
+                            </div>
+                        ) : (
+                            <div className="relative hidden sm:block">
+                                <Icons.Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                <input type="text" placeholder="搜尋元素..." 
+                                    className="pl-9 pr-4 py-1.5 bg-gray-100 border-transparent focus:bg-white focus:border-indigo-300 focus:ring-0 rounded-full text-sm w-48 transition-all"
+                                    value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                        )}
+                    </header>
+
+                    <div className="flex flex-1 overflow-hidden relative">
+                        {sidebarOpen && <div className="fixed inset-0 bg-black/50 z-20 md:hidden glass" onClick={() => setSidebarOpen(false)} />}
+                        
+                        <aside className={`fixed md:static inset-y-0 left-0 w-[300px] sm:w-80 bg-white border-r shadow-xl md:shadow-none z-40 transform transition-transform duration-300 ease-in-out flex flex-col ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
+                            <div className="md:hidden p-4 border-b flex justify-between items-center bg-gray-50">
+                                <span className="font-bold text-gray-700">顯示設定</span>
+                                <button onClick={() => setSidebarOpen(false)} className="p-1 hover:bg-gray-200 rounded-full"><Icons.X size={20} /></button>
+                            </div>
+
+                            <div className="p-4 sm:p-6 space-y-8 overflow-y-auto flex-1">
+                                {/* Calculator Toggle */}
+                                <div className={`p-4 rounded-xl border cursor-pointer transition-all ${calcMode ? 'bg-indigo-600 text-white border-indigo-700 shadow-md' : 'bg-white border-gray-200 hover:border-indigo-300'}`} onClick={toggleCalcMode}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3 font-bold">
+                                            <Icons.Calculator size={20} /> 摩爾質量計算器
+                                        </div>
+                                        <div className={`w-10 h-5 rounded-full p-0.5 transition-colors ${calcMode ? 'bg-indigo-400' : 'bg-gray-200'}`}>
+                                            <div className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform ${calcMode ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                                        </div>
+                                    </div>
+                                    <p className={`text-xs mt-2 ${calcMode ? 'text-indigo-200' : 'text-gray-500'}`}>
+                                        開啟後，點擊元素可計算化合物總質量。
+                                    </p>
+                                </div>
+
+                                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                                    <h3 className="text-xs font-bold text-blue-800 uppercase tracking-wider mb-3 flex items-center gap-2"><Icons.Thermometer size={14} /> 溫度模擬器</h3>
+                                    <div className="flex items-end justify-between mb-2">
+                                        <span className="text-2xl font-bold text-blue-900 font-mono">{(currentTemp - 273.15).toFixed(0)}°C</span>
+                                        <span className="text-xs text-blue-500 mb-1 font-mono">{currentTemp.toFixed(0)} K</span>
+                                    </div>
+                                    <input type="range" min="0" max="6000" step="10" value={currentTemp} onChange={(e) => setCurrentTemp(parseFloat(e.target.value))} className="w-full h-2 bg-gradient-to-r from-blue-300 via-yellow-300 to-red-500 rounded-lg appearance-none cursor-pointer" />
+                                    <div className="flex justify-between text-[10px] text-blue-400 mt-1"><span>-273°C</span><span>5700°C</span></div>
+                                    <div className="mt-2 flex gap-2">
+                                        <button onClick={() => setCurrentTemp(298.15)} className="text-xs bg-white px-2 py-1 rounded border hover:bg-blue-100 transition">常溫</button>
+                                        <button onClick={() => setCurrentTemp(0)} className="text-xs bg-white px-2 py-1 rounded border hover:bg-blue-100 transition">絕對零度</button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2"><Icons.Info size={14} /> 資訊顯示層</h3>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {Object.keys(INFO_LAYERS).map(key => (
+                                            <label key={key} className="flex items-center gap-2 cursor-pointer p-2 hover:bg-gray-50 rounded-lg transition-colors border border-transparent hover:border-gray-200 select-none">
+                                                <div className={`w-4 h-4 flex items-center justify-center rounded border ${activeLayers[key] ? 'bg-indigo-600 border-indigo-600' : 'bg-white border-gray-300'}`}>{activeLayers[key] && <span className="text-white text-[10px]">✓</span>}</div>
+                                                <span className="text-xs font-medium text-gray-700">{INFO_LAYERS[key].label}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2"><Icons.Activity size={14} /> 數據熱圖模式</h3>
+                                    <div className="space-y-1">
+                                        {Object.keys(HEATMAP_MODES).map(key => (
+                                            <button key={key} onClick={() => { setHeatmapMode(key); setHighlightCategory(null); }} className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all flex items-center justify-between border ${heatmapMode === key ? 'bg-indigo-50 text-indigo-700 font-bold border-indigo-200 shadow-sm' : 'text-gray-600 hover:bg-gray-50 border-transparent'}`}>
+                                                {HEATMAP_MODES[key].label}
+                                                {heatmapMode === key && <div className="w-2 h-2 rounded-full bg-indigo-500 shadow-sm"></div>}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    {heatmapMode === 'NONE' && (
+                                        <div className="mt-4">
+                                            <p className="text-[10px] text-gray-400 mb-2">分類篩選：</p>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {Object.keys(CATEGORY_COLORS).map(cat => (
+                                                    <button key={cat} onClick={() => setHighlightCategory(highlightCategory === cat ? null : cat)} className={`text-[9px] px-2 py-1 rounded border transition-all ${highlightCategory === cat ? 'ring-2 ring-offset-1 ring-gray-400 font-bold' : 'opacity-70 hover:opacity-100'} ${CATEGORY_COLORS[cat].split(' ')[0]} ${CATEGORY_COLORS[cat].split(' ')[1]}`}>{cat}</button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {heatmapMode !== 'NONE' && (
+                                        <div className="mt-4 bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
+                                            <div className="flex justify-between text-[10px] text-gray-500 mb-1 font-mono"><span>{HEATMAP_MODES[heatmapMode].min}</span><span>{HEATMAP_MODES[heatmapMode].max}</span></div>
+                                            <div className={`h-2.5 rounded-full w-full bg-gradient-to-r ${HEATMAP_MODES[heatmapMode].colorScale === 'blue' ? 'from-blue-100 to-blue-900' : HEATMAP_MODES[heatmapMode].colorScale === 'red' ? 'from-yellow-100 via-red-500 to-red-900' : HEATMAP_MODES[heatmapMode].colorScale === 'viridis' ? 'from-blue-500 via-green-500 to-red-500' : HEATMAP_MODES[heatmapMode].colorScale === 'orange' ? 'from-orange-100 to-orange-900' : HEATMAP_MODES[heatmapMode].colorScale === 'green' ? 'from-green-100 to-green-900' : 'from-gray-200 to-gray-800'}`}></div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </aside>
+
+                        <main className="flex-1 overflow-auto bg-slate-100 p-2 sm:p-4 md:p-6 relative">
+                            {/* Calculator Panel Overlay */}
+                            {calcMode && (
+                                <div className="sticky top-0 z-20 mb-4 max-w-fit mx-auto">
+                                    <CalculatorPanel compound={compound} onClear={handleCalcClear} onRemoveLast={handleCalcRemoveLast}/>
+                                </div>
+                            )}
+
+                            <div className="min-w-fit mx-auto bg-white rounded-xl shadow-sm border border-gray-200 p-2 sm:p-6 overflow-x-auto">
+                                <div className="grid gap-1 min-w-[800px] select-none" style={{ gridTemplateColumns: 'repeat(18, minmax(36px, 1fr))', gridTemplateRows: 'repeat(9, minmax(36px, 1fr))' }}>
+                                    {[...Array(18)].map((_, i) => (
+                                        <div key={`group-${i}`} className="text-center text-[10px] text-gray-300 font-mono row-start-1" style={{ gridColumn: i + 1 }}>{i+1}</div>
+                                    ))}
+                                    {elementsData.filter(e => e.nameZh.includes(searchTerm) || e.symbol.toLowerCase().includes(searchTerm.toLowerCase())).map(element => (
+                                        <ElementCell key={element.number} element={element} activeLayers={activeLayers} heatmapMode={heatmapMode} onSelect={setSelectedElement} currentTemp={currentTemp} highlightCategory={highlightCategory} calcMode={calcMode} onCalcAdd={handleCalcAdd} />
+                                    ))}
+                                    <div className="col-start-3 row-start-6 flex items-center justify-center text-xs text-gray-400 bg-gray-50 border border-dashed border-gray-300 rounded-sm pointer-events-none">57-71</div>
+                                    <div className="col-start-3 row-start-7 flex items-center justify-center text-xs text-gray-400 bg-gray-50 border border-dashed border-gray-300 rounded-sm pointer-events-none">89-103</div>
+                                    <div className="col-start-1 row-start-8 col-span-2 flex items-center justify-end pr-2 text-xs font-bold text-gray-400">Lanthanides</div>
+                                    <div className="col-start-1 row-start-9 col-span-2 flex items-center justify-end pr-2 text-xs font-bold text-gray-400">Actinides</div>
+                                </div>
+                            </div>
+                        </main>
+                    </div>
+
+                    {selectedElement && !calcMode && <DetailModal element={selectedElement} onClose={() => setSelectedElement(null)} currentTemp={currentTemp} />}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<PeriodicTableApp />);
+    </script>
+</body>
+</html>  
