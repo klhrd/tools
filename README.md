@@ -13,6 +13,8 @@
 - [監考者策略模擬器](https://klhrd.github.io/tools/exam_simulator/)
 - [電化學電池模擬器](https://klhrd.github.io/tools/galvanic_cell_simulator_v1.1.0/)
 - [薄透鏡光線追蹤模擬器](https://klhrd.github.io/tools/LensSim/)
+- [**會考加權分數計算器**](https://klhrd.github.io/tools/GradeCalc/v1.2.2/)
+- [柏林噪聲模擬器](https://klhrd.github.io/tools/Perlin_Noise/v1.2.0)
 
 ## 來自其他我做的
 - [**跑馬燈**](https://klhrd.github.io/marquee/)
