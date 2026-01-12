@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>v0.0.6 月相與軌道原理模擬器</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #020205; font-family: 'Noto Sans TC', sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 0; }
+        
+        /* Glassmorphism - Simplified */
+        .glass-panel {
+            background: rgba(10, 15, 25, 0.8);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+        }
+        
+        .glass-float {
+            background: rgba(20, 25, 45, 0.6);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 99px;
+        }
+
+        /* Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #e2e8f0;
+            border: 2px solid #3b82f6;
+            cursor: pointer;
+            margin-top: -7px;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+            transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 2px;
+            cursor: pointer;
+            background: rgba(148, 163, 184, 0.2);
+        }
+
+        /* Toggle Switch */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #3b82f6;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #3b82f6;
+        }
+        
+        /* Compass Markers */
+        .compass-marker {
+            text-shadow: 0 0 4px rgba(0,0,0,0.8);
+            font-family: 'Roboto Mono', monospace;
+        }
+    </style>
+</head>
+<body class="text-slate-200 selection:bg-blue-500 selection:text-white">
+
+    <!-- 3D Canvas -->
+    <div id="canvas-container"></div>
+
+    <!-- UI Overlay -->
+    <div class="absolute top-0 left-0 w-full h-full pointer-events-none flex flex-col justify-between overflow-hidden">
+        
+        <!-- Top Left: Title & Settings -->
+        <div class="pointer-events-auto w-full flex justify-between items-start p-4 relative z-50">
+            <!-- Title -->
+            <div class="glass-float px-4 py-2 flex items-center gap-3 hover:bg-slate-800/80 transition cursor-default">
+                <div class="bg-blue-600/20 p-1.5 rounded-full">
+                    <i class="fa-solid fa-moon text-blue-200 text-sm"></i>
+                </div>
+                <div>
+                    <h1 class="text-sm font-bold text-slate-100 tracking-wide">月相與軌道原理</h1>
+                </div>
+            </div>
+
+            <!-- Settings -->
+            <div class="relative">
+                <button onclick="toggleMenu()" class="glass-float w-9 h-9 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700/50 transition">
+                    <i class="fa-solid fa-gear text-sm"></i>
+                </button>
+
+                <!-- Dropdown -->
+                <div id="settings-menu" class="absolute top-12 right-0 glass-float !rounded-xl p-4 w-52 hidden flex-col gap-3 transition-all duration-200 shadow-2xl origin-top-right scale-95 opacity-0">
+                    <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-700/50 pb-2 mb-1">顯示設定</div>
+                    
+                    <div class="flex items-center justify-between group">
+                        <span class="text-xs text-slate-300 group-hover:text-white transition"><i class="fa-solid fa-eye mr-2 opacity-50 w-4"></i>地球視角視窗</span>
+                        <div class="relative inline-block w-8 h-4 align-middle select-none">
+                            <input type="checkbox" id="toggle-earth-view" class="toggle-checkbox absolute block w-4 h-4 rounded-full bg-white border-4 appearance-none cursor-pointer checked:right-0 right-4 transition-all duration-300" checked onchange="updateSettings()"/>
+                            <label for="toggle-earth-view" class="toggle-label block overflow-hidden h-4 rounded-full bg-slate-700 cursor-pointer transition-colors duration-300"></label>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between group">
+                        <span class="text-xs text-slate-300 group-hover:text-white transition"><i class="fa-solid fa-sun mr-2 opacity-50 w-4"></i>全域光效</span>
+                        <div class="relative inline-block w-8 h-4 align-middle select-none">
+                            <input type="checkbox" id="toggle-sunlight" class="toggle-checkbox absolute block w-4 h-4 rounded-full bg-white border-4 appearance-none cursor-pointer checked:right-0 right-4 transition-all duration-300" checked onchange="updateSettings()"/>
+                            <label for="toggle-sunlight" class="toggle-label block overflow-hidden h-4 rounded-full bg-slate-700 cursor-pointer transition-colors duration-300"></label>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between group">
+                        <span class="text-xs text-slate-300 group-hover:text-white transition"><i class="fa-solid fa-star mr-2 opacity-50 w-4"></i>星空背景</span>
+                        <div class="relative inline-block w-8 h-4 align-middle select-none">
+                            <input type="checkbox" id="toggle-stars" class="toggle-checkbox absolute block w-4 h-4 rounded-full bg-white border-4 appearance-none cursor-pointer checked:right-0 right-4 transition-all duration-300" checked onchange="updateSettings()"/>
+                            <label for="toggle-stars" class="toggle-label block overflow-hidden h-4 rounded-full bg-slate-700 cursor-pointer transition-colors duration-300"></label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Earth View Compass Labels (Top Right Overlay) -->
+        <!-- These are positioned absolutely to frame the inset webgl view -->
+        <div id="earth-view-container" class="absolute top-[80px] right-4 pointer-events-none z-40 transition-opacity duration-300 w-[120px] h-[120px] sm:w-[150px] sm:h-[150px] flex items-center justify-center border-b border-white/5 rounded-full">
+             <!-- East Label (Left side of the moon view) -->
+             <div class="absolute left-[-10px] top-1/2 transform -translate-y-1/2 text-slate-400 font-bold text-xs compass-marker flex flex-col items-center">
+                 <span>東</span>
+                 <span class="text-[8px] opacity-60">E</span>
+             </div>
+             
+             <!-- West Label (Right side of the moon view) -->
+             <div class="absolute right-[-10px] top-1/2 transform -translate-y-1/2 text-slate-400 font-bold text-xs compass-marker flex flex-col items-center">
+                 <span>西</span>
+                 <span class="text-[8px] opacity-60">W</span>
+             </div>
+
+             <!-- Subtle Frame -->
+             <div class="w-full h-full rounded-full border border-white/10 shadow-[0_0_20px_rgba(0,0,0,0.3)]"></div>
+        </div>
+
+        <!-- Bottom Dashboard -->
+        <div class="pointer-events-auto w-full z-20 mt-auto">
+            <div class="glass-panel px-5 py-5 pb-8 transition-transform duration-300">
+                
+                <!-- Info Row -->
+                <div class="flex flex-wrap items-center justify-between gap-4 mb-3">
+                    
+                    <!-- Date & Phase (Simplified) -->
+                    <div class="flex items-baseline gap-3">
+                        <span id="lunar-date-text" class="text-xl font-bold text-white tracking-wide">初一</span>
+                        <span class="text-slate-500 text-sm">/</span>
+                        <span id="phase-name" class="text-lg text-blue-200 font-medium">朔 (新月)</span>
+                    </div>
+
+                    <!-- Moonrise/Set & Play -->
+                    <div class="flex items-center gap-4 ml-auto">
+                        <div class="flex gap-3 text-xs font-mono text-slate-400">
+                            <span class="flex items-center"><i class="fa-solid fa-arrow-up text-blue-400 mr-1"></i><span id="moonrise-time">06:00</span></span>
+                            <span class="flex items-center"><i class="fa-solid fa-arrow-down text-indigo-400 mr-1"></i><span id="moonset-time">18:00</span></span>
+                        </div>
+
+                        <div class="h-6 w-px bg-slate-700"></div>
+
+                        <button id="play-btn" onclick="togglePlay()" class="w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center transition active:scale-95 shadow-lg shadow-blue-500/20">
+                            <i class="fa-solid fa-play text-xs ml-0.5" id="play-icon"></i>
+                        </button>
+                    </div>
+
+                </div>
+
+                <!-- Slider -->
+                <div class="relative w-full h-4 flex items-center">
+                    <input type="range" id="day-slider" min="1" max="30" step="0.1" value="1" class="z-20 relative focus:outline-none">
+                    
+                    <!-- Simplified Markers -->
+                    <div class="absolute w-full top-4 flex justify-between text-[9px] text-slate-500 font-mono px-1 select-none pointer-events-none">
+                        <span class="relative -left-1">01</span>
+                        <span>08</span>
+                        <span>15</span>
+                        <span>23</span>
+                        <span class="relative -right-1">30</span>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 核心變數 ---
+        let scene, renderer;
+        let cameraOrbit, cameraEarth; 
+        let earthMesh, moonMesh, sunLight;
+        let orbitLine;
+        
+        // 特效物件
+        let starSystem;
+        let dustSystem; // 全域光塵
+        
+        // 狀態
+        const state = {
+            day: 1, 
+            isPlaying: false,
+            showEarthView: true,
+            showStars: true,
+            showOrbit: true,
+            showSunlight: true
+        };
+
+        const MOON_DISTANCE = 40; 
+        const EARTH_SIZE = 7.5; 
+        const MOON_SIZE = 2.0;
+        const SUN_DISTANCE = 150; 
+
+        // --- 初始化 ---
+        function init() {
+            const container = document.getElementById('canvas-container');
+
+            // 1. 場景
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x020205);
+            scene.fog = new THREE.FogExp2(0x020205, 0.0015); // 微調霧氣
+
+            // 2. 渲染器
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.autoClear = false; 
+            container.appendChild(renderer.domElement);
+
+            // 3. 相機
+            cameraOrbit = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 1000);
+            cameraOrbit.position.set(0, 100, 60); 
+            cameraOrbit.lookAt(0, 0, 0);
+            
+            cameraEarth = new THREE.PerspectiveCamera(18, 1, 0.1, 1000); // 視角調窄一點，更有望遠感
+
+            // 控制器
+            const controls = new THREE.OrbitControls(cameraOrbit, renderer.domElement);
+            controls.enablePan = false;
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.minDistance = 50;
+            controls.maxDistance = 300;
+
+            createObjects();
+            setupEvents();
+            updateLunarState(1); 
+            animate();
+        }
+
+        function createObjects() {
+            const loader = new THREE.TextureLoader();
+
+            // A. 星空 (修復: 使用最穩定的 Box 分佈)
+            const starsGeo = new THREE.BufferGeometry();
+            const starsCount = 5000;
+            const posArray = new Float32Array(starsCount * 3);
+            const sizeArray = new Float32Array(starsCount);
+            
+            for(let i=0; i<starsCount; i++) {
+                // 均勻分佈在一個大立方體空間，確保任何角度都看得到
+                posArray[i*3] = (Math.random() - 0.5) * 1000;
+                posArray[i*3+1] = (Math.random() - 0.5) * 1000;
+                posArray[i*3+2] = (Math.random() - 0.5) * 1000;
+                
+                sizeArray[i] = Math.random() * 1.5;
+            }
+            starsGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+            starsGeo.setAttribute('size', new THREE.BufferAttribute(sizeArray, 1));
+            
+            const starsMat = new THREE.PointsMaterial({ 
+                color: 0x99aacc, 
+                size: 1.2, 
+                transparent: true, 
+                opacity: 0.8,
+                sizeAttenuation: true // 確保遠近大小不同
+            });
+            starSystem = new THREE.Points(starsGeo, starsMat);
+            scene.add(starSystem);
+
+            // B. 太陽光源
+            sunLight = new THREE.DirectionalLight(0xffffff, 1.8);
+            sunLight.position.set(SUN_DISTANCE, 0, 0); 
+            sunLight.castShadow = true;
+            sunLight.shadow.mapSize.width = 2048;
+            sunLight.shadow.mapSize.height = 2048;
+            sunLight.shadow.camera.left = -60;
+            sunLight.shadow.camera.right = 60;
+            sunLight.shadow.camera.top = 60;
+            sunLight.shadow.camera.bottom = -60;
+            scene.add(sunLight);
+
+            // C. 全域光塵 (優化參數)
+            const dustCount = 1000;
+            const dustGeo = new THREE.BufferGeometry();
+            const dustPos = new Float32Array(dustCount * 3);
+            const dustSpeed = new Float32Array(dustCount);
+            
+            for(let i=0; i<dustCount; i++) {
+                dustPos[i*3] = (Math.random() - 0.2) * 200; 
+                dustPos[i*3+1] = (Math.random() - 0.5) * 160;
+                dustPos[i*3+2] = (Math.random() - 0.5) * 160;
+                dustSpeed[i] = 0.05 + Math.random() * 0.1;
+            }
+            dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+            dustGeo.userData = { speeds: dustSpeed };
+            
+            const dustMat = new THREE.PointsMaterial({
+                color: 0xffeebb, 
+                size: 0.5,
+                transparent: true,
+                opacity: 0.3, // 稍微調淡，不搶眼
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            dustSystem = new THREE.Points(dustGeo, dustMat);
+            scene.add(dustSystem);
+
+            // D. 太陽本體
+            const sunGeo = new THREE.SphereGeometry(8, 32, 32);
+            const sunMat = new THREE.MeshBasicMaterial({ color: 0xffdd66 });
+            const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+            sunMesh.position.set(SUN_DISTANCE + 10, 0, 0);
+            scene.add(sunMesh);
+            
+            const spriteMat = new THREE.SpriteMaterial({ 
+                map: createGlowTexture(), 
+                color: 0xffaa44, 
+                transparent: true, 
+                blending: THREE.AdditiveBlending,
+                opacity: 0.5
+            });
+            const sunSprite = new THREE.Sprite(spriteMat);
+            sunSprite.scale.set(120, 120, 1);
+            sunMesh.add(sunSprite);
+
+            // 環境光
+            const ambientLight = new THREE.AmbientLight(0x404050, 0.2); 
+            scene.add(ambientLight);
+
+            // E. 地球
+            const earthGeo = new THREE.SphereGeometry(EARTH_SIZE, 64, 64);
+            const earthMat = new THREE.MeshPhongMaterial({
+                color: 0x112255,
+                emissive: 0x000011,
+                specular: 0x333333,
+                shininess: 25
+            });
+            loader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg', (tex) => {
+                earthMat.map = tex;
+                earthMat.color = new THREE.Color(0xffffff);
+                earthMat.needsUpdate = true;
+            });
+            earthMesh = new THREE.Mesh(earthGeo, earthMat);
+            earthMesh.rotation.z = 23.5 * Math.PI / 180;
+            earthMesh.castShadow = true;
+            earthMesh.receiveShadow = true;
+            scene.add(earthMesh);
+
+            // F. 月球
+            const moonGeo = new THREE.SphereGeometry(MOON_SIZE, 64, 64);
+            const moonMat = new THREE.MeshStandardMaterial({
+                color: 0xffffff,
+                roughness: 0.8,
+                metalness: 0.1
+            });
+            loader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/moon_1024.jpg', (tex) => {
+                moonMat.map = tex;
+                moonMat.needsUpdate = true;
+            });
+            moonMesh = new THREE.Mesh(moonGeo, moonMat);
+            moonMesh.castShadow = true;
+            moonMesh.receiveShadow = true;
+            scene.add(moonMesh);
+
+            // G. 軌道線
+            const orbitCurve = new THREE.EllipseCurve(0, 0, MOON_DISTANCE, MOON_DISTANCE, 0, 2 * Math.PI, false, 0);
+            const points = orbitCurve.getPoints(128); 
+            const orbitGeo = new THREE.BufferGeometry().setFromPoints(points);
+            orbitGeo.rotateX(Math.PI / 2);
+            const orbitMat = new THREE.LineBasicMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.15 });
+            orbitLine = new THREE.Line(orbitGeo, orbitMat);
+            scene.add(orbitLine);
+        }
+
+        function createGlowTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+            grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+            grad.addColorStop(0.2, 'rgba(255, 220, 180, 0.6)');
+            grad.addColorStop(0.5, 'rgba(255, 150, 50, 0.2)');
+            grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 128, 128);
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        // --- 邏輯運算 ---
+
+        function calculateMoonTimes(day) {
+            const lagPerDay = 24 / 29.5; 
+            let riseHour = (6 + (day - 1) * lagPerDay) % 24;
+            let setHour = (18 + (day - 1) * lagPerDay) % 24;
+            return {
+                rise: formatTime(riseHour),
+                set: formatTime(setHour)
+            };
+        }
+        
+        function formatTime(decimalHour) {
+            const h = Math.floor(decimalHour);
+            const m = Math.floor((decimalHour - h) * 60);
+            return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+        }
+
+        function updateLunarState(dayVal) {
+            state.day = dayVal;
+            const pct = (state.day - 1) / 29.5;
+            const angleRad = pct * Math.PI * 2; 
+            
+            // 公轉
+            moonMesh.position.x = Math.cos(angleRad) * MOON_DISTANCE;
+            moonMesh.position.z = -Math.sin(angleRad) * MOON_DISTANCE; 
+
+            // 自轉
+            moonMesh.rotation.y = angleRad - Math.PI; 
+            
+            earthMesh.rotation.y += 0.002;
+
+            // Earth View Cam
+            cameraEarth.position.set(0, 0, 0);
+            cameraEarth.lookAt(moonMesh.position);
+
+            updateUI(state.day, pct);
+        }
+
+        function getLunarPhaseName(day) {
+            if (day >= 29.5 || day <= 1.5) return "朔 (新月)";
+            if (day >= 7 && day <= 8.5) return "上弦月";
+            if (day >= 14.5 && day <= 16) return "望 (滿月)";
+            if (day >= 22 && day <= 23.5) return "下弦月";
+            if (day < 7) return "眉月";
+            if (day < 14.5) return "盈凸月";
+            if (day < 22) return "虧凸月";
+            return "殘月";
+        }
+
+        function updateUI(day, pct) {
+            const dayInt = Math.floor(day);
+            const dateStr = ["", "初一", "初二", "初三", "初四", "初五", "初六", "初七", "初八", "初九", "初十", 
+                             "十一", "十二", "十三", "十四", "十五", "十六", "十七", "十八", "十九", "二十",
+                             "廿一", "廿二", "廿三", "廿四", "廿五", "廿六", "廿七", "廿八", "廿九", "三十"];
+            
+            const dText = dateStr[dayInt] || `Day ${dayInt}`;
+            document.getElementById('lunar-date-text').innerText = dText;
+            document.getElementById('phase-name').innerText = getLunarPhaseName(day);
+            
+            // Times
+            const times = calculateMoonTimes(day);
+            document.getElementById('moonrise-time').innerText = times.rise;
+            document.getElementById('moonset-time').innerText = times.set;
+        }
+
+        function togglePlay() {
+            state.isPlaying = !state.isPlaying;
+            const btnIcon = document.getElementById('play-icon');
+            const btn = document.getElementById('play-btn');
+            
+            if (state.isPlaying) {
+                btnIcon.classList.remove('fa-play', 'ml-0.5');
+                btnIcon.classList.add('fa-pause');
+                btn.classList.add('bg-red-500');
+                btn.classList.remove('bg-blue-600');
+            } else {
+                btnIcon.classList.remove('fa-pause');
+                btnIcon.classList.add('fa-play', 'ml-0.5');
+                btn.classList.remove('bg-red-500');
+                btn.classList.add('bg-blue-600');
+            }
+        }
+
+        function updateSettings() {
+            state.showEarthView = document.getElementById('toggle-earth-view').checked;
+            state.showStars = document.getElementById('toggle-stars').checked;
+            state.showSunlight = document.getElementById('toggle-sunlight').checked;
+
+            if (starSystem) starSystem.visible = state.showStars;
+            if (dustSystem) dustSystem.visible = state.showSunlight;
+            
+            const container = document.getElementById('earth-view-container');
+            container.style.opacity = state.showEarthView ? '1' : '0';
+        }
+
+        function toggleMenu() {
+            const menu = document.getElementById('settings-menu');
+            if(menu.classList.contains('hidden')) {
+                menu.classList.remove('hidden');
+                menu.classList.add('flex');
+                setTimeout(() => {
+                    menu.classList.remove('scale-95', 'opacity-0');
+                    menu.classList.add('scale-100', 'opacity-100');
+                }, 10);
+            } else {
+                menu.classList.remove('scale-100', 'opacity-100');
+                menu.classList.add('scale-95', 'opacity-0');
+                setTimeout(() => {
+                    menu.classList.add('hidden');
+                    menu.classList.remove('flex');
+                }, 200);
+            }
+        }
+
+        function setupEvents() {
+            window.addEventListener('resize', onWindowResize, false);
+            
+            const slider = document.getElementById('day-slider');
+            slider.addEventListener('input', (e) => {
+                state.isPlaying = false; // Stop auto play
+                document.getElementById('play-icon').classList.remove('fa-pause');
+                document.getElementById('play-icon').classList.add('fa-play', 'ml-0.5');
+                const btn = document.getElementById('play-btn');
+                btn.classList.remove('bg-red-500');
+                btn.classList.add('bg-blue-600');
+                
+                updateLunarState(parseFloat(e.target.value));
+            });
+            
+            document.addEventListener('click', (e) => {
+                const menu = document.getElementById('settings-menu');
+                const btn = document.querySelector('button[onclick="toggleMenu()"]');
+                if (!menu.contains(e.target) && !btn.contains(e.target) && !menu.classList.contains('hidden')) {
+                    toggleMenu();
+                }
+            });
+        }
+
+        function onWindowResize() {
+            cameraOrbit.aspect = window.innerWidth / window.innerHeight;
+            cameraOrbit.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Auto Play
+            if (state.isPlaying) {
+                let nextDay = state.day + 0.05; 
+                if (nextDay > 30) nextDay = 1;
+                state.day = nextDay;
+                document.getElementById('day-slider').value = nextDay;
+                updateLunarState(nextDay);
+            }
+
+            // Dust Animation
+            if (dustSystem && dustSystem.visible) {
+                const positions = dustSystem.geometry.attributes.position.array;
+                const speeds = dustSystem.geometry.userData.speeds;
+                
+                for(let i=0; i<speeds.length; i++) {
+                    positions[i*3] -= speeds[i];
+                    if(positions[i*3] < -50) {
+                        positions[i*3] = 150; 
+                        positions[i*3+1] = (Math.random() - 0.5) * 160;
+                        positions[i*3+2] = (Math.random() - 0.5) * 160;
+                    }
+                }
+                dustSystem.geometry.attributes.position.needsUpdate = true;
+            }
+
+            render();
+        }
+
+        function render() {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+
+            renderer.setScissorTest(true);
+
+            // 1. Main View
+            renderer.setViewport(0, 0, width, height);
+            renderer.setScissor(0, 0, width, height);
+            renderer.render(scene, cameraOrbit);
+
+            // 2. Earth View (Top Right)
+            if (state.showEarthView) {
+                let insetSize = Math.min(width, height) / 4.5;
+                if (width < 640) insetSize = width / 3.5;
+                
+                // 調整到右上角容器位置
+                // CSS 中 #earth-view-container top=80px, right=16px
+                // 我們需要手動計算 webGL 的 viewport 座標 (origin 在左下)
+                
+                // CSS: Top 80px (from top)
+                // WebGL Y: Height - 80 - insetSize
+                // But container height is slightly larger than inset size usually.
+                // Let's match the visual container size roughly
+                
+                const cssTop = 80; 
+                const cssRight = 16;
+                const insetW = width < 640 ? 120 : 150; // Match CSS width roughly
+                const insetH = insetW;
+                
+                const insetX = width - insetW - cssRight;
+                const insetY = height - insetH - cssTop;
+
+                renderer.setViewport(insetX, insetY, insetW, insetH);
+                renderer.setScissor(insetX, insetY, insetW, insetH);
+                
+                // Hide clutter
+                const earthVis = earthMesh.visible;
+                const orbitVis = orbitLine.visible;
+                const dustVis = dustSystem ? dustSystem.visible : false;
+                
+                earthMesh.visible = false; 
+                orbitLine.visible = false;
+                if(dustSystem) dustSystem.visible = false; 
+                
+                renderer.render(scene, cameraEarth);
+                
+                // Restore
+                earthMesh.visible = earthVis;
+                orbitLine.visible = orbitVis;
+                if(dustSystem) dustSystem.visible = dustVis;
+            }
+
+            renderer.setScissorTest(false);
+        }
+
+        init();
+
+    </script>
+</body>
+</html>
