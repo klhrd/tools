@@ -23,14 +23,13 @@
 
 ### **線上預覽 (GitHub Pages)**
 
-您可以直接訪問此專案的 GitHub Pages 頁面進行體驗：
-
-\[在此處貼上您的 GitHub Pages 連結，例如 https://www.google.com/search?q=https://your-username.github.io/repo-name/\]
+您可以直接訪問此專案的 GitHub Pages 頁面進行體驗：  
+[太陽運行路徑模擬器](https://klhrd.github.io/tools/sun-path-simulator/v0.0.6)
 
 ### **本地運行**
 
 1. 下載此專案。  
-2. 直接使用瀏覽器打開 index.html (或 sun\_path\_simulator.html) 即可運行，無需安裝額外伺服器。
+2. 直接使用瀏覽器打開 `v0.0.6.html` 即可運行，無需安裝額外伺服器。
 
 ## **🛠️ 技術棧 (Tech Stack)**
 
@@ -46,6 +45,7 @@
 * **時間調整**：拖曳下方時間軸，或點擊日出/日落/正午標記快速跳轉。  
 * **設定選單**：點擊右上角選單按鈕，可調整顯示圖層、定位與介面設定。
 
-## **📄 授權 (License)**
+## **版本紀錄**
 
-本專案採用 MIT License 開源授權。
+### v0.0.6
+- 2026-01-12T22:23:00 
