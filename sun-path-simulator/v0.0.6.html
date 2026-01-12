@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>太陽運行路徑模擬器 v0.0.6</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
+
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #050510; font-family: 'Noto Sans TC', sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 0; }
+        
+        /* Glassmorphism UI */
+        .glass-panel {
+            background: rgba(30, 30, 45, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #e0e0e0;
+            border-radius: 16px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #FDB813;
+            cursor: pointer;
+            margin-top: -8px;
+            box-shadow: 0 0 10px rgba(253, 184, 19, 0.5);
+            border: 2px solid white;
+            transition: transform 0.1s;
+            position: relative;
+            z-index: 20;
+        }
+        input[type=range]::-webkit-slider-thumb:active {
+            transform: scale(1.2);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+        }
+        
+        /* Lat Slider specific */
+        .lat-slider::-webkit-slider-thumb {
+            background: #3B82F6;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+        }
+
+        /* Checkbox & Radio Styling */
+        .custom-checkbox input:checked + div {
+            background-color: #3B82F6;
+            border-color: #3B82F6;
+        }
+        .custom-checkbox input:checked + div svg {
+            display: block;
+        }
+        
+        /* Button Group Styling */
+        .btn-group button {
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .btn-group button.active {
+            background-color: #3B82F6;
+            border-color: #3B82F6;
+            color: white;
+        }
+
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Timeline Markers */
+        .time-marker {
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            z-index: 10;
+            cursor: pointer;
+            border: 2px solid rgba(255,255,255,0.8);
+            transition: transform 0.2s;
+        }
+        .time-marker:hover {
+            transform: translate(-50%, -50%) scale(1.5);
+            z-index: 30;
+        }
+        .time-marker::after {
+            content: '';
+            position: absolute;
+            bottom: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 2px;
+            height: 6px;
+            background-color: inherit;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 3D Canvas -->
+    <div id="canvas-container"></div>
+
+    <!-- UI Overlay Wrapper -->
+    <div class="absolute inset-0 pointer-events-none flex flex-col z-10 overflow-hidden">
+        
+        <!-- Top Bar -->
+        <div class="flex justify-between items-start p-2 md:p-4 pointer-events-auto">
+            <!-- Info Card -->
+            <div class="glass-panel p-3 flex flex-col min-w-[140px] shadow-lg transform transition hover:scale-105 origin-top-left">
+                <h1 class="text-sm md:text-base font-bold text-yellow-400 flex items-center">
+                    <i class="fas fa-sun mr-2"></i> 模擬器 <span class="ml-2 text-[10px] text-gray-400 border border-gray-600 px-1 rounded">v0.0.6</span>
+                </h1>
+                
+                <div class="mt-2 text-xs md:text-sm border-t border-gray-600 pt-2 flex items-center justify-between">
+                    <div class="flex items-center text-gray-200">
+                         <i class="fas fa-map-marker-alt text-red-400 mr-2"></i>
+                         <span id="location-name" class="font-bold truncate max-w-[100px]">嘉義</span>
+                    </div>
+                </div>
+                <div class="flex justify-between items-end mt-1">
+                    <span class="text-[10px] text-gray-400">緯度</span>
+                    <span class="font-mono text-blue-300 text-sm font-bold"><span id="lat-display">23.50</span>°</span>
+                </div>
+            </div>
+
+            <!-- Time Display -->
+            <div class="glass-panel px-4 py-2 flex flex-col items-center shadow-lg">
+                 <div class="text-[10px] text-gray-400 uppercase tracking-widest">Local Time</div>
+                 <div id="time-display" class="font-mono text-xl md:text-2xl font-bold text-white drop-shadow-md tracking-wider">12:00</div>
+            </div>
+
+            <!-- Menu Button -->
+            <button id="menu-btn" class="glass-panel w-10 h-10 md:w-11 md:h-11 flex items-center justify-center hover:bg-white/10 transition active:scale-95 shadow-lg">
+                <i class="fas fa-bars text-lg"></i>
+            </button>
+        </div>
+
+        <!-- Spacer -->
+        <div class="flex-1"></div>
+
+        <!-- Bottom Controls Area -->
+        <div class="p-2 md:p-4 pointer-events-auto flex flex-col md:flex-row gap-3 items-end md:items-end">
+            
+            <!-- Quick Lat Control (Hidden by default in v0.0.6) -->
+            <div id="quick-lat-panel" class="glass-panel p-3 w-full md:w-auto items-center gap-2 md:gap-1 transition-all hidden">
+                <label class="text-[10px] text-blue-300 font-bold whitespace-nowrap">快速緯度</label>
+                <div class="flex-1 w-full flex items-center gap-2">
+                    <span class="text-[10px] text-gray-400 w-3">-90</span>
+                    <input type="range" id="quick-lat-slider" min="-90" max="90" step="0.5" value="23.5" class="lat-slider w-full md:w-32">
+                    <span class="text-[10px] text-gray-400 w-3">90</span>
+                </div>
+            </div>
+
+            <!-- Main Control Bar -->
+            <div class="glass-panel p-3 flex-1 w-full shadow-xl">
+                
+                <!-- Season & Events Row -->
+                <div class="flex flex-wrap justify-between items-center mb-3 gap-2">
+                    <!-- Season Selector (No Wrap) -->
+                    <div class="flex bg-gray-800/50 rounded-lg p-1 gap-1 flex-nowrap whitespace-nowrap overflow-x-auto no-scrollbar">
+                        <button class="season-btn flex-1 px-3 py-1 rounded text-[10px] md:text-xs transition text-gray-400 hover:text-white whitespace-nowrap" data-season="summer">夏至</button>
+                        <button class="season-btn flex-1 px-3 py-1 rounded text-[10px] md:text-xs transition text-gray-400 hover:text-white whitespace-nowrap" data-season="equinox">春秋分</button>
+                        <button class="season-btn flex-1 px-3 py-1 rounded text-[10px] md:text-xs transition text-gray-400 hover:text-white whitespace-nowrap" data-season="winter">冬至</button>
+                    </div>
+
+                    <!-- Jump Buttons -->
+                    <div class="flex gap-2">
+                         <button id="jump-sunrise" class="bg-orange-900/40 hover:bg-orange-800 text-orange-200 text-[10px] px-2 py-1 rounded border border-orange-700/30 transition flex items-center whitespace-nowrap">
+                            <i class="fas fa-sunrise mr-1"></i><span class="time-val">--:--</span>
+                        </button>
+                        <button id="jump-sunset" class="bg-purple-900/40 hover:bg-purple-800 text-purple-200 text-[10px] px-2 py-1 rounded border border-purple-700/30 transition flex items-center whitespace-nowrap">
+                            <i class="fas fa-moon mr-1"></i><span class="time-val">--:--</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Time Slider Row -->
+                <div class="flex items-center gap-3">
+                    <button id="play-btn" class="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-yellow-500 hover:bg-yellow-400 rounded-full text-black transition shadow-lg shadow-yellow-500/30 active:scale-95">
+                        <i class="fas fa-play ml-1"></i>
+                    </button>
+                    
+                    <div class="flex-1 relative group w-full h-8 flex items-center">
+                        <!-- Hour Markers -->
+                        <div class="absolute -top-3 w-full flex justify-between text-[10px] text-gray-500 px-1 font-mono select-none pointer-events-none">
+                            <span>00</span><span>06</span><span>12</span><span>18</span><span>24</span>
+                        </div>
+                        
+                        <!-- Magnetic Markers Container -->
+                        <div id="timeline-markers" class="absolute top-1/2 left-0 w-full h-0 z-10 pointer-events-none">
+                            <!-- JS will inject markers here -->
+                        </div>
+
+                        <input type="range" id="time-slider" min="0" max="24" step="0.01" value="12" class="w-full relative z-20 focus:outline-none">
+                    </div>
+                </div>
+                
+                <!-- Az/Alt Info -->
+                <div class="mt-2 flex justify-center gap-4 text-[10px] text-gray-400 border-t border-white/5 pt-1">
+                    <span>仰角: <span id="alt-display" class="text-yellow-300 font-mono text-xs">--°</span></span>
+                    <span>方位: <span id="az-display" class="text-cyan-300 font-mono text-xs">--°</span></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Menu -->
+    <div id="settings-overlay" class="fixed inset-0 bg-black/50 z-40 hidden backdrop-blur-sm transition-opacity"></div>
+    <div id="settings-menu" class="fixed top-0 right-0 h-full w-80 glass-panel border-l border-white/10 transform translate-x-full transition-transform duration-300 z-50 overflow-y-auto no-scrollbar">
+        <div class="p-5">
+            <div class="flex justify-between items-center border-b border-gray-600 pb-4 mb-4">
+                <h3 class="font-bold text-white text-lg"><i class="fas fa-cog mr-2"></i>設定選項</h3>
+                <button id="close-menu-btn" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-300 hover:text-white transition">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <!-- Location -->
+            <div class="mb-5 bg-black/20 p-3 rounded-lg">
+                <div class="text-xs text-blue-400 font-bold mb-3 uppercase tracking-wider flex items-center">
+                    <i class="fas fa-map-marked-alt mr-2"></i>地點設定
+                </div>
+                <button id="gps-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white text-sm py-2.5 rounded-lg transition flex items-center justify-center mb-3 shadow-lg">
+                    <i class="fas fa-location-arrow mr-2"></i> 自動定位 (GPS)
+                </button>
+                <div class="flex gap-2 mb-3">
+                    <input type="number" id="manual-lat" placeholder="輸入緯度" class="flex-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:border-blue-400 outline-none">
+                    <button id="manual-loc-btn" class="bg-gray-700 hover:bg-gray-600 text-white px-4 rounded text-sm transition">GO</button>
+                </div>
+                <div class="text-[10px] text-gray-400 mb-2">常用位置：</div>
+                <div id="location-history" class="flex flex-wrap gap-2"></div>
+            </div>
+
+            <!-- UI Toggles -->
+            <div class="mb-5 border-t border-gray-700 pt-4">
+                <div class="text-xs text-yellow-400 font-bold mb-3 uppercase tracking-wider">介面控制</div>
+                <label class="flex items-center cursor-pointer mb-3">
+                    <input type="checkbox" id="toggle-quick-lat" class="w-4 h-4 rounded border-gray-500 text-blue-500 bg-gray-800 focus:ring-offset-0 focus:ring-0">
+                    <span class="ml-2 text-sm text-gray-300">顯示快速緯度滑桿</span>
+                </label>
+                 <label class="flex items-center cursor-pointer mb-3">
+                    <input type="checkbox" id="toggle-azimuth-markers" class="w-4 h-4 rounded border-gray-500 text-blue-500 bg-gray-800 focus:ring-offset-0 focus:ring-0" checked>
+                    <span class="ml-2 text-sm text-gray-300">顯示日出/日落標籤</span>
+                </label>
+                <label class="flex items-center justify-between cursor-pointer group">
+                    <span class="text-sm text-gray-300">日夜背景變化</span>
+                    <div class="relative inline-block w-10 h-5">
+                        <input type="checkbox" id="toggle-daynight" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer transition-transform duration-200 ease-in-out translate-x-5 checked:border-blue-500" checked/>
+                        <div class="block overflow-hidden h-5 rounded-full bg-blue-500 cursor-pointer"></div>
+                    </div>
+                </label>
+            </div>
+
+            <!-- Bearing Mode -->
+            <div class="mb-5 border-t border-gray-700 pt-4">
+                <div class="text-xs text-yellow-400 font-bold mb-2 uppercase tracking-wider">方位角顯示模式</div>
+                <div class="flex bg-gray-800/50 rounded-lg p-1">
+                    <button class="bearing-mode-btn flex-1 py-1.5 text-xs text-gray-400 hover:text-white transition rounded active" data-mode="azimuth">方位角 (0-360°)</button>
+                    <button class="bearing-mode-btn flex-1 py-1.5 text-xs text-gray-400 hover:text-white transition rounded" data-mode="quadrant">象限角 (N/S E/W)</button>
+                </div>
+            </div>
+
+            <!-- Visual Toggles -->
+            <div class="mb-5 border-t border-gray-700 pt-4">
+                <div class="text-xs text-yellow-400 font-bold mb-3 uppercase tracking-wider">顯示圖層</div>
+                
+                <!-- Celestial Grid Mode -->
+                <div class="mb-4">
+                    <div class="text-[10px] text-gray-400 mb-1">天球網格</div>
+                    <div class="flex btn-group rounded-md overflow-hidden bg-gray-800/50 w-full">
+                        <button class="flex-1 py-1.5 text-xs text-gray-400 hover:text-white transition grid-mode-btn" data-mode="full">完整</button>
+                        <button class="flex-1 py-1.5 text-xs text-gray-400 hover:text-white transition grid-mode-btn active" data-mode="simple">簡化</button>
+                        <button class="flex-1 py-1.5 text-xs text-gray-400 hover:text-white transition grid-mode-btn" data-mode="none">無</button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                    <label class="flex items-center cursor-pointer custom-checkbox">
+                        <input type="checkbox" id="toggle-landscape" class="hidden" checked>
+                        <div class="w-4 h-4 border border-gray-500 rounded flex items-center justify-center mr-2 bg-black/30"><i class="fas fa-check text-[10px] text-white hidden"></i></div>
+                        <span class="text-sm text-gray-300">地景</span>
+                    </label>
+                    <label class="flex items-center cursor-pointer custom-checkbox">
+                        <input type="checkbox" id="toggle-axis" class="hidden" checked>
+                        <div class="w-4 h-4 border border-gray-500 rounded flex items-center justify-center mr-2 bg-black/30"><i class="fas fa-check text-[10px] text-white hidden"></i></div>
+                        <span class="text-sm text-gray-300">地軸</span>
+                    </label>
+                    <label class="flex items-center cursor-pointer custom-checkbox">
+                        <input type="checkbox" id="toggle-shadow" class="hidden" checked>
+                        <div class="w-4 h-4 border border-gray-500 rounded flex items-center justify-center mr-2 bg-black/30"><i class="fas fa-check text-[10px] text-white hidden"></i></div>
+                        <span class="text-sm text-gray-300">影子</span>
+                    </label>
+                </div>
+                
+                <div class="border-t border-gray-700 mb-3"></div>
+                
+                <div class="space-y-2">
+                    <label class="flex items-center cursor-pointer custom-checkbox">
+                        <input type="checkbox" id="toggle-summer" class="hidden" checked>
+                        <div class="w-4 h-4 border border-red-500 rounded flex items-center justify-center mr-2 bg-red-900/20"><i class="fas fa-check text-[10px] text-white hidden"></i></div>
+                        <span class="text-sm text-red-200">夏至軌跡</span>
+                    </label>
+                    <label class="flex items-center cursor-pointer custom-checkbox">
+                        <input type="checkbox" id="toggle-equinox" class="hidden" checked>
+                        <div class="w-4 h-4 border border-green-500 rounded flex items-center justify-center mr-2 bg-green-900/20"><i class="fas fa-check text-[10px] text-white hidden"></i></div>
+                        <span class="text-sm text-green-200">春秋分軌跡</span>
+                    </label>
+                    <label class="flex items-center cursor-pointer custom-checkbox">
+                        <input type="checkbox" id="toggle-winter" class="hidden" checked>
+                        <div class="w-4 h-4 border border-blue-500 rounded flex items-center justify-center mr-2 bg-blue-900/20"><i class="fas fa-check text-[10px] text-white hidden"></i></div>
+                        <span class="text-sm text-blue-200">冬至軌跡</span>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="mt-10 text-center text-xs text-gray-600 font-mono">
+                Sun Path Simulator v0.0.6
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed top-4 left-1/2 transform -translate-x-1/2 glass-panel px-4 py-2 transition-all duration-500 opacity-0 translate-y-[-20px] pointer-events-none z-[100] flex items-center shadow-2xl">
+        <i class="fas fa-info-circle mr-2 text-blue-400"></i> <span id="toast-msg">訊息</span>
+    </div>
+
+    <script>
+        // --- 1. Global Config ---
+        const config = {
+            lat: 23.5,
+            radius: 50,
+            enableDayNight: true,
+            activeSeason: 'summer',
+            animationSpeed: 0.05,
+            isPlaying: false,
+            gridMode: 'simple', 
+            showAzimuthMarkers: true,
+            bearingMode: 'azimuth', // 'azimuth' or 'quadrant'
+            solarEvents: { rise: null, set: null, noon: 12.0 } // Store times for snapping
+        };
+        config.sunDistance = config.radius;
+
+        const declination = {
+            summer: 23.45 * (Math.PI / 180),
+            equinox: 0,
+            winter: -23.45 * (Math.PI / 180)
+        };
+
+        let locationHistory = [
+            { name: "嘉義", lat: 23.5 },
+            { name: "台北", lat: 25.03 },
+            { name: "赤道", lat: 0 },
+            { name: "北極點", lat: 90 },
+            { name: "雪梨", lat: -33.86 }
+        ];
+
+        let scene, camera, renderer, controls;
+        let sunMesh, sunLight, ambientLight, sunGlow;
+        let earthAxis;
+        let celestialGridFull, celestialGridSimple;
+        let shadowCaster, landscapeGroup, horizonLabelsGroup;
+        let pathLines = {};
+        
+        const D2R = Math.PI / 180;
+        const R2D = 180 / Math.PI;
+
+        // --- 2. Init ---
+        function init() {
+            const container = document.getElementById('canvas-container');
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x050510);
+            scene.fog = new THREE.FogExp2(0x050510, 0.002);
+
+            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(50, 40, 60); 
+            camera.lookAt(0, 0, 0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Fix blurriness on high DPI
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI; 
+            controls.minDistance = 10;
+            controls.maxDistance = 200;
+
+            createEnvironment();
+            createCelestialGrids();
+            createSun();
+            createPaths();
+            updateSunPosition();
+            renderHistory();
+            updateSeasonUI();
+            updateGridModeUI();
+
+            window.addEventListener('resize', onWindowResize);
+            setupUIListeners();
+            animate();
+        }
+
+        // --- 3. Environment Objects ---
+        function createEnvironment() {
+            landscapeGroup = new THREE.Group();
+            scene.add(landscapeGroup);
+
+            const gridHelper = new THREE.GridHelper(200, 40, 0x444444, 0x111111);
+            landscapeGroup.add(gridHelper);
+
+            const planeGeo = new THREE.PlaneGeometry(200, 200);
+            const planeMat = new THREE.MeshStandardMaterial({ 
+                color: 0x151515, roughness: 0.8, metalness: 0.2
+            });
+            const plane = new THREE.Mesh(planeGeo, planeMat);
+            plane.rotation.x = -Math.PI / 2;
+            plane.position.y = -0.1; 
+            plane.receiveShadow = true;
+            landscapeGroup.add(plane);
+
+            const horizonGeo = new THREE.RingGeometry(config.radius - 0.5, config.radius + 0.5, 128);
+            horizonGeo.rotateX(-Math.PI / 2);
+            const horizonMat = new THREE.MeshBasicMaterial({ color: 0x44aaff, side: THREE.DoubleSide, opacity: 0.8, transparent: true });
+            const horizon = new THREE.Mesh(horizonGeo, horizonMat);
+            landscapeGroup.add(horizon);
+
+            createCompassLabels();
+
+            const axisLen = config.radius * 2.2;
+            const axisGeo = new THREE.CylinderGeometry(0.2, 0.2, axisLen, 8);
+            const axisMat = new THREE.MeshBasicMaterial({ color: 0xaaaaaa, opacity: 0.5, transparent: true });
+            earthAxis = new THREE.Mesh(axisGeo, axisMat);
+            scene.add(earthAxis);
+            updateEarthAxis();
+
+            const poleGeo = new THREE.CylinderGeometry(0.5, 0.5, 6, 16);
+            poleGeo.translate(0, 3, 0); 
+            const poleMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee });
+            shadowCaster = new THREE.Mesh(poleGeo, poleMat);
+            shadowCaster.castShadow = true;
+            shadowCaster.receiveShadow = true;
+            landscapeGroup.add(shadowCaster);
+            
+            horizonLabelsGroup = new THREE.Group();
+            scene.add(horizonLabelsGroup);
+        }
+
+        function createCelestialGrids() {
+            const celGeo = new THREE.SphereGeometry(config.radius, 36, 18);
+            const celMat = new THREE.MeshBasicMaterial({ 
+                color: 0xffffff, wireframe: true, transparent: true, opacity: 0.1 
+            });
+            celestialGridFull = new THREE.Mesh(celGeo, celMat);
+            scene.add(celestialGridFull);
+
+            celestialGridSimple = new THREE.Group();
+            const circlePoints = [];
+            for (let i = 0; i <= 64; i++) {
+                const theta = (i / 64) * Math.PI * 2;
+                circlePoints.push(new THREE.Vector3(Math.cos(theta) * config.radius, Math.sin(theta) * config.radius, 0));
+            }
+            const circleGeo = new THREE.BufferGeometry().setFromPoints(circlePoints);
+            const circleMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3 });
+            
+            const meridian = new THREE.Line(circleGeo, circleMat);
+            meridian.rotation.y = Math.PI / 2;
+            celestialGridSimple.add(meridian);
+
+            const primeVertical = new THREE.Line(circleGeo, circleMat);
+            celestialGridSimple.add(primeVertical);
+
+            scene.add(celestialGridSimple);
+        }
+
+        function updateCelestialGridVisibility() {
+            celestialGridFull.visible = (config.gridMode === 'full');
+            celestialGridSimple.visible = (config.gridMode === 'simple');
+        }
+
+        function createCompassLabels() {
+            const dirs = [
+                { txt: 'N', deg: 0, color: '#ff5555' },
+                { txt: 'E', deg: 90, color: '#55ff55' },
+                { txt: 'S', deg: 180, color: '#5555ff' },
+                { txt: 'W', deg: 270, color: '#ffffff' }
+            ];
+            const dist = config.radius + 5;
+            dirs.forEach(d => {
+                const sprite = makeTextSprite(d.txt, d.color, 80);
+                let x = 0, z = 0;
+                if(d.txt === 'N') z = -dist;
+                if(d.txt === 'S') z = dist;
+                if(d.txt === 'E') x = dist;
+                if(d.txt === 'W') x = -dist;
+                sprite.position.set(x, 2, z);
+                landscapeGroup.add(sprite);
+            });
+        }
+
+        // --- High Quality Text Sprite ---
+        function makeTextSprite(message, color, fontSize=60) {
+            const scaleFactor = 4; // High resolution factor
+            const w = 512 * scaleFactor;
+            const h = 256 * scaleFactor;
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            
+            ctx.font = `bold ${fontSize * scaleFactor}px "Roboto Mono"`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            // Text Stroke
+            ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+            ctx.lineWidth = 6 * scaleFactor;
+            ctx.strokeText(message, w/2, h/2);
+            
+            // Text Fill
+            ctx.fillStyle = color;
+            ctx.fillText(message, w/2, h/2);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.minFilter = THREE.LinearFilter;
+            
+            const mat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+            const sprite = new THREE.Sprite(mat);
+            // Maintain visual scale but use high res texture
+            sprite.scale.set(10, 5, 1); 
+            return sprite;
+        }
+
+        function createSun() {
+            const sunGroup = new THREE.Group();
+            
+            const sunGeo = new THREE.SphereGeometry(2.5, 32, 32);
+            const sunMat = new THREE.MeshBasicMaterial({ color: 0xFDB813 });
+            const mesh = new THREE.Mesh(sunGeo, sunMat);
+            sunGroup.add(mesh);
+
+            const glowGeo = new THREE.SphereGeometry(3.5, 32, 32);
+            const glowMat = new THREE.MeshBasicMaterial({ color: 0xFFD700, transparent: true, opacity: 0.3 });
+            sunGlow = new THREE.Mesh(glowGeo, glowMat);
+            sunGroup.add(sunGlow);
+
+            sunMesh = sunGroup;
+            scene.add(sunMesh);
+
+            sunLight = new THREE.DirectionalLight(0xffffff, 1.5);
+            sunLight.castShadow = true;
+            sunLight.shadow.mapSize.width = 2048;
+            sunLight.shadow.mapSize.height = 2048;
+            const d = 60;
+            sunLight.shadow.camera.left = -d;
+            sunLight.shadow.camera.right = d;
+            sunLight.shadow.camera.top = d;
+            sunLight.shadow.camera.bottom = -d;
+            scene.add(sunLight);
+
+            ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+            scene.add(ambientLight);
+        }
+
+        // --- 4. Logic & Calculations ---
+        function updateEarthAxis() {
+            const tiltRad = (90 - config.lat) * D2R;
+            earthAxis.rotation.x = -tiltRad; 
+        }
+
+        function createPaths() {
+            ['summer', 'equinox', 'winter'].forEach(k => {
+                if(pathLines[k]) { scene.remove(pathLines[k]); pathLines[k].geometry.dispose(); }
+            });
+
+            pathLines.summer = createPathLine(declination.summer, 0xff4444);
+            pathLines.equinox = createPathLine(declination.equinox, 0x44ff44);
+            pathLines.winter = createPathLine(declination.winter, 0x4444ff);
+
+            scene.add(pathLines.summer);
+            scene.add(pathLines.equinox);
+            scene.add(pathLines.winter);
+            
+            updateHorizonLabels();
+            checkVisibility();
+            calculateSolarEvents();
+        }
+
+        function createPathLine(dec, color) {
+            const points = [];
+            const latRad = config.lat * D2R;
+            for(let h = 0; h <= 360; h+=2) {
+                const hRad = (h - 180) * D2R; 
+                const sinAlt = Math.sin(latRad) * Math.sin(dec) + Math.cos(latRad) * Math.cos(dec) * Math.cos(hRad);
+                const alt = Math.asin(sinAlt);
+                const cosAz = (Math.sin(dec) - Math.sin(latRad) * Math.sin(alt)) / (Math.cos(latRad) * Math.cos(alt));
+                let az = Math.acos(Math.min(1, Math.max(-1, cosAz)));
+                if (Math.sin(hRad) > 0) az = 2 * Math.PI - az;
+
+                const r = config.radius;
+                const x = r * Math.cos(alt) * Math.sin(az);
+                const y = r * Math.sin(alt);
+                const z = -r * Math.cos(alt) * Math.cos(az);
+                points.push(new THREE.Vector3(x, y, z));
+            }
+            const geo = new THREE.BufferGeometry().setFromPoints(points);
+            const mat = new THREE.LineBasicMaterial({ color: color });
+            return new THREE.Line(geo, mat);
+        }
+
+        function formatBearing(deg) {
+            if (config.bearingMode === 'azimuth') {
+                return `${deg.toFixed(1)}°`;
+            } else {
+                // Quadrant Bearing Logic
+                let d = deg % 360;
+                if(d < 0) d += 360;
+                
+                if (d === 0) return "N";
+                if (d === 90) return "E";
+                if (d === 180) return "S";
+                if (d === 270) return "W";
+
+                if (d > 0 && d < 90) return `N ${d.toFixed(1)}° E`;
+                if (d > 90 && d < 180) return `S ${(180 - d).toFixed(1)}° E`;
+                if (d > 180 && d < 270) return `S ${(d - 180).toFixed(1)}° W`;
+                return `N ${(360 - d).toFixed(1)}° W`;
+            }
+        }
+
+        function updateHorizonLabels() {
+            while(horizonLabelsGroup.children.length > 0){ 
+                horizonLabelsGroup.remove(horizonLabelsGroup.children[0]); 
+            }
+            if(!config.showAzimuthMarkers) return;
+
+            const latRad = config.lat * D2R;
+            
+            const createLabel = (dec, color, labelPrefix) => {
+                const val = -Math.tan(latRad) * Math.tan(dec);
+                if (Math.abs(val) > 1) return; // No sunrise/set
+
+                const cosAz = Math.sin(dec) / Math.cos(latRad);
+                let azRad = Math.acos(Math.min(1, Math.max(-1, cosAz))); 
+                
+                // Rise Position
+                let azDeg = azRad * R2D;
+                let x = config.radius * Math.sin(azRad);
+                let z = -config.radius * Math.cos(azRad);
+                let text = `日出 ${formatBearing(azDeg)}`;
+                let sprite = makeTextSprite(text, color, 40);
+                sprite.position.set(x, 2.5, z);
+                sprite.scale.set(8,4,1);
+                horizonLabelsGroup.add(sprite);
+
+                // Set Position
+                azRad = 2 * Math.PI - azRad;
+                azDeg = azRad * R2D;
+                x = config.radius * Math.sin(azRad);
+                z = -config.radius * Math.cos(azRad);
+                text = `日落 ${formatBearing(azDeg)}`;
+                sprite = makeTextSprite(text, color, 40);
+                sprite.position.set(x, 2.5, z);
+                sprite.scale.set(8,4,1);
+                horizonLabelsGroup.add(sprite);
+            };
+
+            const check = (id) => document.getElementById(id).checked;
+            if(check('toggle-summer')) createLabel(declination.summer, '#ff8888');
+            if(check('toggle-winter')) createLabel(declination.winter, '#8888ff');
+            if(check('toggle-equinox')) createLabel(declination.equinox, '#88ff88');
+        }
+
+        function updateSunPosition() {
+            const slider = document.getElementById('time-slider');
+            const time = parseFloat(slider.value);
+            const hRad = (time - 12) * 15 * D2R;
+            const latRad = config.lat * D2R;
+            const dec = declination[config.activeSeason];
+
+            const sinAlt = Math.sin(latRad) * Math.sin(dec) + Math.cos(latRad) * Math.cos(dec) * Math.cos(hRad);
+            const altRad = Math.asin(sinAlt);
+            
+            const cosAz = (Math.sin(dec) - Math.sin(latRad) * Math.sin(altRad)) / (Math.cos(latRad) * Math.cos(altRad));
+            let azRad = Math.acos(Math.min(1, Math.max(-1, cosAz)));
+            if (Math.sin(hRad) > 0) azRad = 2 * Math.PI - azRad;
+
+            const r = config.radius;
+            const x = r * Math.cos(altRad) * Math.sin(azRad);
+            const y = r * Math.sin(altRad);
+            const z = -r * Math.cos(altRad) * Math.cos(azRad);
+
+            sunMesh.position.set(x, y, z);
+            sunLight.position.set(x, y, z);
+            sunMesh.lookAt(0,0,0); 
+
+            updateInfoDisplay(time, altRad, azRad);
+            updateAtmosphere(altRad);
+        }
+
+        function updateAtmosphere(altRad) {
+            if (!config.enableDayNight) {
+                scene.background = new THREE.Color(0x050510);
+                scene.fog.color.setHex(0x050510);
+                sunLight.intensity = 1.2;
+                ambientLight.intensity = 0.5;
+                return;
+            }
+            const altDeg = altRad * R2D;
+            let bgColor, ambInt, sunInt;
+
+            if (altDeg > 10) {
+                bgColor = new THREE.Color(0x87CEEB).lerp(new THREE.Color(0x050510), 0.2); 
+                sunInt = 1.5; ambInt = 0.6;
+            } else if (altDeg > -5) {
+                const t = (altDeg + 5) / 15; 
+                const night = new THREE.Color(0x050510);
+                const sunset = new THREE.Color(0xFD5E53);
+                bgColor = night.lerp(sunset, t);
+                sunInt = t * 1.5; ambInt = 0.2 + t * 0.4;
+            } else {
+                bgColor = new THREE.Color(0x050510);
+                sunInt = 0; ambInt = 0.1;
+            }
+            scene.background.lerp(bgColor, 0.1);
+            scene.fog.color.copy(scene.background);
+            sunLight.intensity = sunInt;
+            ambientLight.intensity = ambInt;
+        }
+
+        function calculateSolarEvents() {
+            const latRad = config.lat * D2R;
+            const dec = declination[config.activeSeason];
+            const val = -Math.tan(latRad) * Math.tan(dec);
+            
+            let riseStr = "--:--", setStr = "--:--";
+            let riseTime = null, setTime = null;
+
+            if (val >= 1) { 
+                riseStr = "極夜"; setStr = "極夜";
+            } else if (val <= -1) { 
+                riseStr = "極晝"; setStr = "極晝";
+                riseTime = 0; setTime = 24;
+            } else {
+                const hRad = Math.acos(val);
+                const hHr = hRad * R2D / 15;
+                riseTime = 12 - hHr;
+                setTime = 12 + hHr;
+                riseStr = formatTime(riseTime);
+                setStr = formatTime(setTime);
+            }
+
+            config.solarEvents.rise = riseTime;
+            config.solarEvents.set = setTime;
+
+            const btnRise = document.getElementById('jump-sunrise');
+            const btnSet = document.getElementById('jump-sunset');
+            
+            btnRise.querySelector('.time-val').innerText = riseStr;
+            btnSet.querySelector('.time-val').innerText = setStr;
+
+            btnRise.onclick = () => { if(riseTime !== null) setTimeUI(riseTime); };
+            btnSet.onclick = () => { if(setTime !== null) setTimeUI(setTime); };
+            
+            updateTimelineMarkers(riseTime, setTime);
+        }
+
+        function updateTimelineMarkers(rise, set) {
+            const container = document.getElementById('timeline-markers');
+            container.innerHTML = '';
+
+            const createMarker = (time, color, type) => {
+                if(time === null || time === 0 || time === 24) return;
+                const pct = (time / 24) * 100;
+                const el = document.createElement('div');
+                el.className = 'time-marker shadow-lg';
+                el.style.left = `${pct}%`;
+                el.style.backgroundColor = color;
+                el.title = `${type} ${formatTime(time)}`;
+                el.onclick = (e) => {
+                    e.stopPropagation(); // Prevent slider click
+                    setTimeUI(time);
+                };
+                // Adding pointer-events auto because parent is none
+                el.style.pointerEvents = 'auto'; 
+                container.appendChild(el);
+            };
+
+            createMarker(rise, '#f97316', '日出'); // Orange
+            createMarker(12, '#eab308', '正午'); // Yellow (Noon)
+            createMarker(set, '#a855f7', '日落'); // Purple
+        }
+
+        function formatTime(t) {
+            const h = Math.floor(t);
+            const m = Math.floor((t - h) * 60);
+            return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
+        }
+
+        function setTimeUI(val) {
+            document.getElementById('time-slider').value = val;
+            updateSunPosition();
+        }
+
+        function updateInfoDisplay(time, alt, az) {
+            document.getElementById('time-display').innerText = formatTime(time);
+            document.getElementById('alt-display').innerText = (alt * R2D).toFixed(1) + "°";
+            let azDeg = az * R2D;
+            if(azDeg < 0) azDeg += 360;
+            
+            let bearingStr = "";
+            if(config.bearingMode === 'quadrant') {
+                 bearingStr = formatBearing(azDeg); // Returns full string like "N 45 E"
+            } else {
+                 bearingStr = azDeg.toFixed(0) + "°";
+            }
+            document.getElementById('az-display').innerText = bearingStr;
+        }
+
+        function checkVisibility() {
+             const getCheck = (id) => document.getElementById(id).checked;
+             if(pathLines.summer) pathLines.summer.visible = getCheck('toggle-summer');
+             if(pathLines.equinox) pathLines.equinox.visible = getCheck('toggle-equinox');
+             if(pathLines.winter) pathLines.winter.visible = getCheck('toggle-winter');
+             
+             landscapeGroup.visible = getCheck('toggle-landscape');
+             updateCelestialGridVisibility(); // Custom function for grid modes
+             earthAxis.visible = getCheck('toggle-axis');
+             shadowCaster.visible = getCheck('toggle-shadow');
+             sunLight.castShadow = getCheck('toggle-shadow');
+             
+             horizonLabelsGroup.visible = getCheck('toggle-azimuth-markers');
+        }
+
+        // --- 5. UI Events ---
+        function setupUIListeners() {
+            // Menu
+            const menuBtn = document.getElementById('menu-btn');
+            const closeBtn = document.getElementById('close-menu-btn');
+            const overlay = document.getElementById('settings-overlay');
+            const menu = document.getElementById('settings-menu');
+
+            const toggleMenu = (show) => {
+                if (show) {
+                    menu.classList.remove('translate-x-full');
+                    overlay.classList.remove('hidden');
+                    setTimeout(() => overlay.classList.remove('opacity-0'), 10);
+                } else {
+                    menu.classList.add('translate-x-full');
+                    overlay.classList.add('opacity-0');
+                    setTimeout(() => overlay.classList.add('hidden'), 300);
+                }
+            };
+
+            menuBtn.onclick = () => toggleMenu(true);
+            closeBtn.onclick = () => toggleMenu(false);
+            overlay.onclick = () => toggleMenu(false);
+
+            // Time Slider with Snapping
+            const slider = document.getElementById('time-slider');
+            slider.addEventListener('input', (e) => {
+                let val = parseFloat(e.target.value);
+                const rise = config.solarEvents.rise;
+                const set = config.solarEvents.set;
+                const noon = 12.0;
+                const snapDist = 0.2; // approx 12 mins snap range
+
+                // Magnetic snap logic
+                if (rise && Math.abs(val - rise) < snapDist) val = rise;
+                if (set && Math.abs(val - set) < snapDist) val = set;
+                if (Math.abs(val - noon) < snapDist) val = noon; // Snap to Noon
+                
+                // If snapped, update visual slider value immediately to feel "stuck"
+                if (Math.abs(val - parseFloat(e.target.value)) > 0 && Math.abs(val - parseFloat(e.target.value)) < snapDist) {
+                     e.target.value = val;
+                 }
+                
+                updateSunPosition();
+            });
+
+            // Bearing Mode Buttons
+            document.querySelectorAll('.bearing-mode-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    config.bearingMode = e.target.dataset.mode;
+                    // Update UI State
+                    document.querySelectorAll('.bearing-mode-btn').forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    // Refresh Labels
+                    updateHorizonLabels();
+                    updateSunPosition(); // Update info panel
+                });
+            });
+
+            // Quick Lat Slider
+            document.getElementById('quick-lat-slider').addEventListener('input', (e) => {
+                const lat = parseFloat(e.target.value);
+                updateLocation(lat, `自訂緯度 ${lat.toFixed(1)}`);
+            });
+
+            // Quick Lat Toggle
+            document.getElementById('toggle-quick-lat').addEventListener('change', (e) => {
+                const panel = document.getElementById('quick-lat-panel');
+                if(e.target.checked) {
+                    panel.classList.remove('hidden');
+                    panel.classList.add('flex');
+                } else {
+                    panel.classList.add('hidden');
+                    panel.classList.remove('flex');
+                }
+            });
+
+            // Azimuth Markers Toggle
+            document.getElementById('toggle-azimuth-markers').addEventListener('change', (e) => {
+                config.showAzimuthMarkers = e.target.checked;
+                updateHorizonLabels();
+                checkVisibility();
+            });
+
+            // Grid Mode Buttons
+            document.querySelectorAll('.grid-mode-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    config.gridMode = e.target.dataset.mode;
+                    updateGridModeUI();
+                    checkVisibility();
+                });
+            });
+
+            // Season Buttons
+            document.querySelectorAll('.season-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    config.activeSeason = e.target.dataset.season;
+                    updateSeasonUI();
+                    createPaths();
+                    updateSunPosition();
+                });
+            });
+
+            // Other Toggles
+            ['toggle-landscape','toggle-axis','toggle-shadow', 'toggle-summer', 'toggle-equinox', 'toggle-winter'].forEach(id => {
+                document.getElementById(id).addEventListener('change', () => {
+                    checkVisibility();
+                    if(id.includes('toggle-summer') || id.includes('toggle-winter') || id.includes('toggle-equinox')) {
+                        updateHorizonLabels(); // Re-check if labels should show
+                    }
+                });
+            });
+
+            document.getElementById('toggle-daynight').addEventListener('change', (e) => {
+                config.enableDayNight = e.target.checked;
+                updateSunPosition();
+            });
+
+            document.getElementById('play-btn').onclick = () => {
+                config.isPlaying = !config.isPlaying;
+                const btn = document.getElementById('play-btn');
+                btn.innerHTML = config.isPlaying ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play ml-1"></i>';
+                btn.className = config.isPlaying ? 
+                    "w-10 h-10 flex-shrink-0 flex items-center justify-center bg-red-500 hover:bg-red-400 rounded-full text-white transition shadow-lg active:scale-95" :
+                    "w-10 h-10 flex-shrink-0 flex items-center justify-center bg-yellow-500 hover:bg-yellow-400 rounded-full text-black transition shadow-lg active:scale-95";
+            };
+
+            document.getElementById('manual-loc-btn').onclick = () => {
+                const val = parseFloat(document.getElementById('manual-lat').value);
+                if(val >= -90 && val <= 90) updateLocation(val, `自訂 ${val}`);
+                else showToast("緯度需在 -90 ~ 90 之間", true);
+            };
+
+            document.getElementById('gps-btn').onclick = () => {
+                if(navigator.geolocation) {
+                    showToast("定位中...");
+                    navigator.geolocation.getCurrentPosition(pos => {
+                        const lat = pos.coords.latitude;
+                        fetchCityName(lat, pos.coords.longitude);
+                    }, err => showToast("無法取得定位", true));
+                }
+            };
+        }
+
+        function updateSeasonUI() {
+            document.querySelectorAll('.season-btn').forEach(btn => {
+                if(btn.dataset.season === config.activeSeason) {
+                    btn.classList.remove('text-gray-400', 'hover:text-white');
+                    btn.classList.add('bg-blue-500', 'text-white', 'shadow-md');
+                } else {
+                    btn.classList.add('text-gray-400', 'hover:text-white');
+                    btn.classList.remove('bg-blue-500', 'text-white', 'shadow-md');
+                }
+            });
+        }
+
+        function updateGridModeUI() {
+            document.querySelectorAll('.grid-mode-btn').forEach(btn => {
+                if(btn.dataset.mode === config.gridMode) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        }
+
+        function updateLocation(lat, name) {
+            config.lat = lat;
+            document.getElementById('lat-display').innerText = lat.toFixed(2);
+            document.getElementById('location-name').innerText = name;
+            document.getElementById('quick-lat-slider').value = lat; 
+            
+            updateEarthAxis();
+            createPaths(); 
+            updateSunPosition();
+            showToast(`已切換至 ${name}`);
+        }
+        
+        // --- Utils ---
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            if(config.isPlaying) {
+                const s = document.getElementById('time-slider');
+                let v = parseFloat(s.value) + config.animationSpeed;
+                if(v >= 24) v = 0;
+                s.value = v;
+                // Update sun without triggering magnetic snap during auto-play for smoothness
+                updateSunPosition(); 
+            }
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function showToast(msg, err=false) {
+            const t = document.getElementById('toast');
+            document.getElementById('toast-msg').innerText = msg;
+            t.classList.remove('opacity-0', 'translate-y-[-20px]');
+            if(err) t.classList.add('border-red-500', 'text-red-200');
+            else t.classList.remove('border-red-500', 'text-red-200');
+            setTimeout(() => t.classList.add('opacity-0', 'translate-y-[-20px]'), 2000);
+        }
+
+        function renderHistory() {
+            const div = document.getElementById('location-history');
+            div.innerHTML = "";
+            locationHistory.forEach(loc => {
+                const btn = document.createElement('button');
+                btn.className = "bg-gray-700 hover:bg-gray-600 text-white text-xs px-2 py-1 rounded transition";
+                btn.innerText = loc.name;
+                btn.onclick = () => updateLocation(loc.lat, loc.name);
+                div.appendChild(btn);
+            });
+        }
+        
+        async function fetchCityName(lat, lon) {
+             const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=zh`;
+             try {
+                 const res = await fetch(url);
+                 const data = await res.json();
+                 updateLocation(lat, data.city || data.locality || "GPS位置");
+             } catch(e) {
+                 updateLocation(lat, "GPS位置");
+             }
+        }
+
+        init();
+    </script>
+</body>
+</html>
