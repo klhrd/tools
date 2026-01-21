@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 專業技術書自動寫作系統</title>
+    <script src="https://js.puter.com/v2/"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;700;900&display=swap');
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f8fafc; }
+        .prose pre { background: #0f172a !important; color: #f8fafc !important; border-radius: 12px; border: 1px solid #1e293b; }
+        .prose h1 { color: #0f172a; border-bottom: 4px solid #3b82f6; padding-bottom: 10px; font-weight: 900; }
+        .prose h2 { color: #1e40af; border-left: 6px solid #3b82f6; padding-left: 15px; margin-top: 40px; }
+        .prose h3 { color: #334155; margin-top: 30px; background: #eff6ff; padding: 8px 12px; border-radius: 8px; }
+        .step-active { border-color: #3b82f6; background-color: #eff6ff; }
+        .progress-fill { transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
+        input[type="range"] { accent-color: #2563eb; }
+    </style>
+</head>
+<body class="pb-24">
+
+    <!-- Navbar -->
+    <nav class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200">
+        <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-microchip text-blue-600 text-2xl"></i>
+                <span class="text-xl font-black text-slate-800">TechBook <span class="text-blue-600">AI</span></span>
+            </div>
+            <div id="statusIndicator" class="text-sm font-bold flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 text-slate-500">
+                <div class="w-2 h-2 rounded-full bg-slate-400"></div>
+                系統就緒
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 mt-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <!-- 控制面板 (左側) -->
+        <aside class="lg:col-span-4 space-y-6">
+            <div class="bg-white rounded-3xl shadow-xl border border-slate-100 p-6">
+                <h2 class="text-lg font-black mb-6 flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-blue-600"></i> 書籍參數配置
+                </h2>
+                
+                <div class="space-y-5">
+                    <!-- 基本設定 -->
+                    <div>
+                        <label class="text-xs font-bold text-slate-400 uppercase">書籍主題</label>
+                        <input type="text" id="topic" value="Fortran 現代科學計算實戰" class="w-full mt-1 bg-slate-50 border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none border transition">
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-xs font-bold text-slate-400 uppercase">程式語言</label>
+                            <input type="text" id="language" value="fortran" class="w-full mt-1 bg-slate-50 border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none border transition">
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-slate-400 uppercase">目標讀者</label>
+                            <input type="text" id="target" value="科學計算研究員" class="w-full mt-1 bg-slate-50 border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none border transition">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="text-xs font-bold text-slate-400 uppercase">寫作風格</label>
+                        <input type="text" id="style" value="工程師思維、邏輯嚴密、實作導向" class="w-full mt-1 bg-slate-50 border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none border transition">
+                    </div>
+
+                    <hr class="border-slate-100">
+
+                    <!-- 結構設定 -->
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between text-sm font-bold">
+                                <span class="text-slate-600">篇數 (Parts)</span>
+                                <span id="v_parts" class="text-blue-600">2</span>
+                            </div>
+                            <input type="range" id="parts" min="1" max="3" value="2" oninput="v_parts.innerText=this.value" class="w-full h-2 bg-slate-200 rounded-lg cursor-pointer mt-2">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm font-bold">
+                                <span class="text-slate-600">每篇章數 (Chapters)</span>
+                                <span id="v_chapters" class="text-blue-600">2</span>
+                            </div>
+                            <input type="range" id="chapters" min="1" max="4" value="2" oninput="v_chapters.innerText=this.value" class="w-full h-2 bg-slate-200 rounded-lg cursor-pointer mt-2">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm font-bold">
+                                <span class="text-slate-600">每章節數 (Sections)</span>
+                                <span id="v_sections" class="text-blue-600">2</span>
+                            </div>
+                            <input type="range" id="sections" min="1" max="3" value="2" oninput="v_sections.innerText=this.value" class="w-full h-2 bg-slate-200 rounded-lg cursor-pointer mt-2">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm font-bold">
+                                <span class="text-slate-600">每節小節 (Subsections)</span>
+                                <span id="v_subs" class="text-blue-600">2</span>
+                            </div>
+                            <input type="range" id="subsections" min="1" max="3" value="2" oninput="v_subs.innerText=this.value" class="w-full h-2 bg-slate-200 rounded-lg cursor-pointer mt-2">
+                        </div>
+                    </div>
+
+                    <button id="runBtn" onclick="main()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-2xl shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center justify-center gap-3 mt-4">
+                        <i class="fa-solid fa-bolt"></i> 開始撰寫技術書
+                    </button>
+                </div>
+            </div>
+
+            <!-- 進度與日誌 -->
+            <div id="progressCard" class="hidden bg-slate-900 rounded-3xl p-6 shadow-2xl border border-slate-800">
+                <div class="flex justify-between items-center mb-4">
+                    <span class="text-blue-400 font-bold text-sm uppercase tracking-widest">Process Log</span>
+                    <span id="p_val" class="text-white font-black text-2xl">0%</span>
+                </div>
+                <div class="w-full bg-slate-800 rounded-full h-2 mb-6">
+                    <div id="p_bar" class="bg-blue-500 h-2 rounded-full progress-fill" style="width: 0%"></div>
+                </div>
+                <div id="log" class="h-48 overflow-y-auto font-mono text-xs text-slate-400 space-y-1 scrollbar-hide">
+                    <!-- Logs go here -->
+                </div>
+            </div>
+        </aside>
+
+        <!-- 預覽區域 (右側) -->
+        <main class="lg:col-span-8">
+            <!-- Error Message -->
+            <div id="errorBox" class="hidden mb-6 bg-red-50 border border-red-200 p-4 rounded-2xl flex gap-3 text-red-700">
+                <i class="fa-solid fa-circle-exclamation mt-1"></i>
+                <div>
+                    <p class="font-bold">連線失敗</p>
+                    <p id="errorMsg" class="text-sm"></p>
+                </div>
+            </div>
+
+            <div id="previewArea" class="hidden bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
+                <div class="bg-slate-50 px-8 py-4 border-b border-slate-100 flex justify-between items-center">
+                    <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-book-open text-blue-600"></i> 即時撰寫預覽
+                    </h3>
+                    <div class="flex gap-2">
+                        <button onclick="copyContent()" class="p-2 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold hover:bg-slate-100 transition">
+                            <i class="fa-solid fa-copy"></i>
+                        </button>
+                        <button onclick="downloadMd()" class="p-2 px-4 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition">
+                            下載 MD
+                        </button>
+                    </div>
+                </div>
+                <div id="output" class="p-10 prose prose-slate max-w-none min-h-screen">
+                    <!-- Markdown content -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let fullContent = "";
+        let abort = false;
+
+        function addLog(msg, color = "text-slate-500") {
+            const log = document.getElementById('log');
+            const div = document.createElement('div');
+            div.className = color;
+            div.innerHTML = `<span class="opacity-30 mr-2">[${new Date().toLocaleTimeString()}]</span> ${msg}`;
+            log.appendChild(div);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function setStatus(text, colorClass) {
+            const dot = document.querySelector('#statusIndicator div');
+            const span = document.querySelector('#statusIndicator span');
+            dot.className = `w-2 h-2 rounded-full ${colorClass}`;
+            span.innerText = text;
+        }
+
+        async function callAI(prompt) {
+            if(abort) return null;
+            try {
+                const res = await puter.ai.chat(prompt);
+                if(!res) throw new Error("API No Response");
+                return res.toString();
+            } catch (e) {
+                abort = true;
+                document.getElementById('errorBox').classList.remove('hidden');
+                document.getElementById('errorMsg').innerText = "AI 服務暫時無法取得回應，可能是連線問題或頻率限制。";
+                addLog("CRITICAL ERROR: AI Failed", "text-red-500");
+                setStatus("系統錯誤", "bg-red-500");
+                return null;
+            }
+        }
+
+        async function main() {
+            // UI Init
+            abort = false;
+            fullContent = "";
+            document.getElementById('runBtn').disabled = true;
+            document.getElementById('progressCard').classList.remove('hidden');
+            document.getElementById('previewArea').classList.remove('hidden');
+            document.getElementById('errorBox').classList.add('hidden');
+            document.getElementById('log').innerHTML = "";
+            setStatus("撰寫中...", "bg-blue-500 animate-pulse");
+
+            const topic = document.getElementById('topic').value;
+            const lang = document.getElementById('language').value;
+            const style = document.getElementById('style').value;
+            const target = document.getElementById('target').value;
+            const parts = parseInt(document.getElementById('parts').value);
+            const chapters = parseInt(document.getElementById('chapters').value);
+            const sections = parseInt(document.getElementById('sections').value);
+            const subs = parseInt(document.getElementById('subsections').value);
+
+            addLog(`🚀 開始撰寫：《${topic}》`, "text-blue-400 font-bold");
+            fullContent += `# ${topic} 全書指南\n\n> 讀者：${target}\n> 風格：${style}\n\n---\n\n`;
+
+            // Step 1: 生成骨架
+            addLog("正在規劃全書目錄架構...");
+            const structPrompt = `請為《${topic}》規劃 ${parts} 篇，每篇 ${chapters} 章。僅輸出標題，篇標題請含[Part]，章標題含[Chapter]。`;
+            const structRaw = await callAI(structPrompt);
+            if(!structRaw) return;
+
+            const lines = structRaw.split('\n').filter(l => l.trim());
+            let bookMap = [];
+            let lastPart = null;
+
+            lines.forEach(line => {
+                if(line.includes('[Part]')) {
+                    lastPart = { title: line.replace('[Part]', '').trim(), chapters: [] };
+                    bookMap.push(lastPart);
+                } else if(line.includes('[Chapter]') && lastPart) {
+                    lastPart.chapters.push(line.replace('[Chapter]', '').trim());
+                }
+            });
+
+            // Step 2: 四層嵌套生成
+            const totalTasks = parts * chapters * sections * subs;
+            let currentTask = 0;
+
+            const techRule = `寫作規範：1. 必須有包含註解的 \`\`\`${lang} 代碼範例。2. 使用 Markdown 表格。3. 包含「Pro Tip」。4. 禁止非法或有害內容。`;
+
+            for (let pi = 0; pi < bookMap.length; pi++) {
+                if(abort) break;
+                const p = bookMap[pi];
+                fullContent += `\n# 篇 ${pi+1}：${p.title}\n\n`;
+                addLog(`進入篇章：${p.title}`, "text-indigo-400");
+
+                for (let ci = 0; ci < p.chapters.length; ci++) {
+                    if(abort) break;
+                    const c = p.chapters[ci];
+                    fullContent += `\n## 第 ${ci+1} 章：${c}\n\n`;
+                    addLog(`  正在寫：${c}`, "text-slate-300");
+
+                    // 為這一章生成 Sections 標題
+                    const secPrompt = `請為『${c}』規劃 ${sections} 個主要節標題。僅輸出標題。`;
+                    const secTitles = (await callAI(secPrompt)).split('\n').filter(l => l.trim()).slice(0, sections);
+
+                    for (let si = 0; si < secTitles.length; si++) {
+                        if(abort) break;
+                        const s = secTitles[si];
+                        fullContent += `### ${si+1}. ${s}\n\n`;
+
+                        // 為這一節生成 Subsections
+                        const subPrompt = `請為『${s}』規劃 ${subs} 個更細的小節標題。`;
+                        const subTitles = (await callAI(subPrompt)).split('\n').filter(l => l.trim()).slice(0, subs);
+
+                        for (let sbi = 0; sbi < subTitles.length; sbi++) {
+                            if(abort) break;
+                            const sb = subTitles[sbi];
+                            currentTask++;
+                            
+                            // Progress
+                            const pcent = Math.round((currentTask / totalTasks) * 100);
+                            document.getElementById('p_bar').style.width = pcent + "%";
+                            document.getElementById('p_val').innerText = pcent + "%";
+                            addLog(`    - 撰寫小節：${sb}`);
+
+                            const writePrompt = `任務：撰寫技術書內容。\n主題：${topic}\n位置：${c} > ${s} > ${sb}\n風格：${style}\n${techRule}\n要求：使用 #### (H4) 作為標題開頭。內容需深度探討。`;
+                            const piece = await callAI(writePrompt);
+                            fullContent += piece + "\n\n";
+                            updateUI();
+                        }
+                    }
+                }
+            }
+
+            // Step 3: Appendix
+            if(!abort) {
+                addLog("📝 正在整理附錄...", "text-green-400");
+                const appx = await callAI(`為《${topic}》寫一個包含速查表與術語對照的附錄。`);
+                fullContent += `\n---\n# 附錄\n\n${appx}`;
+                updateUI();
+                setStatus("生成完畢", "bg-green-500");
+                addLog("✅ 技術全書生成成功！", "text-green-500 font-bold");
+                document.getElementById('runBtn').disabled = false;
+            }
+        }
+
+        function updateUI() {
+            document.getElementById('output').innerHTML = marked.parse(fullContent);
+        }
+
+        function downloadMd() {
+            const blob = new Blob([fullContent], {type: 'text/markdown'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${document.getElementById('topic').value}.md`;
+            a.click();
+        }
+
+        function copyContent() {
+            const el = document.createElement('textarea');
+            el.value = fullContent;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+            alert("已複製全書 Markdown 內容！");
+        }
+    </script>
+</body>
+</html>
+
