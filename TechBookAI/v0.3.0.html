@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI 書籍工廠 v0.3.0</title>
+    
+    <!-- 核心庫 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://js.puter.com/v2/"></script>
+    
+    <!-- MathJax -->
+    <script>
+        window.MathJax = {
+            tex: { 
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            svg: { fontCache: 'global' },
+            startup: { typeset: false }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <!-- Icons & Fonts -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;700&family=Noto+Serif+TC:wght@400;700&family=JetBrains+Mono:wght@400&family=Zen+Maru+Gothic:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* 變數定義 */
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --accent: #38bdf8;
+            --border: #334155;
+            --code-bg: #020617;
+            --font-main: 'Noto Sans TC', sans-serif;
+        }
+
+        /* 主題：黑曜石 (預設) */
+        body.theme-obsidian {
+            --bg-primary: #0b0c10;
+            --bg-secondary: #1f2833;
+            --text-primary: #c5c6c7;
+            --text-secondary: #8892b0;
+            --accent: #66fcf1;
+            --border: #45a29e;
+            --code-bg: #000000;
+        }
+
+        /* 主題：白金 */
+        body.theme-platinum {
+            --bg-primary: #f2f2f7;
+            --bg-secondary: #ffffff;
+            --text-primary: #1c1c1e;
+            --text-secondary: #8e8e93;
+            --accent: #007aff;
+            --border: #d1d1d6;
+            --code-bg: #f5f5f7;
+        }
+
+        /* 全局樣式 */
+        body { 
+            background-color: var(--bg-primary); 
+            color: var(--text-primary); 
+            font-family: var(--font-main);
+            transition: background-color 0.3s, color 0.3s;
+            overflow: hidden; /* 防止 Body 滾動，交給內部容器 */
+        }
+
+        /* 通用類別 */
+        .app-bg-primary { background-color: var(--bg-primary); }
+        .app-bg-secondary { background-color: var(--bg-secondary); }
+        .app-text-primary { color: var(--text-primary); }
+        .app-text-secondary { color: var(--text-secondary); }
+        .app-border { border-color: var(--border); }
+        .app-accent { color: var(--accent); }
+        .app-accent-bg { background-color: var(--accent); color: var(--bg-primary); }
+        
+        /* Modal Overlay */
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+        }
+
+        /* Markdown 預覽優化 */
+        .markdown-body { 
+            color: var(--text-primary); 
+            line-height: 1.8; 
+            font-size: 1rem;
+            padding-bottom: 50px;
+        }
+        .markdown-body h1, .markdown-body h2, .markdown-body h3 { 
+            color: var(--text-primary); 
+            font-weight: 700; 
+            margin-top: 1.5em; 
+            margin-bottom: 0.8em; 
+        }
+        .markdown-body h1 { 
+            font-size: 2em; 
+            border-bottom: 2px solid var(--accent); 
+            padding-bottom: 0.3em; 
+            text-align: center; 
+        }
+        .markdown-body h2 { 
+            font-size: 1.5em; 
+            border-left: 4px solid var(--accent); 
+            padding-left: 0.5em; 
+        }
+        .markdown-body p { margin-bottom: 1.2em; text-align: justify; }
+        
+        /* 程式碼區塊 */
+        .markdown-body pre { 
+            background: var(--code-bg); 
+            padding: 1rem; 
+            border-radius: 0.5rem; 
+            overflow-x: auto; 
+            border: 1px solid var(--border); 
+            margin: 1.5em 0; 
+        }
+        .markdown-body code { 
+            font-family: 'JetBrains Mono', monospace; 
+            color: #ef596f; 
+            background: rgba(127,127,127,0.1); 
+            padding: 0.2em 0.4em; 
+            border-radius: 4px; 
+            font-size: 0.9em;
+        }
+        .markdown-body pre code { color: var(--text-primary); background: transparent; padding: 0; color: inherit; }
+
+        /* 字體設定類別 */
+        .font-sans { font-family: 'Noto Sans TC', sans-serif; }
+        .font-serif { font-family: 'Noto Serif TC', serif; }
+        .font-rounded { font-family: 'Zen Maru Gothic', sans-serif; }
+
+        /* 讀取動畫 */
+        .loader {
+            width: 18px; height: 18px;
+            border: 2px solid var(--text-secondary);
+            border-bottom-color: var(--accent);
+            border-radius: 50%;
+            display: inline-block;
+            animation: rotation 1s linear infinite;
+        }
+        @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        
+        /* Print */
+        @media print {
+            .no-print { display: none !important; }
+            .markdown-body { color: black !important; font-family: 'Noto Serif TC', serif; }
+            body { background: white; overflow: visible; }
+            #root { height: auto; overflow: visible; }
+        }
+    </style>
+</head>
+<body class="theme-obsidian">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useReducer } = React;
+
+        // --- 設定與常數 ---
+        const BOOK_TYPES = {
+            coding: {
+                label: "程式開發 (Coding)",
+                icon: "fa-laptop-code",
+                placeholder: "例如：Python 網路爬蟲實戰",
+                prompt_suffix: "包含程式碼範例 (Code Blocks)。每個概念需搭配實作。附錄需包含『語法速查表』。",
+                defaultFont: "font-sans"
+            },
+            science: {
+                label: "科學/數學 (Science)",
+                icon: "fa-atom",
+                placeholder: "例如：相對論淺說",
+                prompt_suffix: "數學公式嚴格使用 LaTeX ($...$ 或 $$...$$)。邏輯推導清晰。",
+                defaultFont: "font-serif"
+            },
+            novel: {
+                label: "小說 (Novel)",
+                icon: "fa-book-open",
+                placeholder: "例如：星際流亡者",
+                prompt_suffix: "注重場景描寫、對話與劇情張力。減少條列式說明。",
+                defaultFont: "font-serif"
+            },
+            business: {
+                label: "商業企劃 (Business)",
+                icon: "fa-chart-line",
+                placeholder: "例如：2026 AI 轉型策略",
+                prompt_suffix: "包含市場分析、數據預測、SWOT 分析。語氣專業。",
+                defaultFont: "font-sans"
+            },
+            cookbook: {
+                label: "食譜/料理 (Cookbook)",
+                icon: "fa-utensils",
+                placeholder: "例如：30分鐘懶人晚餐",
+                prompt_suffix: "包含『食材清單』、『步驟詳解』與『小撇步』。格式清晰。",
+                defaultFont: "font-rounded"
+            },
+            kids: {
+                label: "兒童繪本 (Kids)",
+                icon: "fa-child",
+                placeholder: "例如：勇敢的小熊",
+                prompt_suffix: "文字簡單充滿童趣，適合朗讀。每一頁都要描述『畫面構圖』(作為插圖提示)。",
+                defaultFont: "font-rounded"
+            }
+        };
+
+        const STEPS = ["類型/主題", "大綱修訂", "細節設定", "撰寫/預覽", "匯出完成"];
+
+        // --- Helper: MathJax 保護器 ---
+        const protectMath = (text) => {
+            if (!text) return { protectedText: "", mathBlocks: [] };
+            const mathBlocks = [];
+            // 保護 $$...$$
+            let pText = text.replace(/\$\$([\s\S]*?)\$\$/g, (match) => {
+                mathBlocks.push(match);
+                return `MATHBLOCK${mathBlocks.length - 1}ENDMATHBLOCK`;
+            });
+            // 保護 $...$
+            pText = pText.replace(/\$([^$\n]+?)\$/g, (match) => {
+                mathBlocks.push(match);
+                return `MATHBLOCK${mathBlocks.length - 1}ENDMATHBLOCK`;
+            });
+            return { protectedText: pText, mathBlocks };
+        };
+
+        const restoreMath = (html, mathBlocks) => {
+            return html.replace(/MATHBLOCK(\d+)ENDMATHBLOCK/g, (match, index) => mathBlocks[index]);
+        };
+
+        // --- 主應用程式 ---
+        const App = () => {
+            // UI State
+            const [sidebarOpen, setSidebarOpen] = useState(false); // Mobile Sidebar
+            const [showSettings, setShowSettings] = useState(false);
+            const [theme, setTheme] = useState("obsidian");
+            const [fontStyle, setFontStyle] = useState("font-sans");
+            
+            // Project State
+            const [config, setConfig] = useState({
+                type: "science",
+                topic: "",
+                apiProvider: "puter",
+                apiKey: "",
+                parts: 1,
+                chapters: 3,
+                sections: 2,
+                customInstructions: "",
+            });
+
+            // Generation State
+            const [currentStep, setCurrentStep] = useState(0);
+            const [logs, setLogs] = useState([]);
+            const [chatHistory, setChatHistory] = useState([]);
+            const [chatInput, setChatInput] = useState("");
+            
+            const [outlineJSON, setOutlineJSON] = useState([]);
+            const [outlineText, setOutlineText] = useState("");
+            
+            const [generatedContent, setGeneratedContent] = useState("");
+            const [progress, setProgress] = useState(0);
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [isPaused, setIsPaused] = useState(false);
+            
+            // Refs for control
+            const abortControllerRef = useRef(null);
+            const pauseRef = useRef(false); // Ref for immediate pause check in loop
+            const progressRef = useRef({ pIdx: 0, cIdx: 0, sIdx: 0 }); // Resume point
+
+            // --- Effects ---
+            useEffect(() => {
+                document.body.className = `theme-${theme}`;
+            }, [theme]);
+
+            useEffect(() => {
+                pauseRef.current = isPaused;
+            }, [isPaused]);
+
+            // MathJax Re-render
+            useEffect(() => {
+                if (window.MathJax && window.MathJax.typesetPromise) {
+                    window.MathJax.typesetPromise().catch(() => {});
+                }
+            }, [generatedContent, currentStep]);
+
+            // --- Log System ---
+            const addLog = (msg, type = "info") => {
+                const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                setLogs(prev => [`[${time}] ${msg}`, ...prev]);
+            };
+
+            // --- AI Call with Retry ---
+            const callAI = async (prompt, retries = 3) => {
+                for (let i = 0; i < retries; i++) {
+                    try {
+                        let result = "";
+                        if (config.apiProvider === 'puter') {
+                            if (typeof puter === 'undefined') throw new Error("Puter.js 未載入");
+                            const resp = await puter.ai.chat(prompt);
+                            result = resp.message.content || resp.toString();
+                        } else {
+                            if (!config.apiKey) throw new Error("缺少 API Key");
+                            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${config.apiKey}`;
+                            const resp = await fetch(url, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                            });
+                            const data = await resp.json();
+                            if (data.error) throw new Error(data.error.message);
+                            result = data.candidates[0].content.parts[0].text;
+                        }
+                        return result;
+                    } catch (e) {
+                        if (i === retries - 1) throw e;
+                        addLog(`連線不穩，${(i + 1) * 2}秒後重試 (${i + 1}/${retries})...`, "warning");
+                        await new Promise(r => setTimeout(r, (i + 1) * 2000));
+                    }
+                }
+            };
+
+            // --- 專案匯出/匯入 ---
+            const exportProject = () => {
+                const data = {
+                    version: "0.3.0",
+                    date: new Date().toISOString(),
+                    config,
+                    outlineJSON,
+                    generatedContent,
+                    progress,
+                    currentStep,
+                    progressRef: progressRef.current
+                };
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Project_${config.topic || "Untitled"}_v0.3.json`;
+                a.click();
+                addLog("專案已匯出 (.json)", "success");
+            };
+
+            const importProject = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const data = JSON.parse(event.target.result);
+                        if (!data.version) throw new Error("格式不符");
+                        setConfig(data.config);
+                        setOutlineJSON(data.outlineJSON);
+                        setGeneratedContent(data.generatedContent);
+                        setProgress(data.progress);
+                        setCurrentStep(data.currentStep);
+                        progressRef.current = data.progressRef || { pIdx: 0, cIdx: 0, sIdx: 0 };
+                        addLog("專案載入成功！", "success");
+                    } catch (err) {
+                        addLog("載入失敗: 檔案毀損或格式錯誤", "error");
+                    }
+                };
+                reader.readAsText(file);
+            };
+
+            // --- Step 1: Brainstorm ---
+            const sendChat = async () => {
+                if (!chatInput.trim()) return;
+                const msg = { role: 'user', text: chatInput };
+                setChatHistory(prev => [...prev, msg]);
+                setChatInput("");
+                
+                try {
+                    const system = `你是一位專業編輯。用戶想寫一本關於「${config.topic}」的書，類型「${BOOK_TYPES[config.type].label}」。請簡短引導用戶釐清目標讀者與風格。`;
+                    const history = chatHistory.map(m => `${m.role}: ${m.text}`).join('\n');
+                    const prompt = `${system}\n歷史:\n${history}\nUser: ${msg.text}\nAI:`;
+                    
+                    const reply = await callAI(prompt);
+                    setChatHistory(prev => [...prev, { role: 'ai', text: reply }]);
+                } catch (e) {
+                    addLog(`諮詢錯誤: ${e.message}`, "error");
+                }
+            };
+
+            // --- Step 2: Outline ---
+            const generateOutline = async () => {
+                setIsGenerating(true);
+                addLog("正在生成大綱...", "info");
+                try {
+                    const prompt = `
+                        角色：書籍架構師
+                        主題：${config.topic}
+                        類型：${BOOK_TYPES[config.type].label}
+                        要求：${config.parts}篇, 每篇${config.chapters}章, 每章${config.sections}節。
+                        格式：純 JSON Array，無 Markdown。
+                        範例：[{"title":"篇名","chapters":[{"title":"章名","sections":["節1"]}]}]
+                    `;
+                    let text = await callAI(prompt);
+                    text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+                    const json = JSON.parse(text);
+                    setOutlineJSON(json);
+                    
+                    // Convert to text for editing
+                    let txt = "";
+                    json.forEach((p, pi) => {
+                        txt += `Part ${pi+1}: ${p.title}\n`;
+                        p.chapters.forEach((c, ci) => {
+                            txt += `  Chapter ${ci+1}: ${c.title}\n`;
+                            c.sections.forEach(s => txt += `    - ${s}\n`);
+                        });
+                        txt += "\n";
+                    });
+                    setOutlineText(txt);
+                    setCurrentStep(1);
+                    addLog("大綱生成完畢", "success");
+                } catch (e) {
+                    addLog(`大綱生成失敗: ${e.message}`, "error");
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            // --- Step 3: Parse Outline ---
+            const parseOutline = () => {
+                try {
+                    const lines = outlineText.split('\n');
+                    let newStruct = [], curPart = null, curChap = null;
+                    
+                    lines.forEach(line => {
+                        const t = line.trim();
+                        if (!t) return;
+                        if (line.match(/^Part/i) || (!line.startsWith(' ') && !line.startsWith('-'))) {
+                            curPart = { title: t.replace(/^Part \d+:/i, '').trim(), chapters: [] };
+                            newStruct.push(curPart);
+                        } else if (line.match(/^\s+Chapter/i) || (line.startsWith(' ') && !t.startsWith('-'))) {
+                            if (!curPart) { curPart = {title:"第一篇", chapters:[]}; newStruct.push(curPart); }
+                            curChap = { title: t.replace(/^Chapter \d+:/i, '').trim(), sections: [] };
+                            curPart.chapters.push(curChap);
+                        } else if (t.startsWith('-')) {
+                            if (curChap) curChap.sections.push(t.replace('-','').trim());
+                        }
+                    });
+                    if (newStruct.length === 0) throw new Error("空大綱");
+                    setOutlineJSON(newStruct);
+                    setCurrentStep(2);
+                } catch (e) {
+                    alert("大綱格式錯誤，請檢查縮排");
+                }
+            };
+
+            // --- Step 4: Write Loop ---
+            const startWriting = async () => {
+                setCurrentStep(3);
+                setIsGenerating(true);
+                setIsPaused(false);
+                pauseRef.current = false;
+
+                let content = generatedContent || `# ${config.topic}\n\n`; // Resume or Start new
+                let context = content.slice(-500);
+
+                // Calculate total
+                let total = 0;
+                outlineJSON.forEach(p => p.chapters.forEach(c => c.sections.forEach(() => total++)));
+                if (BOOK_TYPES[config.type].prompt_suffix.includes("附錄")) total++;
+                
+                // Resume Logic
+                let { pIdx, cIdx, sIdx } = progressRef.current;
+                let processed = 0;
+                // Pre-calculate processed count for progress bar
+                for (let i=0; i<outlineJSON.length; i++) {
+                    for (let j=0; j<outlineJSON[i].chapters.length; j++) {
+                        for (let k=0; k<outlineJSON[i].chapters[j].sections.length; k++) {
+                            if (i<pIdx || (i===pIdx && j<cIdx) || (i===pIdx && j===cIdx && k<sIdx)) processed++;
+                        }
+                    }
+                }
+
+                try {
+                    // 目錄 (只在第一次生成)
+                    if (pIdx === 0 && cIdx === 0 && sIdx === 0) {
+                        content += `## 目錄\n\n`;
+                        outlineJSON.forEach((p, i) => {
+                            content += `### ${p.title}\n`;
+                            p.chapters.forEach((c, j) => content += `- **${c.title}**\n`);
+                        });
+                        content += `\n---\n\n`;
+                        setGeneratedContent(content);
+                    }
+
+                    // Loop
+                    for (let i = pIdx; i < outlineJSON.length; i++) {
+                        const part = outlineJSON[i];
+                        if (i > pIdx || (i === pIdx && cIdx === 0 && sIdx === 0)) {
+                             if (!content.includes(`# 第 ${i+1} 篇`)) {
+                                content += `# 第 ${i + 1} 篇：${part.title}\n\n`;
+                                setGeneratedContent(content);
+                             }
+                        }
+
+                        for (let j = (i === pIdx ? cIdx : 0); j < part.chapters.length; j++) {
+                            const chap = part.chapters[j];
+                            if (j > cIdx || (i === pIdx && j === cIdx && sIdx === 0)) {
+                                if (!content.includes(`## 第 ${j+1} 章`)) {
+                                    content += `## 第 ${j + 1} 章：${chap.title}\n\n`;
+                                    setGeneratedContent(content);
+                                }
+                            }
+
+                            for (let k = (i === pIdx && j === cIdx ? sIdx : 0); k < chap.sections.length; k++) {
+                                // --- PAUSE CHECK ---
+                                while (pauseRef.current) {
+                                    await new Promise(r => setTimeout(r, 1000));
+                                    if (!isGenerating) return; // Stop if cancelled
+                                }
+                                
+                                const sec = chap.sections[k];
+                                addLog(`正在撰寫：${sec}`);
+                                
+                                const typeConf = BOOK_TYPES[config.type];
+                                const prompt = `
+                                    主題：${config.topic} (${typeConf.label})
+                                    進度：${part.title} > ${chap.title} > ${sec}
+                                    前文：${context}...
+                                    要求：撰寫「${sec}」。${typeConf.prompt_suffix}
+                                    格式：Markdown (H3 ###), 字數 800+。
+                                `;
+                                
+                                const text = await callAI(prompt);
+                                content += `### ${sec}\n\n${text}\n\n`;
+                                setGeneratedContent(content);
+                                context = text.slice(-300);
+                                
+                                processed++;
+                                setProgress(Math.round((processed / total) * 100));
+                                
+                                // Update resume point
+                                progressRef.current = { pIdx: i, cIdx: j, sIdx: k + 1 }; 
+                                if (progressRef.current.sIdx >= chap.sections.length) {
+                                    progressRef.current.sIdx = 0;
+                                    progressRef.current.cIdx++;
+                                }
+                                if (progressRef.current.cIdx >= part.chapters.length) {
+                                    progressRef.current.cIdx = 0;
+                                    progressRef.current.pIdx++;
+                                }
+
+                                await new Promise(r => setTimeout(r, 1000));
+                            }
+                        }
+                    }
+                    
+                    // Appendix
+                    if (BOOK_TYPES[config.type].prompt_suffix.includes("附錄") && !content.includes("# 附錄")) {
+                        addLog("生成附錄...");
+                        const appText = await callAI(`為《${config.topic}》生成附錄(速查表/索引)。`);
+                        content += `# 附錄\n\n${appText}\n\n`;
+                        setGeneratedContent(content);
+                        setProgress(100);
+                    }
+
+                    addLog("全書完成！", "success");
+                    setCurrentStep(4);
+                    setIsGenerating(false);
+
+                } catch (e) {
+                    addLog(`生成中斷: ${e.message}`, "error");
+                    setIsPaused(true); // Auto pause on error
+                }
+            };
+
+            const togglePause = () => {
+                if (isPaused) {
+                    setIsPaused(false);
+                    addLog("繼續生成...", "info");
+                } else {
+                    setIsPaused(true);
+                    addLog("已暫停 (您可以稍後繼續或匯出專案)", "warning");
+                }
+            };
+
+            // --- UI Components ---
+            const Sidebar = () => (
+                <div className={`fixed inset-y-0 left-0 z-40 w-64 app-bg-secondary app-border border-r transform transition-transform duration-300 md:relative md:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                    <div className="p-5 flex justify-between items-center app-border border-b h-16">
+                        <div className="font-bold text-lg app-accent">
+                            <i className="fas fa-book-journal-whills mr-2"></i> 書籍工廠
+                        </div>
+                        <button onClick={() => setSidebarOpen(false)} className="md:hidden text-gray-400"><i className="fas fa-times"></i></button>
+                    </div>
+
+                    <div className="p-4 space-y-2">
+                        {STEPS.map((s, i) => (
+                            <div key={i} className={`px-3 py-2 rounded text-sm ${currentStep === i ? 'app-accent-bg font-bold' : (currentStep > i ? 'app-accent' : 'text-gray-500')}`}>
+                                {currentStep > i ? <i className="fas fa-check-circle mr-2"></i> : <span className="mr-2">{i+1}.</span>}
+                                {s}
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="absolute bottom-0 w-full p-4 app-border border-t bg-black/10">
+                        <button onClick={() => setShowSettings(true)} className="w-full py-2 mb-2 rounded border app-border hover:bg-white/5 text-sm">
+                            <i className="fas fa-cog mr-2"></i> 設定 & API
+                        </button>
+                        <div className="flex gap-2">
+                             <button onClick={exportProject} className="flex-1 py-2 rounded bg-green-700 hover:bg-green-600 text-white text-xs" title="匯出進度">
+                                <i className="fas fa-file-export mr-1"></i> 存檔
+                            </button>
+                            <label className="flex-1 py-2 rounded bg-blue-700 hover:bg-blue-600 text-white text-xs text-center cursor-pointer" title="匯入進度">
+                                <i className="fas fa-file-import mr-1"></i> 讀檔
+                                <input type="file" accept=".json" onChange={importProject} className="hidden"/>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            const SettingsModal = () => showSettings && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4">
+                    <div className="app-bg-secondary w-full max-w-md rounded-xl shadow-2xl overflow-hidden app-border border">
+                        <div className="p-4 app-border border-b flex justify-between items-center">
+                            <h3 className="font-bold">系統設定</h3>
+                            <button onClick={() => setShowSettings(false)}><i className="fas fa-times"></i></button>
+                        </div>
+                        <div className="p-6 space-y-6">
+                            {/* Theme */}
+                            <div>
+                                <label className="block text-xs font-bold mb-2 uppercase opacity-50">介面主題</label>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setTheme('obsidian')} className={`flex-1 py-2 rounded border ${theme==='obsidian' ? 'app-accent-border app-accent-bg' : 'app-border'}`}>黑曜石</button>
+                                    <button onClick={() => setTheme('platinum')} className={`flex-1 py-2 rounded border ${theme==='platinum' ? 'app-accent-border app-accent-bg' : 'app-border'}`}>白金</button>
+                                </div>
+                            </div>
+                            {/* Font */}
+                            <div>
+                                <label className="block text-xs font-bold mb-2 uppercase opacity-50">預覽字體</label>
+                                <select value={fontStyle} onChange={(e) => setFontStyle(e.target.value)} className="w-full p-2 rounded app-bg-primary app-border border outline-none">
+                                    <option value="font-sans">黑體 (Sans)</option>
+                                    <option value="font-serif">明體 (Serif)</option>
+                                    <option value="font-rounded">圓體 (Rounded)</option>
+                                </select>
+                            </div>
+                            {/* API */}
+                            <div>
+                                <label className="block text-xs font-bold mb-2 uppercase opacity-50">AI 核心</label>
+                                <select value={config.apiProvider} onChange={(e) => setConfig({...config, apiProvider: e.target.value})} className="w-full p-2 mb-2 rounded app-bg-primary app-border border outline-none">
+                                    <option value="puter">Puter AI (免費)</option>
+                                    <option value="gemini">Google Gemini</option>
+                                </select>
+                                {config.apiProvider === 'gemini' && (
+                                    <input type="password" placeholder="API Key" value={config.apiKey} onChange={(e) => setConfig({...config, apiKey: e.target.value})} className="w-full p-2 rounded app-bg-primary app-border border text-sm"/>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            // --- Main Render ---
+            return (
+                <div className="flex h-screen w-full">
+                    {/* Overlay for mobile sidebar */}
+                    {sidebarOpen && <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => setSidebarOpen(false)}></div>}
+                    
+                    <Sidebar />
+                    <SettingsModal />
+
+                    <div className="flex-1 flex flex-col h-full overflow-hidden relative app-bg-primary">
+                        
+                        {/* Topbar */}
+                        <div className="h-16 app-bg-secondary app-border border-b flex items-center justify-between px-4 shrink-0 z-20">
+                            <div className="flex items-center">
+                                <button onClick={() => setSidebarOpen(true)} className="md:hidden mr-4 text-xl"><i className="fas fa-bars"></i></button>
+                                <h2 className="font-bold truncate max-w-[200px] md:max-w-md">{config.topic || "新專案"}</h2>
+                            </div>
+                            {currentStep >= 3 && (
+                                <div className="flex items-center gap-2">
+                                    {isGenerating && (
+                                        <button onClick={togglePause} className={`px-3 py-1 rounded text-sm font-bold ${isPaused ? 'bg-yellow-600' : 'bg-red-600'} text-white`}>
+                                            <i className={`fas fa-${isPaused ? 'play' : 'pause'} mr-1`}></i> {isPaused ? "繼續" : "暫停"}
+                                        </button>
+                                    )}
+                                    <button onClick={() => window.print()} className="w-8 h-8 rounded bg-gray-700 text-white flex items-center justify-center"><i className="fas fa-print"></i></button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Content Area */}
+                        <div className="flex-1 overflow-hidden relative">
+                            
+                            {/* Step 0: Type & Chat */}
+                            {currentStep === 0 && (
+                                <div className="h-full flex flex-col md:flex-row overflow-y-auto">
+                                    <div className="p-6 md:p-10 w-full md:w-1/2 space-y-6">
+                                        <h2 className="text-2xl font-bold app-accent">1. 選擇類型</h2>
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                            {Object.entries(BOOK_TYPES).map(([k, v]) => (
+                                                <button key={k} onClick={() => { setConfig({...config, type: k}); setFontStyle(v.defaultFont); }}
+                                                    className={`p-3 rounded-xl border text-left transition-all ${config.type === k ? 'app-accent-bg app-accent-border shadow-lg scale-105' : 'app-bg-secondary app-border hover:bg-white/5'}`}>
+                                                    <i className={`fas ${v.icon} text-xl mb-2 block`}></i>
+                                                    <span className="text-sm font-bold block">{v.label.split(' ')[0]}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-bold mb-2">書名/主題</label>
+                                            <input type="text" className="w-full p-3 text-lg rounded-lg app-bg-secondary app-border border outline-none focus:border-blue-500"
+                                                value={config.topic} onChange={e => setConfig({...config, topic: e.target.value})} placeholder={BOOK_TYPES[config.type].placeholder}/>
+                                        </div>
+                                    </div>
+
+                                    <div className="w-full md:w-1/2 app-bg-secondary border-l app-border flex flex-col h-[500px] md:h-auto">
+                                        <div className="p-4 border-b app-border bg-black/10 font-bold text-sm"><i className="fas fa-comments mr-2"></i>AI 顧問</div>
+                                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                            {chatHistory.length === 0 && <div className="text-center opacity-50 mt-10">輸入主題開始諮詢...</div>}
+                                            {chatHistory.map((m, i) => (
+                                                <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : ''}`}>
+                                                    <div className={`max-w-[85%] p-3 rounded-lg text-sm ${m.role === 'user' ? 'app-accent-bg text-white' : 'bg-gray-700 text-gray-200'}`}>{m.text}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="p-4 border-t app-border bg-black/10 space-y-3">
+                                            <div className="flex gap-2">
+                                                <input className="flex-1 p-2 rounded app-bg-primary app-border border outline-none" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendChat()} placeholder="在此輸入..." />
+                                                <button onClick={sendChat} className="px-4 bg-blue-600 text-white rounded"><i className="fas fa-paper-plane"></i></button>
+                                            </div>
+                                            <button onClick={generateOutline} disabled={!config.topic} className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-lg shadow disabled:opacity-50">
+                                                生成大綱 <i className="fas fa-arrow-right ml-1"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Step 1: Outline Edit */}
+                            {currentStep === 1 && (
+                                <div className="h-full flex flex-col p-6 max-w-4xl mx-auto">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h2 className="text-xl font-bold">2. 修訂大綱</h2>
+                                        <button onClick={parseOutline} className="bg-blue-600 text-white px-6 py-2 rounded shadow font-bold">下一步</button>
+                                    </div>
+                                    <textarea className="flex-1 p-6 rounded-xl app-bg-secondary app-border border outline-none font-mono text-sm leading-relaxed shadow-inner resize-none"
+                                        value={outlineText} onChange={e => setOutlineText(e.target.value)}></textarea>
+                                </div>
+                            )}
+
+                            {/* Step 2: Details */}
+                            {currentStep === 2 && (
+                                <div className="h-full flex flex-col items-center justify-center p-6">
+                                    <div className="w-full max-w-2xl app-bg-secondary p-8 rounded-2xl shadow-2xl app-border border">
+                                        <h2 className="text-2xl font-bold mb-6 app-accent">3. 最後確認</h2>
+                                        <div className="mb-6">
+                                            <label className="block text-sm font-bold mb-2">客製化指令 (選填)</label>
+                                            <textarea className="w-full h-32 p-4 rounded-lg app-bg-primary app-border border outline-none"
+                                                placeholder="例如：請使用輕鬆幽默的語氣，多舉生活中的例子..."
+                                                value={config.customInstructions} onChange={e => setConfig({...config, customInstructions: e.target.value})}></textarea>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-4 mb-6 text-center text-sm">
+                                            <div className="p-3 bg-black/20 rounded">
+                                                <div className="opacity-50 text-xs uppercase">篇章</div>
+                                                <div className="font-bold text-lg">{outlineJSON.length}</div>
+                                            </div>
+                                            <div className="p-3 bg-black/20 rounded">
+                                                <div className="opacity-50 text-xs uppercase">章節</div>
+                                                <div className="font-bold text-lg">{outlineJSON.reduce((a,b)=>a+b.chapters.length,0)}</div>
+                                            </div>
+                                            <div className="p-3 bg-black/20 rounded">
+                                                <div className="opacity-50 text-xs uppercase">小節</div>
+                                                <div className="font-bold text-lg">{outlineJSON.reduce((a,p)=>a+p.chapters.reduce((b,c)=>b+c.sections.length,0),0)}</div>
+                                            </div>
+                                        </div>
+                                        <button onClick={startWriting} className="w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-lg shadow-lg transform transition active:scale-95">
+                                            開始撰寫全書 <i className="fas fa-pen-nib ml-2"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Step 3/4: Preview & Generating */}
+                            {currentStep >= 3 && (
+                                <div className="h-full flex flex-col md:flex-row">
+                                    {/* Logs / Progress (Mobile Top / Desktop Sidebar) */}
+                                    <div className="md:w-80 app-bg-secondary border-r app-border flex flex-col shrink-0 h-48 md:h-auto border-b md:border-b-0">
+                                        <div className="p-4 border-b app-border">
+                                            <div className="flex justify-between text-xs mb-1 font-bold">
+                                                <span>{isGenerating ? (isPaused ? "已暫停" : "撰寫中...") : "完成"}</span>
+                                                <span>{progress}%</span>
+                                            </div>
+                                            <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                                                <div className={`h-full transition-all duration-500 ${isPaused ? 'bg-yellow-500' : 'bg-blue-500'}`} style={{width: `${progress}%`}}></div>
+                                            </div>
+                                        </div>
+                                        <div className="flex-1 overflow-y-auto p-4 bg-black/10 text-xs font-mono space-y-1">
+                                            {logs.map((l, i) => <div key={i} className={l.includes("error")?"text-red-400":l.includes("warning")?"text-yellow-400":"opacity-70"}>{l}</div>)}
+                                            <div ref={(el) => el && el.scrollIntoView({ behavior: "smooth" })}></div>
+                                        </div>
+                                    </div>
+
+                                    {/* Main Preview */}
+                                    <div className="flex-1 overflow-y-auto p-6 md:p-12 relative" id="print-area">
+                                        <div className={`max-w-3xl mx-auto min-h-[800px] markdown-body ${fontStyle} pb-32`}
+                                            dangerouslySetInnerHTML={{ __html: marked.parse(restoreMath(protectMath(generatedContent).protectedText, protectMath(generatedContent).mathBlocks)) }}>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
