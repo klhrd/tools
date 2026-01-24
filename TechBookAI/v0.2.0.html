@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 書籍/報告產生器 v0.2.0</title>
+    
+    <!-- 核心樣式與庫 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://js.puter.com/v2/"></script> <!-- Puter AI -->
+    
+    <!-- MathJax for LaTeX -->
+    <script>
+        window.MathJax = {
+            tex: { 
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            svg: { fontCache: 'global' },
+            startup: {
+                typeset: false // 手動觸發
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <!-- Icon -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+    <!-- Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;700&family=Noto+Serif+TC:wght@400;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+
+    <style>
+        /* 基礎設定 */
+        body { font-family: 'Noto Sans TC', sans-serif; transition: background-color 0.3s, color 0.3s; }
+        
+        /* 主題變數定義 */
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --accent: #38bdf8;
+            --border: #334155;
+            --code-bg: #020617;
+        }
+
+        /* 黑曜石主題 (Obsidian) */
+        body.theme-obsidian {
+            --bg-primary: #0b0c10;
+            --bg-secondary: #1f2833;
+            --text-primary: #c5c6c7;
+            --text-secondary: #8892b0;
+            --accent: #d4af37; /* 金色 */
+            --border: #45a29e;
+            --code-bg: #000000;
+        }
+
+        /* 白金主題 (Platinum) */
+        body.theme-platinum {
+            --bg-primary: #f5f5f7;
+            --bg-secondary: #ffffff;
+            --text-primary: #1d1d1f;
+            --text-secondary: #86868b;
+            --accent: #0071e3; /* 蘋果藍 */
+            --border: #d2d2d7;
+            --code-bg: #f5f5f7;
+        }
+
+        /* 應用主題變數 */
+        .app-bg-primary { background-color: var(--bg-primary); }
+        .app-bg-secondary { background-color: var(--bg-secondary); }
+        .app-text-primary { color: var(--text-primary); }
+        .app-text-secondary { color: var(--text-secondary); }
+        .app-border { border-color: var(--border); }
+        .app-accent { color: var(--accent); }
+        .app-accent-bg { background-color: var(--accent); color: var(--bg-primary); }
+        .app-accent-border { border-color: var(--accent); }
+
+        /* 編輯器樣式 */
+        .editor-textarea {
+            font-family: 'JetBrains Mono', monospace;
+            line-height: 1.6;
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            border: none;
+            resize: none;
+            outline: none;
+        }
+
+        /* Markdown 預覽樣式優化 */
+        .markdown-body { color: var(--text-primary); line-height: 2.0; font-size: 1.05rem; }
+        .markdown-body.serif-mode { font-family: 'Noto Serif TC', serif; } 
+        
+        .markdown-body h1, .markdown-body h2, .markdown-body h3 { 
+            color: var(--text-primary); 
+            font-weight: 700; 
+            margin-top: 2em; 
+            margin-bottom: 1em; 
+            line-height: 1.3;
+        }
+        .markdown-body h1 { font-size: 2.2em; border-bottom: 2px solid var(--accent); padding-bottom: 0.3em; text-align: center; }
+        .markdown-body h2 { font-size: 1.8em; border-left: 5px solid var(--accent); padding-left: 0.5em; }
+        .markdown-body h3 { font-size: 1.4em; color: var(--accent); }
+        
+        .markdown-body p { margin-bottom: 1.5em; text-align: justify; letter-spacing: 0.02em; }
+        
+        /* 代碼塊優化 */
+        .markdown-body pre { 
+            background: var(--code-bg); 
+            padding: 1.5rem; 
+            border-radius: 0.8rem; 
+            overflow-x: auto; 
+            border: 1px solid var(--border); 
+            margin: 2em 0; 
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.1);
+        }
+        .markdown-body code { 
+            font-family: 'JetBrains Mono', monospace; 
+            color: #ef596f; 
+            background: rgba(127,127,127,0.15); 
+            padding: 0.2em 0.4em; 
+            border-radius: 4px; 
+            font-size: 0.9em;
+        }
+        .markdown-body pre code { color: var(--text-primary); background: transparent; padding: 0; }
+        
+        .markdown-body blockquote { 
+            border-left: 4px solid var(--accent); 
+            padding: 1em 1.5em; 
+            color: var(--text-secondary); 
+            background: rgba(127,127,127,0.05); 
+            font-style: italic; 
+            margin: 2em 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        /* 滾動條樣式 */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+
+        .loader {
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top: 3px solid var(--accent);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* 列印樣式 */
+        @media print {
+            body * { visibility: hidden; }
+            #print-area, #print-area * { visibility: visible; }
+            #print-area { position: absolute; left: 0; top: 0; width: 100%; padding: 0; margin: 0; background: white; color: black; }
+            .markdown-body { font-family: 'Noto Serif TC', serif; color: black; }
+            .markdown-body h1 { color: black; border-bottom: 2px solid black; }
+            .markdown-body a { text-decoration: none; color: black; }
+        }
+    </style>
+</head>
+<body class="theme-obsidian h-screen overflow-hidden flex flex-col">
+    <div id="root" class="h-full"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
+
+        // --- 1. 定義書籍類型 (擴充版) ---
+        const BOOK_TYPES = {
+            coding: {
+                label: "程式開發教學 (Coding)",
+                icon: "fa-laptop-code",
+                placeholder: "例如：Python 零基礎入門、React 實戰手冊...",
+                prompt_suffix: "必須包含詳細的程式碼範例 (Code Blocks)。每個概念需搭配 `變數` 或 `函數` 的實作。附錄需包含『完整語法速查表』。",
+                serif: false
+            },
+            science: {
+                label: "科學與數學 (Science/Math)",
+                icon: "fa-square-root-variable",
+                placeholder: "例如：微積分導論、量子力學基礎...",
+                prompt_suffix: "所有數學公式**嚴格**使用 LaTeX 格式。行內公式用 `$ E=mc^2 $`，獨立公式用 `$$ E=mc^2 $$`。語氣嚴謹、邏輯推導清晰。字體需使用襯線體 (Serif) 風格。",
+                serif: true
+            },
+            business: {
+                label: "商業企劃/管理 (Business)",
+                icon: "fa-briefcase",
+                placeholder: "例如：2026年數位行銷策略、新創公司募資計畫...",
+                prompt_suffix: "包含『市場分析』、『SWOT 分析』、『財務預測』。語氣專業、數據驅動。多使用條列式與表格比較。",
+                serif: true
+            },
+            novel: {
+                label: "小說/故事 (Novel)",
+                icon: "fa-book-open",
+                placeholder: "例如：賽博龐克偵探故事、被遺忘的魔法王國...",
+                prompt_suffix: "注重角色情感、對話描寫與場景構建 (Show, Don't Tell)。包含『起承轉合』。不要使用太多層級標題，保持閱讀沉浸感。",
+                serif: true
+            },
+            travel: {
+                label: "旅遊指南 (Travel)",
+                icon: "fa-plane",
+                placeholder: "例如：京都深度五日遊、冰島環島攻略...",
+                prompt_suffix: "包含『景點介紹』、『交通攻略』、『必吃美食』。語氣輕鬆有趣，多提供實用的小撇步 (Tips)。",
+                serif: false
+            },
+            poetry: {
+                label: "詩歌/散文選集 (Poetry)",
+                icon: "fa-feather-alt",
+                placeholder: "例如：秋天的思念、現代都市詩選...",
+                prompt_suffix: "注重意境與修辭。格式優美。每篇詩作後附上簡短賞析。",
+                serif: true
+            }
+        };
+
+        const STEPS = ["1. 類型與諮詢", "2. 大綱修訂", "3. 細節微調", "4. AI 撰寫", "5. 編輯匯出"];
+
+        // --- 數學公式保護器 ---
+        // 防止 Marked.js 破壞 LaTeX 中的下劃線等符號
+        const protectMath = (text) => {
+            if (!text) return "";
+            // 將 $$...$$ 和 $...$ 替換為臨時佔位符
+            const mathBlocks = [];
+            
+            // 處理 Block Math $$...$$
+            let protectedText = text.replace(/\$\$([\s\S]*?)\$\$/g, (match) => {
+                mathBlocks.push(match);
+                return `MATHBLOCK${mathBlocks.length - 1}ENDMATHBLOCK`;
+            });
+
+            // 處理 Inline Math $...$ (需小心不匹配一般金錢符號，這裡假設 $ 後面不是空格)
+            protectedText = protectedText.replace(/\$([^$\n]+?)\$/g, (match) => {
+                mathBlocks.push(match);
+                return `MATHBLOCK${mathBlocks.length - 1}ENDMATHBLOCK`;
+            });
+
+            return { protectedText, mathBlocks };
+        };
+
+        const restoreMath = (html, mathBlocks) => {
+            return html.replace(/MATHBLOCK(\d+)ENDMATHBLOCK/g, (match, index) => {
+                return mathBlocks[index];
+            });
+        };
+
+        const App = () => {
+            // --- State ---
+            const [theme, setTheme] = useState("obsidian"); // 'obsidian' | 'platinum'
+            const [config, setConfig] = useState({
+                type: "science",
+                topic: "",
+                apiProvider: "puter",
+                apiKey: "",
+                parts: 1,
+                chapters: 3,
+                sections: 2,
+                customInstructions: "",
+            });
+            
+            // Chat State
+            const [chatHistory, setChatHistory] = useState([]);
+            const [chatInput, setChatInput] = useState("");
+            
+            const [logs, setLogs] = useState([]);
+            const [outlineJSON, setOutlineJSON] = useState([]);
+            const [outlineText, setOutlineText] = useState("");
+            
+            const [generatedContent, setGeneratedContent] = useState("");
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [currentStep, setCurrentStep] = useState(0); 
+            const [progress, setProgress] = useState(0);
+            
+            const previewRef = useRef(null);
+            const chatEndRef = useRef(null);
+
+            // --- Theme Effect ---
+            useEffect(() => {
+                document.body.className = `theme-${theme} h-screen overflow-hidden flex flex-col`;
+            }, [theme]);
+
+            // --- MathJax Render ---
+            useEffect(() => {
+                if (window.MathJax && window.MathJax.typesetPromise && previewRef.current) {
+                    // 先清除之前的渲染
+                    window.MathJax.typesetPromise([previewRef.current]).catch(err => {});
+                }
+            }, [generatedContent, currentStep]);
+
+            // --- Auto Scroll Chat ---
+            useEffect(() => {
+                chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            }, [chatHistory]);
+
+            // --- Helpers ---
+            const addLog = (msg, type = "info") => {
+                const timestamp = new Date().toLocaleTimeString();
+                setLogs(prev => [`[${timestamp}] ${msg}`, ...prev]);
+            };
+
+            const callAI = async (prompt) => {
+                try {
+                    if (config.apiProvider === 'puter') {
+                        if (typeof puter === 'undefined') throw new Error("Puter.js 未加載");
+                        const resp = await puter.ai.chat(prompt);
+                        return resp.message.content || resp.toString();
+                    } else {
+                        if (!config.apiKey) throw new Error("請輸入 Google API Key");
+                        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${config.apiKey}`;
+                        const payload = { contents: [{ parts: [{ text: prompt }] }] };
+                        const response = await fetch(url, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(payload)
+                        });
+                        const data = await response.json();
+                        if (data.error) throw new Error(data.error.message);
+                        return data.candidates[0].content.parts[0].text;
+                    }
+                } catch (e) {
+                    addLog(`API 錯誤: ${e.message}`, "error");
+                    throw e;
+                }
+            };
+
+            // --- Step 1: Chat Brainstorming ---
+            const sendChatMessage = async () => {
+                if (!chatInput.trim() || !config.topic) return;
+                
+                const userMsg = { role: "user", text: chatInput };
+                setChatHistory(prev => [...prev, userMsg]);
+                setChatInput("");
+                setIsGenerating(true);
+
+                const systemPrompt = `
+                    你是一位專業的出版顧問。用戶想寫一本關於「${config.topic}」的書，類型是「${BOOK_TYPES[config.type].label}」。
+                    請透過對話幫助用戶釐清：
+                    1. 目標讀者是誰？
+                    2. 書的核心價值是什麼？
+                    3. 風格要深奧還是淺顯？
+                    
+                    請簡短回應，每次只問一個關鍵問題，引導用戶思考。
+                    如果用戶說「可以了」或「開始吧」，請回答「好的，我們準備生成大綱。」
+                `;
+
+                // 組合歷史對話
+                let historyText = chatHistory.map(m => `${m.role}: ${m.text}`).join("\n");
+                let fullPrompt = `${systemPrompt}\n\n歷史對話：\n${historyText}\nUser: ${userMsg.text}\nAI:`;
+
+                try {
+                    const reply = await callAI(fullPrompt);
+                    setChatHistory(prev => [...prev, { role: "ai", text: reply }]);
+                } catch (e) {
+                    setChatHistory(prev => [...prev, { role: "error", text: "AI 連線失敗，請重試。" }]);
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            // --- Step 1.5 -> 2: Generate Outline ---
+            const generateOutline = async () => {
+                setIsGenerating(true);
+                addLog("正在生成大綱結構...", "info");
+                
+                // 收集對話中的洞察
+                const chatContext = chatHistory.map(m => m.text).join("\n");
+                
+                const typeConfig = BOOK_TYPES[config.type];
+                const prompt = `
+                    角色：專業書籍架構師
+                    主題：${config.topic}
+                    類型：${typeConfig.label}
+                    背景討論紀錄：${chatContext}
+                    
+                    任務：生成書籍大綱 JSON。
+                    結構要求：${config.parts} 篇 (Part), 每篇 ${config.chapters} 章 (Chapter), 每章 ${config.sections} 節 (Section)。
+                    
+                    回傳格式 (JSON Array):
+                    [
+                        {
+                            "title": "篇名",
+                            "chapters": [
+                                {
+                                    "title": "章名",
+                                    "sections": ["節標題1", "節標題2"]
+                                }
+                            ]
+                        }
+                    ]
+                    
+                    注意：只回傳純 JSON，不要 Markdown。
+                `;
+
+                try {
+                    let text = await callAI(prompt);
+                    text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+                    const json = JSON.parse(text);
+                    setOutlineJSON(json);
+                    
+                    let textDraft = "";
+                    json.forEach((part, pIdx) => {
+                        textDraft += `Part ${pIdx+1}: ${part.title}\n`;
+                        part.chapters.forEach((chap, cIdx) => {
+                            textDraft += `  Chapter ${cIdx+1}: ${chap.title}\n`;
+                            chap.sections.forEach(sec => {
+                                textDraft += `    - ${sec}\n`;
+                            });
+                        });
+                        textDraft += "\n";
+                    });
+                    setOutlineText(textDraft);
+                    
+                    setCurrentStep(1);
+                    addLog("大綱已生成。", "success");
+                } catch (e) {
+                    addLog(`大綱生成失敗: ${e.message}`, "error");
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            const parseOutlineText = () => {
+                try {
+                    const lines = outlineText.split('\n');
+                    let newStructure = [];
+                    let currentPart = null;
+                    let currentChapter = null;
+
+                    lines.forEach(line => {
+                        const trimLine = line.trim();
+                        if (!trimLine) return;
+
+                        if (line.match(/^Part/i) || (!line.startsWith(' ') && !line.startsWith('-'))) {
+                            currentPart = { title: trimLine.replace(/^Part \d+:/i, '').trim(), chapters: [] };
+                            newStructure.push(currentPart);
+                            currentChapter = null;
+                        } else if (line.match(/^\s+Chapter/i) || (line.startsWith('  ') && !line.trim().startsWith('-'))) {
+                            if (!currentPart) { currentPart = { title: "第一篇", chapters: [] }; newStructure.push(currentPart); }
+                            currentChapter = { title: trimLine.replace(/^Chapter \d+:/i, '').trim(), sections: [] };
+                            currentPart.chapters.push(currentChapter);
+                        } else if (trimLine.startsWith('-')) {
+                            if (currentChapter) currentChapter.sections.push(trimLine.replace('-', '').trim());
+                        }
+                    });
+
+                    if (newStructure.length === 0) throw new Error("大綱解析為空");
+                    setOutlineJSON(newStructure);
+                    setCurrentStep(2);
+                    addLog("大綱確認完成。", "success");
+                } catch (e) {
+                    alert("大綱格式錯誤，請保持 Part -> Chapter -> - Section 層級");
+                }
+            };
+
+            // --- Step 4: Generation ---
+            const startGeneration = async () => {
+                setCurrentStep(3);
+                setIsGenerating(true);
+                
+                let fullText = `# ${config.topic}\n\n`;
+                let totalItems = 0;
+                outlineJSON.forEach(p => p.chapters.forEach(c => c.sections.forEach(() => totalItems++)));
+                if (BOOK_TYPES[config.type].prompt_suffix.includes("附錄")) totalItems++;
+                let completedItems = 0;
+
+                let context = "這是書籍的開始。";
+
+                try {
+                    // 目錄
+                    fullText += `## 目錄\n\n`;
+                    outlineJSON.forEach((part, pIdx) => {
+                        fullText += `### ${part.title}\n`;
+                        part.chapters.forEach((chap, cIdx) => {
+                            fullText += `- **第 ${cIdx+1} 章：${chap.title}**\n`;
+                        });
+                    });
+                    fullText += `\n---\n\n`;
+                    setGeneratedContent(fullText);
+
+                    for (let pIdx = 0; pIdx < outlineJSON.length; pIdx++) {
+                        const part = outlineJSON[pIdx];
+                        fullText += `# 第 ${pIdx + 1} 篇：${part.title}\n\n`;
+                        setGeneratedContent(fullText);
+
+                        for (let cIdx = 0; cIdx < part.chapters.length; cIdx++) {
+                            const chapter = part.chapters[cIdx];
+                            fullText += `## 第 ${cIdx + 1} 章：${chapter.title}\n\n`;
+                            setGeneratedContent(fullText);
+
+                            for (let sIdx = 0; sIdx < chapter.sections.length; sIdx++) {
+                                const section = chapter.sections[sIdx];
+                                addLog(`正在撰寫：${section}`);
+                                
+                                const typeConfig = BOOK_TYPES[config.type];
+                                const prompt = `
+                                    你是一位專業作者。
+                                    主題：${config.topic}
+                                    類型：${typeConfig.label}
+                                    全書要求：${config.customInstructions}
+                                    
+                                    當前進度：${part.title} > ${chapter.title} > ${section}
+                                    前文摘要：${context.substring(0, 300)}...
+                                    
+                                    任務：撰寫「${section}」的內容。
+                                    要求：
+                                    1. 使用 Markdown，標題從 ### (H3) 開始。
+                                    2. **嚴格**檢查 LaTeX 公式，行內用 $...$，區塊用 $$...$$。不要漏掉 $ 符號。
+                                    3. 若是程式開發，必須用 Code Block。
+                                    4. 字數約 800 字。
+                                    5. 結尾請加上過渡句，以便與下一節拼接。
+                                `;
+
+                                const content = await callAI(prompt);
+                                
+                                // 拼接優化：確保有足夠換行
+                                fullText += `\n\n### ${section}\n\n${content}\n\n`;
+                                setGeneratedContent(fullText);
+                                
+                                context = content.substring(content.length - 200); 
+                                completedItems++;
+                                setProgress(Math.round((completedItems / totalItems) * 100));
+                                
+                                await new Promise(r => setTimeout(r, 800));
+                            }
+                        }
+                    }
+
+                    if (BOOK_TYPES[config.type].prompt_suffix.includes("附錄")) {
+                        addLog("正在生成附錄...");
+                        const appendixPrompt = `請為《${config.topic}》生成一份完整的「速查表」或「術語索引」。使用 Markdown 表格。`;
+                        const appendix = await callAI(appendixPrompt);
+                        fullText += `\n\n# 附錄\n\n${appendix}\n\n`;
+                        setGeneratedContent(fullText);
+                        setProgress(100);
+                    }
+
+                    addLog("全書撰寫完畢。", "success");
+                    setCurrentStep(4);
+
+                } catch (e) {
+                    addLog(`中斷: ${e.message}`, "error");
+                    setIsGenerating(false);
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            // --- Render Markdown ---
+            const renderMarkdown = (text) => {
+                const { protectedText, mathBlocks } = protectMath(text);
+                const html = marked.parse(protectedText);
+                return restoreMath(html, mathBlocks);
+            };
+
+            // --- Export ---
+            const downloadMD = () => {
+                const blob = new Blob([generatedContent], { type: 'text/markdown' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `${config.topic}_v0.2.0.md`;
+                a.click();
+            };
+
+            return (
+                <div className="flex h-full flex-col md:flex-row app-bg-secondary app-text-primary">
+                    
+                    {/* Sidebar */}
+                    <div className="w-full md:w-80 app-bg-primary app-border border-r flex flex-col shrink-0 transition-colors duration-300">
+                        <div className="p-5 app-border border-b flex justify-between items-center">
+                            <h1 className="text-xl font-bold app-accent">
+                                <i className="fas fa-book-journal-whills mr-2"></i>AI 書籍工廠
+                                <span className="text-xs ml-2 opacity-50">v0.2.0</span>
+                            </h1>
+                        </div>
+
+                        {/* Theme Switcher */}
+                        <div className="p-4 flex gap-2 justify-center">
+                            <button onClick={() => setTheme('obsidian')} className={`px-3 py-1 text-xs rounded-full border ${theme === 'obsidian' ? 'app-accent-bg border-transparent font-bold' : 'app-border app-text-secondary'}`}>
+                                <i className="fas fa-moon mr-1"></i>黑曜石
+                            </button>
+                            <button onClick={() => setTheme('platinum')} className={`px-3 py-1 text-xs rounded-full border ${theme === 'platinum' ? 'app-accent-bg border-transparent font-bold' : 'app-border app-text-secondary'}`}>
+                                <i className="fas fa-sun mr-1"></i>白金
+                            </button>
+                        </div>
+
+                        {/* Steps */}
+                        <div className="px-4 py-2 space-y-1">
+                            {STEPS.map((step, idx) => (
+                                <div key={idx} className={`text-sm px-3 py-2 rounded transition-colors ${currentStep === idx ? 'app-accent-bg font-bold shadow-md' : (currentStep > idx ? 'app-accent' : 'app-text-secondary')}`}>
+                                    {currentStep > idx ? <i className="fas fa-check mr-2"></i> : <i className={`fas fa-${idx+1} mr-2 opacity-50`}></i>}
+                                    {step}
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Logs */}
+                        <div className="flex-1 overflow-y-auto p-4 app-border border-t bg-black/10">
+                            <div className="space-y-1 font-mono text-xs opacity-70">
+                                {logs.map((log, i) => (
+                                    <div key={i} className={log.includes("error") ? "text-red-400" : log.includes("success") ? "text-green-400" : ""}>{log}</div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Main Content */}
+                    <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+                        
+                        {/* Toolbar (Step 4/5 only) */}
+                        {currentStep >= 4 && (
+                            <div className="h-14 app-border border-b app-bg-primary/80 backdrop-blur flex items-center justify-between px-6 shrink-0 z-10">
+                                <span className="font-bold truncate max-w-xs">{config.topic}</span>
+                                <div className="flex space-x-3">
+                                    <button onClick={downloadMD} className="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-white text-sm"><i className="fas fa-download mr-1"></i>.md</button>
+                                    <button onClick={() => window.print()} className="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-white text-sm"><i className="fas fa-print mr-1"></i>PDF</button>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex-1 overflow-hidden relative flex">
+                            
+                            {/* Step 0: Type & Brainstorming */}
+                            {currentStep === 0 && (
+                                <div className="w-full h-full flex flex-col md:flex-row">
+                                    {/* Left: Settings */}
+                                    <div className="w-full md:w-1/2 p-8 overflow-y-auto app-bg-secondary">
+                                        <h2 className="text-2xl font-bold mb-6 app-accent border-l-4 border-current pl-4">1. 選擇類型與主題</h2>
+                                        
+                                        <label className="block text-sm font-bold mb-2">書籍類型</label>
+                                        <div className="grid grid-cols-2 gap-3 mb-6">
+                                            {Object.entries(BOOK_TYPES).map(([key, val]) => (
+                                                <div 
+                                                    key={key} 
+                                                    onClick={() => {
+                                                        setConfig({...config, type: key});
+                                                        setChatHistory([]); // 重置聊天
+                                                    }}
+                                                    className={`p-3 rounded-lg border cursor-pointer transition-all ${config.type === key ? 'app-accent-border app-accent-bg text-white' : 'app-border hover:bg-black/10'}`}
+                                                >
+                                                    <div className="flex items-center">
+                                                        <i className={`fas ${val.icon} mr-2 text-lg`}></i>
+                                                        <span className="font-bold text-sm">{val.label.split(' ')[0]}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <label className="block text-sm font-bold mb-2">書籍主題</label>
+                                        <input 
+                                            type="text" 
+                                            value={config.topic} 
+                                            onChange={(e) => setConfig({...config, topic: e.target.value})} 
+                                            placeholder={BOOK_TYPES[config.type].placeholder}
+                                            className="w-full p-3 rounded bg-black/20 app-border border focus:border-blue-500 outline-none mb-6 text-lg"
+                                        />
+
+                                        <div className="bg-black/10 p-4 rounded-lg app-border border mb-6">
+                                            <h3 className="text-xs font-bold mb-2 uppercase opacity-50">結構參數</h3>
+                                            <div className="flex gap-4 text-sm">
+                                                <label>篇 <input type="number" value={config.parts} onChange={e=>setConfig({...config, parts: e.target.value})} className="w-12 text-center bg-transparent border-b outline-none"/></label>
+                                                <label>章 <input type="number" value={config.chapters} onChange={e=>setConfig({...config, chapters: e.target.value})} className="w-12 text-center bg-transparent border-b outline-none"/></label>
+                                                <label>節 <input type="number" value={config.sections} onChange={e=>setConfig({...config, sections: e.target.value})} className="w-12 text-center bg-transparent border-b outline-none"/></label>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Right: AI Chat */}
+                                    <div className="w-full md:w-1/2 flex flex-col app-bg-primary border-l app-border">
+                                        <div className="p-4 border-b app-border bg-black/10">
+                                            <h3 className="font-bold app-accent"><i className="fas fa-comments mr-2"></i>AI 寫作顧問</h3>
+                                            <p className="text-xs opacity-70">在此與 AI 討論您的構想，完成後點擊「生成大綱」</p>
+                                        </div>
+                                        
+                                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                            {chatHistory.length === 0 && (
+                                                <div className="text-center opacity-40 mt-10">
+                                                    <i className="fas fa-robot text-4xl mb-2"></i>
+                                                    <p>輸入主題並發送訊息，開始諮詢。</p>
+                                                </div>
+                                            )}
+                                            {chatHistory.map((msg, i) => (
+                                                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                                    <div className={`max-w-[85%] p-3 rounded-lg text-sm ${msg.role === 'user' ? 'app-accent-bg text-white' : 'bg-gray-700 text-gray-200'}`}>
+                                                        {msg.text}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {isGenerating && <div className="text-xs opacity-50 animate-pulse">AI 正在思考...</div>}
+                                            <div ref={chatEndRef}></div>
+                                        </div>
+
+                                        <div className="p-4 border-t app-border bg-black/10">
+                                            <div className="flex gap-2 mb-2">
+                                                <input 
+                                                    className="flex-1 bg-black/20 border app-border rounded px-3 py-2 outline-none focus:border-blue-500"
+                                                    placeholder="例如：這本書是寫給大學生看的..."
+                                                    value={chatInput}
+                                                    onChange={(e) => setChatInput(e.target.value)}
+                                                    onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()}
+                                                />
+                                                <button onClick={sendChatMessage} className="w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center">
+                                                    <i className="fas fa-paper-plane"></i>
+                                                </button>
+                                            </div>
+                                            <button 
+                                                onClick={generateOutline}
+                                                disabled={!config.topic}
+                                                className="w-full py-3 rounded-lg bg-green-600 hover:bg-green-500 text-white font-bold shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                確認構想，生成大綱 <i className="fas fa-arrow-right ml-2"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Step 1: Outline Editor */}
+                            {currentStep === 1 && (
+                                <div className="w-full h-full flex flex-col p-8">
+                                    <h2 className="text-2xl font-bold mb-4 app-accent flex justify-between items-center">
+                                        <span>2. 修訂大綱</span>
+                                        <button onClick={parseOutlineText} className="text-sm bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-500">
+                                            下一步 <i className="fas fa-arrow-right ml-1"></i>
+                                        </button>
+                                    </h2>
+                                    <textarea 
+                                        className="flex-1 w-full editor-textarea p-6 rounded-lg app-border border shadow-inner"
+                                        value={outlineText}
+                                        onChange={(e) => setOutlineText(e.target.value)}
+                                        placeholder="AI 正在生成大綱..."
+                                    ></textarea>
+                                </div>
+                            )}
+
+                            {/* Step 2: Custom Instructions */}
+                            {currentStep === 2 && (
+                                <div className="w-full max-w-3xl mx-auto p-8 overflow-y-auto">
+                                    <h2 className="text-2xl font-bold mb-6 app-accent border-l-4 border-current pl-4">3. 最後微調</h2>
+                                    
+                                    <div className="bg-black/10 p-6 rounded-lg app-border border mb-6">
+                                        <label className="block text-sm font-bold mb-2">給 AI 的特別指令</label>
+                                        <textarea 
+                                            className="w-full h-40 bg-transparent border app-border rounded p-4 outline-none focus:border-blue-500 placeholder-opacity-50"
+                                            placeholder="例如：請多用比喻、強調某個觀點、每一章都要有結語..."
+                                            value={config.customInstructions}
+                                            onChange={(e) => setConfig({...config, customInstructions: e.target.value})}
+                                        ></textarea>
+                                    </div>
+
+                                    <div className="flex justify-between">
+                                        <button onClick={() => setCurrentStep(1)} className="text-opacity-70 hover:text-opacity-100 transition">上一步</button>
+                                        <button onClick={startGeneration} className="bg-green-600 hover:bg-green-500 text-white font-bold px-8 py-3 rounded-lg shadow-lg text-lg animate-bounce">
+                                            開始撰寫全書 <i className="fas fa-pen-nib ml-2"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Step 3 & 4: Generation & View */}
+                            {(currentStep === 3 || currentStep === 4) && (
+                                <div className="w-full h-full flex flex-col">
+                                    {isGenerating && (
+                                        <div className="app-bg-primary px-6 py-2 border-b app-border flex items-center justify-between">
+                                            <div className="text-sm app-accent animate-pulse flex items-center">
+                                                <div className="loader mr-3"></div> AI 正在寫作... ({progress}%)
+                                            </div>
+                                            <div className="w-64 bg-gray-700 rounded-full h-2">
+                                                <div className="bg-blue-500 h-2 rounded-full transition-all duration-500" style={{width: `${progress}%`}}></div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="flex-1 flex overflow-hidden">
+                                        {/* Editor (Editable in Step 4) */}
+                                        <div className={`flex flex-col border-r app-border transition-all duration-300 ${currentStep === 4 ? 'w-1/2' : 'w-0 opacity-0'}`}>
+                                            <div className="bg-black/10 px-4 py-2 text-xs font-bold border-b app-border">原始碼編輯</div>
+                                            <textarea 
+                                                className="editor-textarea flex-1 p-4"
+                                                value={generatedContent}
+                                                onChange={(e) => setGeneratedContent(e.target.value)}
+                                            ></textarea>
+                                        </div>
+
+                                        {/* Preview */}
+                                        <div className={`flex flex-col app-bg-secondary ${currentStep === 4 ? 'w-1/2' : 'w-full'}`}>
+                                            <div className="bg-black/10 px-4 py-2 text-xs font-bold border-b app-border flex justify-between">
+                                                <span>預覽模式</span>
+                                                <span className="opacity-50">{BOOK_TYPES[config.type].serif ? "Serif Font" : "Sans Font"}</span>
+                                            </div>
+                                            <div className="flex-1 overflow-y-auto p-8 md:p-16" id="print-area">
+                                                <div 
+                                                    ref={previewRef}
+                                                    className={`markdown-body ${BOOK_TYPES[config.type].serif ? 'serif-mode' : ''} max-w-4xl mx-auto min-h-[800px]`}
+                                                    dangerouslySetInnerHTML={{ __html: renderMarkdown(generatedContent) }}
+                                                ></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
