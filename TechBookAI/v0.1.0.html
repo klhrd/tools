@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 書籍/報告產生器 v0.1.0</title>
+    
+    <!-- 核心樣式與庫 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://js.puter.com/v2/"></script> <!-- Puter AI -->
+    
+    <!-- MathJax for LaTeX -->
+    <script>
+        window.MathJax = {
+            tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+            svg: { fontCache: 'global' }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <!-- Icon -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+    <style>
+        body { background-color: #0f172a; color: #e2e8f0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        /* 編輯器樣式 */
+        .editor-textarea {
+            font-family: 'Consolas', 'Monaco', monospace;
+            line-height: 1.6;
+            background-color: #1e293b;
+            color: #e2e8f0;
+            border: none;
+            resize: none;
+            outline: none;
+        }
+
+        /* Markdown 預覽樣式 */
+        .markdown-body { color: #e2e8f0; line-height: 1.8; font-family: 'Segoe UI', sans-serif; }
+        .markdown-body.serif-mode { font-family: 'Georgia', 'Cambria', 'Times New Roman', serif; } /* 科學類書籍用襯線體 */
+        
+        .markdown-body h1 { font-size: 2.5em; border-bottom: 1px solid #334155; padding-bottom: 0.3em; margin-top: 1.5em; color: #38bdf8; }
+        .markdown-body h2 { font-size: 1.8em; border-bottom: 1px solid #334155; padding-bottom: 0.3em; margin-top: 1.2em; color: #7dd3fc; }
+        .markdown-body h3 { font-size: 1.5em; margin-top: 1em; color: #bae6fd; }
+        .markdown-body h4 { font-size: 1.2em; margin-top: 1em; color: #e0f2fe; }
+        .markdown-body p { margin-bottom: 1em; text-align: justify; }
+        .markdown-body pre { background: #020617; padding: 1.5rem; border-radius: 0.5rem; overflow-x: auto; border: 1px solid #334155; margin: 1.5em 0; }
+        .markdown-body code { font-family: 'Consolas', 'Monaco', monospace; color: #fb7185; background: #1e293b; padding: 2px 4px; border-radius: 4px; }
+        .markdown-body pre code { color: #e2e8f0; background: transparent; padding: 0; }
+        .markdown-body blockquote { border-left: 4px solid #38bdf8; padding-left: 1em; color: #94a3b8; font-style: italic; background: #1e293b; padding: 10px; }
+        .markdown-body table { border-collapse: collapse; width: 100%; margin: 1.5em 0; }
+        .markdown-body th, .markdown-body td { border: 1px solid #475569; padding: 8px 12px; }
+        .markdown-body th { background-color: #1e293b; color: #38bdf8; }
+        
+        /* 列印樣式 */
+        @media print {
+            body * { visibility: hidden; }
+            #print-area, #print-area * { visibility: visible; }
+            #print-area { position: absolute; left: 0; top: 0; width: 100%; background: white; color: black; }
+            .markdown-body h1, .markdown-body h2 { color: black; border-bottom-color: #ccc; }
+            .markdown-body code { color: #d01040; border: 1px solid #eee; }
+            .markdown-body pre { background: #f5f5f5; border: 1px solid #ccc; color: black; }
+        }
+
+        /* 滾動條樣式 */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
+
+        // --- 1. 定義書籍類型 (擴充版) ---
+        const BOOK_TYPES = {
+            coding: {
+                label: "程式開發教學 (Coding)",
+                icon: "fa-laptop-code",
+                desc: "適合語言教學、框架手冊。強制代碼塊。",
+                prompt_suffix: "必須包含詳細的程式碼範例 (Code Blocks)。每個概念需搭配 `變數` 或 `函數` 的實作。附錄需包含『完整語法速查表』。",
+                serif: false
+            },
+            science: {
+                label: "科學與數學 (Science/Math)",
+                icon: "fa-square-root-variable",
+                desc: "適合微積分、物理。支援 LaTeX 公式。",
+                prompt_suffix: "必須使用 LaTeX 格式 (例如 $E=mc^2$) 來撰寫所有數學公式與符號。語氣嚴謹、邏輯推導清晰。字體需使用襯線體 (Serif) 風格。不需要生成程式碼，除非章節特定要求。",
+                serif: true
+            },
+            report: {
+                label: "專業報告/論文 (Report)",
+                icon: "fa-file-contract",
+                desc: "適合市場分析、學術論文。",
+                prompt_suffix: "必須包含『摘要』、『方法論』與『數據分析』。語氣客觀中立。使用條列式重點整理。",
+                serif: true
+            },
+            novel: {
+                label: "小說/故事 (Novel)",
+                icon: "fa-book-open",
+                prompt_suffix: "注重角色情感、對話描寫與場景構建 (Show, Don't Tell)。包含『起承轉合』。不要使用 Markdown 標題層級過多，保持閱讀沉浸感。",
+                serif: true
+            },
+            history: {
+                label: "歷史/人文 (History)",
+                icon: "fa-landmark",
+                desc: "適合傳記、歷史事件。",
+                prompt_suffix: "注重時間軸、事件因果分析。引用史實與不同觀點。",
+                serif: true
+            }
+        };
+
+        const STEPS = ["1. 設定", "2. 大綱修訂", "3. 細節微調", "4. AI 撰寫", "5. 編輯匯出"];
+
+        const App = () => {
+            // --- State ---
+            const [config, setConfig] = useState({
+                topic: "微積分入門：極限與導數",
+                type: "science",
+                apiProvider: "puter",
+                apiKey: "",
+                parts: 1,
+                chapters: 3,
+                sections: 2,
+                customInstructions: "", // 使用者自定義的細節要求
+            });
+            
+            const [logs, setLogs] = useState([]);
+            const [outlineJSON, setOutlineJSON] = useState([]); // 存結構
+            const [outlineText, setOutlineText] = useState(""); // 存 Step 2 的編輯文字
+            
+            const [generatedContent, setGeneratedContent] = useState(""); // 最終 Markdown
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [currentStep, setCurrentStep] = useState(0); 
+            const [progress, setProgress] = useState(0);
+            
+            // 用於 MathJax 重新渲染
+            const previewRef = useRef(null);
+
+            // --- Effect: MathJax Render ---
+            useEffect(() => {
+                if (window.MathJax && window.MathJax.typesetPromise && previewRef.current) {
+                    window.MathJax.typesetPromise([previewRef.current]).catch((err) => console.log(err));
+                }
+            }, [generatedContent, currentStep]);
+
+            // --- Helpers ---
+            const addLog = (msg, type = "info") => {
+                const timestamp = new Date().toLocaleTimeString();
+                setLogs(prev => [`[${timestamp}] ${msg}`, ...prev]);
+            };
+
+            const callAI = async (prompt) => {
+                try {
+                    if (config.apiProvider === 'puter') {
+                        if (typeof puter === 'undefined') throw new Error("Puter.js 未加載");
+                        const resp = await puter.ai.chat(prompt);
+                        return resp.message.content || resp.toString();
+                    } else {
+                        if (!config.apiKey) throw new Error("請輸入 Google API Key");
+                        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${config.apiKey}`;
+                        const payload = { contents: [{ parts: [{ text: prompt }] }] };
+                        const response = await fetch(url, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(payload)
+                        });
+                        const data = await response.json();
+                        if (data.error) throw new Error(data.error.message);
+                        return data.candidates[0].content.parts[0].text;
+                    }
+                } catch (e) {
+                    addLog(`API 錯誤: ${e.message}`, "error");
+                    throw e;
+                }
+            };
+
+            // --- Step 1 -> 2: Generate Initial Outline ---
+            const generateOutline = async () => {
+                setIsGenerating(true);
+                addLog("正在生成大綱結構，請稍候...", "info");
+                
+                const typeConfig = BOOK_TYPES[config.type];
+                const prompt = `
+                    角色：專業書籍架構師
+                    主題：${config.topic}
+                    類型：${typeConfig.label}
+                    任務：生成書籍大綱 JSON。
+                    結構要求：${config.parts} 篇 (Part), 每篇 ${config.chapters} 章 (Chapter), 每章 ${config.sections} 節 (Section)。
+                    
+                    回傳格式 (JSON Array):
+                    [
+                        {
+                            "title": "篇名",
+                            "chapters": [
+                                {
+                                    "title": "章名",
+                                    "sections": ["節標題1", "節標題2"]
+                                }
+                            ]
+                        }
+                    ]
+                    
+                    注意：只回傳純 JSON，不要 Markdown 標記。不要包含程式碼說明，只需標題。
+                `;
+
+                try {
+                    let text = await callAI(prompt);
+                    text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+                    const json = JSON.parse(text);
+                    setOutlineJSON(json);
+                    
+                    // 將 JSON 轉為可編輯的純文字格式，方便用戶修改
+                    let textDraft = "";
+                    json.forEach((part, pIdx) => {
+                        textDraft += `Part ${pIdx+1}: ${part.title}\n`;
+                        part.chapters.forEach((chap, cIdx) => {
+                            textDraft += `  Chapter ${cIdx+1}: ${chap.title}\n`;
+                            chap.sections.forEach(sec => {
+                                textDraft += `    - ${sec}\n`;
+                            });
+                        });
+                        textDraft += "\n";
+                    });
+                    setOutlineText(textDraft);
+                    
+                    setCurrentStep(1);
+                    addLog("大綱已生成，請在右側進行修訂。", "success");
+                } catch (e) {
+                    addLog(`大綱生成失敗: ${e.message}`, "error");
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            // --- Step 2 -> 3: Parse Edited Outline ---
+            const parseOutlineText = () => {
+                // 簡單解析器：將用戶編輯的純文字轉回結構
+                // 邏輯：Part 開頭為篇，Chapter/Indent 為章，- 為節
+                try {
+                    const lines = outlineText.split('\n');
+                    let newStructure = [];
+                    let currentPart = null;
+                    let currentChapter = null;
+
+                    lines.forEach(line => {
+                        const trimLine = line.trim();
+                        if (!trimLine) return;
+
+                        if (line.match(/^Part/i) || (!line.startsWith(' ') && !line.startsWith('-'))) {
+                            // 視為篇
+                            currentPart = { title: trimLine.replace(/^Part \d+:/i, '').trim(), chapters: [] };
+                            newStructure.push(currentPart);
+                            currentChapter = null;
+                        } else if (line.match(/^\s+Chapter/i) || (line.startsWith('  ') && !line.trim().startsWith('-'))) {
+                            // 視為章
+                            if (!currentPart) { // 防呆：如果沒有篇，先創一個
+                                currentPart = { title: "第一篇", chapters: [] };
+                                newStructure.push(currentPart);
+                            }
+                            currentChapter = { title: trimLine.replace(/^Chapter \d+:/i, '').trim(), sections: [] };
+                            currentPart.chapters.push(currentChapter);
+                        } else if (trimLine.startsWith('-')) {
+                            // 視為節
+                            if (currentChapter) {
+                                currentChapter.sections.push(trimLine.replace('-', '').trim());
+                            }
+                        }
+                    });
+
+                    if (newStructure.length === 0) throw new Error("大綱解析為空，請保留格式");
+                    setOutlineJSON(newStructure);
+                    setCurrentStep(2); // 前往細節設定
+                    addLog("大綱修訂完成，進入細節設定。", "success");
+                } catch (e) {
+                    addLog(`大綱解析錯誤: ${e.message}`, "error");
+                    alert("大綱格式無法解析，請確保層級分明 (Part -> Chapter -> - Section)");
+                }
+            };
+
+            // --- Step 4: Generation Loop ---
+            const startGeneration = async () => {
+                setCurrentStep(3);
+                setIsGenerating(true);
+                
+                let fullText = `# ${config.topic}\n\n`;
+                // 計算進度
+                let totalItems = 0;
+                outlineJSON.forEach(p => p.chapters.forEach(c => c.sections.forEach(() => totalItems++)));
+                if (config.type === 'coding') totalItems++; // 附錄
+                let completedItems = 0;
+
+                let context = "這是書籍的開始。";
+
+                try {
+                    // 生成目錄區塊
+                    fullText += `## 目錄\n\n`;
+                    outlineJSON.forEach((part, pIdx) => {
+                        fullText += `### ${part.title}\n`;
+                        part.chapters.forEach((chap, cIdx) => {
+                            fullText += `- **第 ${cIdx+1} 章：${chap.title}**\n`;
+                        });
+                    });
+                    fullText += `\n---\n\n`;
+                    setGeneratedContent(fullText);
+
+                    // 遞迴生成
+                    for (let pIdx = 0; pIdx < outlineJSON.length; pIdx++) {
+                        const part = outlineJSON[pIdx];
+                        fullText += `# 第 ${pIdx + 1} 篇：${part.title}\n\n`;
+                        setGeneratedContent(fullText);
+
+                        for (let cIdx = 0; cIdx < part.chapters.length; cIdx++) {
+                            const chapter = part.chapters[cIdx];
+                            fullText += `## 第 ${cIdx + 1} 章：${chapter.title}\n\n`;
+                            setGeneratedContent(fullText);
+
+                            for (let sIdx = 0; sIdx < chapter.sections.length; sIdx++) {
+                                const section = chapter.sections[sIdx];
+                                addLog(`正在撰寫：${section}`);
+                                
+                                const typeConfig = BOOK_TYPES[config.type];
+                                const prompt = `
+                                    你是一位專業作者。
+                                    主題：${config.topic}
+                                    風格類型：${typeConfig.label}
+                                    全書自定義要求：${config.customInstructions || "無"}
+                                    
+                                    當前進度：${part.title} > ${chapter.title} > ${section}
+                                    前文脈絡：${context.substring(0, 300)}...
+                                    
+                                    任務：撰寫「${section}」的詳細內容。
+                                    風格指引：${typeConfig.prompt_suffix}
+                                    
+                                    格式要求：
+                                    1. 使用 Markdown，標題從 ### (H3) 開始。
+                                    2. 若是科學/數學，所有公式必須用 LaTeX (如 $x^2$)。
+                                    3. 若是程式開發，必須用 Code Block。
+                                    4. 字數：約 600-1000 字，內容需詳實。
+                                `;
+
+                                const content = await callAI(prompt);
+                                fullText += `### ${section}\n\n${content}\n\n`;
+                                setGeneratedContent(fullText);
+                                context = content.substring(0, 200); 
+                                
+                                completedItems++;
+                                setProgress(Math.round((completedItems / totalItems) * 100));
+                                
+                                await new Promise(r => setTimeout(r, 800)); // 避免 Rate Limit
+                            }
+                        }
+                    }
+
+                    // 附錄處理
+                    if (config.type === 'coding') {
+                        addLog("正在生成全書彙整附錄...");
+                        const appendixPrompt = `請為《${config.topic}》生成一份完整的「語法速查表 (Cheat Sheet)」與「常見錯誤索引」。請使用 Markdown 表格呈現。`;
+                        const appendix = await callAI(appendixPrompt);
+                        fullText += `# 附錄\n\n${appendix}\n\n`;
+                        setGeneratedContent(fullText);
+                        setProgress(100);
+                    }
+
+                    addLog("書籍撰寫完畢！進入編輯模式。", "success");
+                    setCurrentStep(4); // 進入編輯模式
+
+                } catch (e) {
+                    addLog(`生成中斷: ${e.message}`, "error");
+                    setIsGenerating(false);
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            // --- Export Functions ---
+            const downloadMD = () => {
+                const blob = new Blob([generatedContent], { type: 'text/markdown' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${config.topic}_v0.1.0.md`;
+                a.click();
+            };
+
+            const downloadHTML = () => {
+                // 簡單包裝一個 HTML
+                const htmlContent = `
+                    <html>
+                    <head>
+                        <title>${config.topic}</title>
+                        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"><\/script>
+                        <style>body{font-family:sans-serif;max-width:800px;margin:auto;padding:20px;line-height:1.6}pre{background:#eee;padding:10px}code{color:#c7254e}</style>
+                    </head>
+                    <body>${document.getElementById('preview-content').innerHTML}</body>
+                    </html>
+                `;
+                const blob = new Blob([htmlContent], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${config.topic}.html`;
+                a.click();
+            };
+
+            const printPDF = () => {
+                window.print();
+            };
+
+            // --- Components ---
+
+            return (
+                <div className="flex h-screen overflow-hidden flex-col md:flex-row">
+                    
+                    {/* --- Sidebar (Navigation & Logs) --- */}
+                    <div className="w-full md:w-80 bg-slate-900 border-r border-slate-700 flex flex-col shrink-0">
+                        <div className="p-4 border-b border-slate-700">
+                            <h1 className="text-xl font-bold text-sky-400">
+                                <i className="fas fa-book-journal-whills mr-2"></i>AI 書籍工廠
+                                <span className="text-xs ml-2 text-slate-500">v0.1.0</span>
+                            </h1>
+                        </div>
+
+                        {/* Progress Steps */}
+                        <div className="p-4 space-y-1">
+                            {STEPS.map((step, idx) => (
+                                <div key={idx} className={`text-sm px-3 py-2 rounded transition-colors ${currentStep === idx ? 'bg-sky-600 text-white font-bold' : (currentStep > idx ? 'text-sky-400' : 'text-slate-500')}`}>
+                                    {currentStep > idx ? <i className="fas fa-check mr-2"></i> : <i className={`fas fa-${idx+1} mr-2 opacity-50`}></i>}
+                                    {step}
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Logs Area */}
+                        <div className="flex-1 overflow-y-auto p-4 border-t border-slate-800 bg-black/20">
+                            <h3 className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">系統日誌</h3>
+                            <div className="space-y-1 font-mono text-xs">
+                                {logs.map((log, i) => (
+                                    <div key={i} className={`${log.includes("error") ? "text-red-400" : log.includes("success") ? "text-green-400" : "text-slate-400"}`}>
+                                        {log}
+                                    </div>
+                                ))}
+                                {isGenerating && <div className="text-sky-400 animate-pulse">AI 正在思考中...</div>}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* --- Main Content Area --- */}
+                    <div className="flex-1 flex flex-col bg-slate-800 h-full overflow-hidden">
+                        
+                        {/* 頂部工具列 (僅在 Step 4/5 顯示有用按鈕) */}
+                        <div className="h-14 border-b border-slate-700 bg-slate-900/50 flex items-center justify-between px-6 shrink-0">
+                            <span className="text-slate-400 text-sm font-mono">{config.topic || "未命名專案"}</span>
+                            
+                            {currentStep === 4 && (
+                                <div className="flex space-x-2">
+                                    <button onClick={downloadMD} className="text-slate-300 hover:text-white px-3 py-1 text-sm bg-slate-700 rounded"><i className="fas fa-file-code mr-1"></i>.md</button>
+                                    <button onClick={downloadHTML} className="text-slate-300 hover:text-white px-3 py-1 text-sm bg-slate-700 rounded"><i className="fas fa-file-code mr-1"></i>.html</button>
+                                    <button onClick={printPDF} className="text-slate-300 hover:text-white px-3 py-1 text-sm bg-slate-700 rounded"><i className="fas fa-print mr-1"></i>列印/PDF</button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* 主要工作區 */}
+                        <div className="flex-1 overflow-hidden relative flex">
+                            
+                            {/* Step 0: 設定 (Config) */}
+                            {currentStep === 0 && (
+                                <div className="w-full max-w-3xl mx-auto p-8 overflow-y-auto">
+                                    <h2 className="text-2xl text-white mb-6 font-bold border-l-4 border-sky-500 pl-4">1. 專案基礎設定</h2>
+                                    
+                                    <div className="grid gap-6">
+                                        {/* API */}
+                                        <div className="bg-slate-900 p-5 rounded-lg border border-slate-700">
+                                            <label className="block text-sm font-bold text-slate-300 mb-2">AI 核心</label>
+                                            <div className="flex gap-4">
+                                                <label className="flex items-center cursor-pointer">
+                                                    <input type="radio" checked={config.apiProvider === 'puter'} onChange={() => setConfig({...config, apiProvider: 'puter'})} className="mr-2"/>
+                                                    <span className="text-white">Puter AI (免費)</span>
+                                                </label>
+                                                <label className="flex items-center cursor-pointer">
+                                                    <input type="radio" checked={config.apiProvider === 'gemini'} onChange={() => setConfig({...config, apiProvider: 'gemini'})} className="mr-2"/>
+                                                    <span className="text-white">Google Gemini</span>
+                                                </label>
+                                            </div>
+                                            {config.apiProvider === 'gemini' && (
+                                                <input type="password" placeholder="API Key" value={config.apiKey} onChange={(e) => setConfig({...config, apiKey: e.target.value})} className="mt-3 w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm"/>
+                                            )}
+                                        </div>
+
+                                        {/* Topic */}
+                                        <div>
+                                            <label className="block text-sm font-bold text-slate-300 mb-2">書籍主題</label>
+                                            <input type="text" value={config.topic} onChange={(e) => setConfig({...config, topic: e.target.value})} className="w-full bg-slate-900 border border-slate-600 rounded p-3 text-white focus:border-sky-500 outline-none text-lg"/>
+                                        </div>
+
+                                        {/* Types */}
+                                        <div>
+                                            <label className="block text-sm font-bold text-slate-300 mb-2">書籍類型 (影響寫作風格與排版)</label>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                {Object.entries(BOOK_TYPES).map(([key, val]) => (
+                                                    <div 
+                                                        key={key} 
+                                                        onClick={() => setConfig({...config, type: key})}
+                                                        className={`p-4 rounded-lg border cursor-pointer transition-all flex items-start ${config.type === key ? 'bg-sky-900/40 border-sky-400' : 'bg-slate-900 border-slate-700 hover:bg-slate-800'}`}
+                                                    >
+                                                        <i className={`fas ${val.icon} text-2xl mt-1 mr-4 ${config.type === key ? 'text-sky-400' : 'text-slate-500'}`}></i>
+                                                        <div>
+                                                            <div className={`font-bold ${config.type === key ? 'text-white' : 'text-slate-300'}`}>{val.label}</div>
+                                                            <div className="text-xs text-slate-500 mt-1">{val.desc}</div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Structure */}
+                                        <div className="bg-slate-900 p-5 rounded-lg border border-slate-700 flex gap-6">
+                                            <div>
+                                                <label className="block text-xs text-slate-400 mb-1">篇 (Parts)</label>
+                                                <input type="number" min="1" max="5" value={config.parts} onChange={(e) => setConfig({...config, parts: parseInt(e.target.value)})} className="w-20 bg-slate-800 border border-slate-600 rounded p-2 text-white text-center"/>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs text-slate-400 mb-1">章 (Chapters)</label>
+                                                <input type="number" min="1" max="10" value={config.chapters} onChange={(e) => setConfig({...config, chapters: parseInt(e.target.value)})} className="w-20 bg-slate-800 border border-slate-600 rounded p-2 text-white text-center"/>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs text-slate-400 mb-1">節 (Sections)</label>
+                                                <input type="number" min="1" max="10" value={config.sections} onChange={(e) => setConfig({...config, sections: parseInt(e.target.value)})} className="w-20 bg-slate-800 border border-slate-600 rounded p-2 text-white text-center"/>
+                                            </div>
+                                        </div>
+
+                                        <button onClick={generateOutline} disabled={isGenerating} className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-4 rounded-lg shadow-lg flex justify-center items-center text-lg">
+                                            {isGenerating ? <div className="loader mr-3"></div> : <i className="fas fa-magic mr-2"></i>}
+                                            生成初始大綱
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Step 1: 大綱修訂 (Outline Editor) */}
+                            {currentStep === 1 && (
+                                <div className="w-full flex flex-col h-full">
+                                    <div className="p-6 pb-2 shrink-0">
+                                        <h2 className="text-2xl text-white font-bold border-l-4 border-sky-500 pl-4 flex justify-between">
+                                            <span>2. 修訂大綱結構</span>
+                                            <span className="text-sm font-normal text-slate-400 self-center">請直接編輯下方文字來增刪章節</span>
+                                        </h2>
+                                    </div>
+                                    <div className="flex-1 p-6 pt-0 flex flex-col">
+                                        <textarea 
+                                            className="flex-1 w-full bg-slate-900 border border-slate-700 rounded-lg p-6 text-slate-300 font-mono text-sm resize-none focus:border-sky-500 outline-none shadow-inner leading-relaxed"
+                                            value={outlineText}
+                                            onChange={(e) => setOutlineText(e.target.value)}
+                                            placeholder="Part 1: Title..."
+                                        ></textarea>
+                                        <div className="mt-4 flex justify-end gap-4">
+                                            <button onClick={() => setCurrentStep(0)} className="text-slate-400 hover:text-white px-6 py-2">上一步</button>
+                                            <button onClick={parseOutlineText} className="bg-sky-600 hover:bg-sky-500 text-white font-bold px-8 py-3 rounded-lg shadow-lg">
+                                                確認大綱並繼續 <i className="fas fa-arrow-right ml-2"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Step 2: 細節微調 (Custom Instructions) */}
+                            {currentStep === 2 && (
+                                <div className="w-full max-w-3xl mx-auto p-8 overflow-y-auto">
+                                    <h2 className="text-2xl text-white mb-6 font-bold border-l-4 border-sky-500 pl-4">3. 細節與風格微調</h2>
+                                    
+                                    <div className="bg-slate-900 p-6 rounded-lg border border-slate-700 mb-6">
+                                        <label className="block text-sm font-bold text-sky-400 mb-2">
+                                            <i className="fas fa-user-edit mr-2"></i>
+                                            你想告訴 AI 什麼？(自定義指令)
+                                        </label>
+                                        <p className="text-xs text-slate-500 mb-3">
+                                            例如：「這本書的讀者是國中生，請用簡單的比喻」、「請多引用 Steve Jobs 的名言」、「請強調數學定理的證明過程」
+                                        </p>
+                                        <textarea 
+                                            className="w-full h-40 bg-slate-800 border border-slate-600 rounded p-4 text-white placeholder-slate-500 focus:border-sky-500 outline-none"
+                                            placeholder="在此輸入你的特殊要求..."
+                                            value={config.customInstructions}
+                                            onChange={(e) => setConfig({...config, customInstructions: e.target.value})}
+                                        ></textarea>
+                                    </div>
+
+                                    <div className="bg-slate-800 p-4 rounded text-sm text-slate-400 mb-6">
+                                        <i className="fas fa-info-circle mr-2"></i>
+                                        您選擇了 <strong>{BOOK_TYPES[config.type].label}</strong>，系統將會自動套用相關的格式設定 (例如 LaTeX 或代碼塊)。
+                                    </div>
+
+                                    <div className="flex justify-between">
+                                        <button onClick={() => setCurrentStep(1)} className="text-slate-400 px-6 py-3">上一步</button>
+                                        <button onClick={startGeneration} className="bg-green-600 hover:bg-green-500 text-white font-bold px-8 py-3 rounded-lg shadow-lg text-lg animate-bounce">
+                                            <i className="fas fa-pen-nib mr-2"></i>開始撰寫全書
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Step 3 & 4: Generation & Split Editor */}
+                            {(currentStep === 3 || currentStep === 4) && (
+                                <div className="w-full h-full flex flex-col">
+                                    
+                                    {/* 進度條 (僅生成時顯示) */}
+                                    {isGenerating && (
+                                        <div className="bg-slate-900 px-6 py-2 border-b border-slate-700 flex items-center justify-between">
+                                            <div className="text-sm text-sky-400 animate-pulse">
+                                                <i className="fas fa-robot mr-2"></i>AI 正在努力寫作中... ({progress}%)
+                                            </div>
+                                            <div className="w-64 bg-slate-700 rounded-full h-2">
+                                                <div className="bg-sky-500 h-2 rounded-full transition-all duration-500" style={{width: `${progress}%`}}></div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* 雙欄編輯器區域 */}
+                                    <div className="flex-1 flex overflow-hidden">
+                                        
+                                        {/* 左欄：Markdown 原始碼 (僅 Step 4 可編輯) */}
+                                        <div className={`flex flex-col bg-slate-900 border-r border-slate-700 transition-all duration-300 ${currentStep === 4 ? 'w-1/2' : 'w-0 opacity-0 overflow-hidden'}`}>
+                                            <div className="bg-slate-800 px-4 py-2 text-xs text-slate-400 font-bold border-b border-slate-700 flex justify-between">
+                                                <span>MARKDOWN 編輯區</span>
+                                                <i className="fas fa-edit"></i>
+                                            </div>
+                                            <textarea 
+                                                className="editor-textarea flex-1 p-4"
+                                                value={generatedContent}
+                                                onChange={(e) => setGeneratedContent(e.target.value)}
+                                            ></textarea>
+                                        </div>
+
+                                        {/* 右欄：即時預覽 */}
+                                        <div className={`flex flex-col bg-slate-800 ${currentStep === 4 ? 'w-1/2' : 'w-full'}`}>
+                                            <div className="bg-slate-800 px-4 py-2 text-xs text-slate-400 font-bold border-b border-slate-700 flex justify-between">
+                                                <span>即時預覽 / 列印視圖</span>
+                                                <span>{BOOK_TYPES[config.type].serif ? "Serif Mode" : "Sans Mode"}</span>
+                                            </div>
+                                            <div className="flex-1 overflow-y-auto p-8 md:p-12 bg-slate-800/50" id="print-area">
+                                                <div 
+                                                    ref={previewRef}
+                                                    id="preview-content"
+                                                    className={`markdown-body ${BOOK_TYPES[config.type].serif ? 'serif-mode' : ''} max-w-4xl mx-auto min-h-[800px]`}
+                                                    dangerouslySetInnerHTML={{ __html: marked.parse(generatedContent) }}
+                                                ></div>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                </div>
+                            )}
+
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
