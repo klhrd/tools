@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown 實作深度教學</title>
+    
+    <!-- 
+      【1. 引入程式庫】
+      使用 CDN 引入 Marked.js，這是將 Markdown 字串解析為 HTML 字串的核心工具。
+    -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <!-- 
+      【2. 額外引入 GitHub 樣式】
+      Markdown 轉出的 HTML 預設是沒有樣式的。
+      引入這個 CSS 可以讓預覽區看起來像 GitHub 的內容一樣美觀。
+    -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown.min.css">
+
+    <style>
+        :root {
+            --header-height: 60px;
+            --primary-color: #0366d6;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            color: #24292e;
+        }
+
+        /* 標題欄 */
+        header {
+            height: var(--header-height);
+            background: #24292e;
+            color: white;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            justify-content: space-between;
+        }
+
+        .container {
+            display: flex;
+            flex: 1; /* 佔滿扣除標題後的剩餘高度 */
+            overflow: hidden;
+        }
+
+        /* 左側：輸入編輯區 */
+        .editor-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #ddd;
+            background: #f6f8fa;
+        }
+
+        .label {
+            padding: 10px;
+            background: #eee;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: #666;
+        }
+
+        #editor {
+            flex: 1;
+            padding: 20px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            border: none;
+            outline: none;
+            resize: none; /* 禁止使用者手動調整大小，由容器控制 */
+            background: transparent;
+        }
+
+        /* 右側：預覽顯示區 */
+        .preview-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: white;
+        }
+
+        #preview {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+        }
+
+        /* 響應式微調：手機模式下改為上下堆疊 */
+        @media (max-width: 768px) {
+            .container { flex-direction: column; }
+            .editor-section, .preview-section { flex: none; height: 50%; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <strong>Markdown 實作範例</strong>
+    <span id="status" style="font-size: 12px; opacity: 0.8;">已即時同步</span>
+</header>
+
+<div class="container">
+    <!-- 編輯區塊 -->
+    <section class="editor-section">
+        <div class="label">Markdown 輸入 (原始碼)</div>
+        <textarea id="editor" spellcheck="false"></textarea>
+    </section>
+
+    <!-- 預覽區塊 -->
+    <section class="preview-section">
+        <div class="label">HTML 預覽 (渲染結果)</div>
+        <!-- 加入 markdown-body class 以套用 GitHub CSS -->
+        <div id="preview" class="markdown-body"></div>
+    </section>
+</div>
+
+<script>
+    /**
+     * 【核心邏輯說明】
+     */
+    const editor = document.getElementById('editor');
+    const preview = document.getElementById('preview');
+    const status = document.getElementById('status');
+
+    // 1. 設定範例內容
+    const initialMarkdown = `# 教學範例
+
+## 基本語法
+你可以試著輸入：
+- **粗體文字**
+- *斜體文字*
+- [超連結](https://google.com)
+
+## 程式碼區塊
+\`\`\`javascript
+function hello() {
+  console.log("Hello Marked!");
+}
+\`\`\``;
+
+    editor.value = initialMarkdown;
+
+    /**
+     * 2. 更新函數
+     * 此函數負責調用 marked 庫並處理輸出。
+     */
+    function renderMarkdown() {
+        const startTime = performance.now();
+        
+        const rawContent = editor.value;
+
+        /* 【進階說明：安全性提示】
+           在真實產品中，如果 Markdown 是由不信任的使用者輸入的，
+           你應該在渲染後使用 DOMPurify 等庫來防止 XSS 攻擊。
+           例如：preview.innerHTML = DOMPurify.sanitize(marked.parse(rawContent));
+        */
+        
+        // 將解析後的 HTML 注入到預覽區域
+        preview.innerHTML = marked.parse(rawContent);
+
+        const endTime = performance.now();
+        status.innerText = `渲染耗時: ${(endTime - startTime).toFixed(2)}ms`;
+    }
+
+    /**
+     * 3. 事件監聽
+     * 'input' 事件比 'keyup' 更好，因為它也能偵測到滑鼠貼上文字的行為。
+     */
+    editor.addEventListener('input', renderMarkdown);
+
+    /**
+     * 【優化建議：Debounce（防抖）】
+     * 如果 Markdown 內容非常龐大，頻繁觸發渲染會造成卡頓。
+     * 你可以實作一個簡單的防抖動機制，讓使用者停止輸入 300ms 後才執行渲染。
+     */
+    /*
+    let timeout;
+    editor.addEventListener('input', () => {
+        clearTimeout(timeout);
+        timeout = setTimeout(renderMarkdown, 300);
+    });
+    */
+
+    // 初始化執行一次
+    renderMarkdown();
+</script>
+
+</body>
+</html>
+
