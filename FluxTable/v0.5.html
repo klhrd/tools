@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FluxTable v0.5.0</title>
+    <style>
+        :root {
+            --bg-body: #121212;
+            --bg-panel: #1e1e1e;
+            --bg-input: #222;
+            --border-color: #333;
+            --border-hover: #555;
+            --accent-color: #ccc;
+            --highlight: #ff9800; /* Industrial Orange */
+            --status-green: #00ff41;
+            --status-red: #ff3333;
+            --font-mono: 'JetBrains Mono', 'Roboto Mono', 'Consolas', monospace;
+            --header-height: 42px;
+        }
+
+        * { box-sizing: border-box; outline: none; }
+
+        body {
+            background-color: var(--bg-body);
+            color: var(--accent-color);
+            font-family: var(--font-mono);
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            font-size: 13px;
+        }
+
+        /* --- Header --- */
+        header {
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: var(--header-height);
+            user-select: none;
+        }
+
+        .brand {
+            font-weight: 800;
+            letter-spacing: 1px;
+            font-size: 1rem;
+            color: #fff;
+            text-transform: uppercase;
+            margin-right: 20px;
+        }
+
+        .toolbar-section {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .toolbar-group {
+            display: flex;
+            background: var(--border-color);
+            border: 1px solid var(--border-color);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .btn {
+            background: var(--bg-panel);
+            color: #777;
+            border: none;
+            padding: 0 12px;
+            height: 24px;
+            cursor: pointer;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            transition: all 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-right: 1px solid #2a2a2a;
+            position: relative;
+        }
+        .btn:last-child { border-right: none; }
+
+        .btn:hover { background: #333; color: #fff; }
+        .btn:active { background: #222; }
+        .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        
+        .btn.active {
+            background: #333;
+            color: var(--highlight);
+            box-shadow: inset 0 -2px 0 var(--highlight);
+        }
+
+        /* Tooltip hack */
+        .btn[title]:hover::after {
+            content: attr(title);
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #000;
+            color: #fff;
+            padding: 4px 6px;
+            font-size: 10px;
+            border-radius: 2px;
+            white-space: nowrap;
+            z-index: 1000;
+            pointer-events: none;
+            margin-top: 4px;
+            border: 1px solid #333;
+        }
+        
+        /* Icon Styles */
+        #btn-bold { font-weight: 900; color: #aaa; }
+        #btn-italic { font-style: italic; font-family: serif; color: #aaa; }
+        #btn-strike { text-decoration: line-through; color: #aaa; }
+        #btn-code { font-family: monospace; font-weight: bold; color: #aaa; letter-spacing: -1px; }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 10px;
+            color: #555;
+            text-transform: uppercase;
+        }
+        .status-dot {
+            width: 6px; height: 6px; background: #333; border-radius: 50%;
+        }
+
+        /* Power Select */
+        .power-select {
+            background: #222;
+            color: var(--highlight);
+            border: 1px solid #444;
+            font-size: 10px;
+            padding: 2px 5px;
+            border-radius: 2px;
+            cursor: pointer;
+            height: 24px;
+        }
+
+        /* --- Workspace --- */
+        .workspace {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            border-top: 1px solid #000;
+        }
+
+        .pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border-color);
+            min-width: 0;
+            position: relative;
+        }
+
+        .pane-header {
+            background: #181818;
+            padding: 4px 10px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: #666;
+            height: 28px;
+        }
+        
+        .pane-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .action-link {
+            cursor: pointer;
+            color: #666;
+            text-decoration: none;
+            font-size: 10px;
+        }
+        .action-link:hover { color: var(--highlight); }
+
+        /* --- Visual Grid --- */
+        .visual-container {
+            flex: 1;
+            overflow: auto;
+            padding: 20px;
+            background: #141414;
+            background-image: 
+                linear-gradient(var(--border-color) 1px, transparent 1px),
+                linear-gradient(90deg, var(--border-color) 1px, transparent 1px);
+            background-size: 100px 100px;
+            background-position: -1px -1px;
+        }
+
+        .flux-table {
+            display: grid;
+            gap: 1px;
+            background: var(--border-color);
+            border: 1px solid var(--border-color);
+            width: fit-content;
+            min-width: 100%;
+            box-shadow: 4px 4px 0 rgba(0,0,0,0.3);
+        }
+
+        .cell {
+            background: var(--bg-panel);
+            color: var(--accent-color);
+            padding: 8px 12px;
+            min-height: 36px;
+            outline: none;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        
+        .cell:hover { background: #252525; }
+        .cell:focus {
+            background: #000;
+            color: #fff;
+            box-shadow: inset 0 0 0 1px var(--highlight);
+            z-index: 10;
+        }
+
+        .cell-header {
+            background: #222;
+            font-weight: 700;
+            color: #888;
+            text-align: center;
+        }
+        .cell-header:focus { color: #fff; background: #000; }
+
+        /* Helpers */
+        .align-left { text-align: left; }
+        .align-center { text-align: center; }
+        .align-right { text-align: right; }
+        
+        /* Rendered Markdown */
+        .md-bold { font-weight: bold; color: #fff; }
+        .md-italic { font-style: italic; }
+        .md-strike { text-decoration: line-through; opacity: 0.6; }
+        .md-code { background: #333; padding: 2px 4px; border-radius: 2px; color: #aaffaa; font-family: monospace; font-size: 0.9em; }
+
+        /* --- Code Editor --- */
+        .code-editor {
+            flex: 1;
+            background: var(--bg-input);
+            color: #ccc;
+            border: none;
+            resize: none;
+            padding: 20px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            white-space: pre;
+            overflow: auto;
+        }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-body); }
+        ::-webkit-scrollbar-thumb { background: #444; }
+        ::-webkit-scrollbar-thumb:hover { background: #666; }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="toolbar-section">
+        <div class="brand">FluxTable <span style="color:#666; font-size: 0.8em;">v0.5.0</span></div>
+        
+        <div class="toolbar-group">
+            <button class="btn" id="btn-undo" onclick="undo()" title="Undo (Ctrl+Z)">↶</button>
+            <button class="btn" id="btn-redo" onclick="redo()" title="Redo (Ctrl+Y)">↷</button>
+        </div>
+
+        <div class="toolbar-group">
+            <button class="btn" id="btn-bold" onclick="formatText('**')" title="Bold">B</button>
+            <button class="btn" id="btn-italic" onclick="formatText('*')" title="Italic">I</button>
+            <button class="btn" id="btn-strike" onclick="formatText('~~')" title="Strike">S</button>
+            <button class="btn" id="btn-code" onclick="formatText('`')" title="Code">&lt;/&gt;</button>
+        </div>
+
+        <div class="toolbar-group">
+            <button class="btn" id="btn-left" onclick="setColAlign('left')" title="Left">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h12v-2H3v2zm0-7v2h18V6H3z"/></svg>
+            </button>
+            <button class="btn" id="btn-center" onclick="setColAlign('center')" title="Center">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm4-5h10v-2H7v2zm-4-7v2h18V6H3z"/></svg>
+            </button>
+            <button class="btn" id="btn-right" onclick="setColAlign('right')" title="Right">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm6-5h12v-2H9v2zm-6-7v2h18V6H3z"/></svg>
+            </button>
+        </div>
+        
+        <!-- Matrix Ops Group (New) -->
+        <div class="toolbar-group">
+            <button class="btn" onclick="transposeTable()" title="Transpose (斜對角翻轉)">
+                <span style="font-family:serif; font-weight:bold;">A<sup>T</sup></span>
+            </button>
+            <button class="btn" onclick="rotateTableCCW()" title="Rotate -90° (逆時針旋轉)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <div class="toolbar-section">
+        <div class="toolbar-group">
+            <button class="btn" onclick="insertRow()" title="Add Row">+ Row</button>
+            <button class="btn" onclick="insertCol()" title="Add Col">+ Col</button>
+            <button class="btn" onclick="deleteTarget()" title="Delete Row/Col" style="color:#aa4444;">Del</button>
+        </div>
+        
+        <select class="power-select" onchange="runColumnOp(this.value); this.value=''">
+            <option value="">Col Ops</option>
+            <option value="clear">Clear Col</option>
+            <option value="upper">UPPERCASE</option>
+            <option value="wrap">Wrap ( )</option>
+        </select>
+        
+        <div class="status-indicator">
+            <div id="statusLight" class="status-dot" style="background: var(--status-green);"></div>
+        </div>
+    </div>
+</header>
+
+<div class="workspace">
+    <div class="pane">
+        <div class="pane-header">
+            <span>VISUAL GRID</span>
+            <span style="font-size:0.9em; color:#444;" id="selectionInfo">No Selection</span>
+        </div>
+        <div class="visual-container" id="visualContainer">
+            <div id="grid" class="flux-table"></div>
+        </div>
+    </div>
+
+    <div class="pane">
+        <div class="pane-header">
+            <select id="codeMode" style="background:transparent; color:#888; border:none; cursor:pointer;" onchange="switchCodeMode()">
+                <option value="markdown">MARKDOWN</option>
+                <option value="csv">CSV DATA</option>
+            </select>
+            <div class="pane-actions">
+                <a class="action-link" onclick="copyCode()">COPY</a>
+                <a class="action-link" onclick="downloadCode()">SAVE</a>
+            </div>
+        </div>
+        <textarea id="codeEditor" class="code-editor" spellcheck="false"></textarea>
+    </div>
+</div>
+
+<script>
+    // --- FluxTable v0.5.0 Core Logic ---
+
+    const defaultState = {
+        headers: ["Component", "Specs", "Status"],
+        rows: [
+            ["Engine", "V8 Biturbo", "**Optimal**"],
+            ["Chassis", "Carbon Fiber", "In Production"],
+            ["Price", "$250,000", "Confirmed"]
+        ],
+        alignments: ["left", "left", "center"]
+    };
+
+    let appState = JSON.parse(localStorage.getItem('flux_v005')) || JSON.parse(JSON.stringify(defaultState));
+    let currentFocus = { row: 0, col: 0 }; 
+    let isComposing = false; 
+
+    // History
+    const historyStack = [];
+    let historyPointer = -1;
+    const MAX_HISTORY = 50;
+
+    // Elements
+    const gridEl = document.getElementById('grid');
+    const editorEl = document.getElementById('codeEditor');
+    const statusLight = document.getElementById('statusLight');
+    const selectionInfo = document.getElementById('selectionInfo');
+    const btnUndo = document.getElementById('btn-undo');
+    const btnRedo = document.getElementById('btn-redo');
+
+    const btnMap = {
+        bold: document.getElementById('btn-bold'),
+        italic: document.getElementById('btn-italic'),
+        strike: document.getElementById('btn-strike'),
+        code: document.getElementById('btn-code'),
+        left: document.getElementById('btn-left'),
+        center: document.getElementById('btn-center'),
+        right: document.getElementById('btn-right'),
+    };
+
+    function init() {
+        pushHistory(appState, true);
+        renderVisual();
+        renderCode();
+        updateToolbarState();
+        setupGlobalKeys();
+        
+        editorEl.addEventListener('input', () => {
+            if (isComposing) return;
+            setStatus('syncing');
+            clearTimeout(window.saveTimer);
+            window.saveTimer = setTimeout(handleCodeInput, 600);
+        });
+    }
+
+    // --- Matrix Operations (New) ---
+
+    function getCompleteMatrix() {
+        // Combines headers and rows into a single 2D array, filling gaps
+        const width = appState.headers.length;
+        const matrix = [ [...appState.headers] ]; // Copy headers
+        appState.rows.forEach(row => {
+            const cleanRow = [...row];
+            while(cleanRow.length < width) cleanRow.push("");
+            matrix.push(cleanRow);
+        });
+        return matrix;
+    }
+
+    function setMatrix(matrix) {
+        if (!matrix || matrix.length === 0) return;
+        
+        // Split back into headers and rows
+        appState.headers = matrix[0];
+        appState.rows = matrix.slice(1);
+        
+        // Reset alignments to match new width (default left)
+        // Or we could try to preserve, but rotation makes it chaotic.
+        // Let's safe reset for now or fill.
+        appState.alignments = new Array(appState.headers.length).fill('left');
+        
+        updateState(appState);
+        renderVisual();
+        renderCode();
+    }
+
+    function transposeTable() {
+        // A^T: Swap rows and cols
+        const matrix = getCompleteMatrix();
+        // Check for empty table
+        if(matrix.length === 0) return;
+
+        const newMatrix = matrix[0].map((_, colIndex) => matrix.map(row => row[colIndex]));
+        setMatrix(newMatrix);
+    }
+
+    function rotateTableCCW() {
+        // Rotate 90 deg Counter-Clockwise
+        // Top-Right becomes Top-Left
+        const matrix = getCompleteMatrix();
+        if(matrix.length === 0) return;
+        
+        const oldRows = matrix.length;
+        const oldCols = matrix[0].length;
+        
+        // New dimensions: oldCols x oldRows
+        const newMatrix = [];
+        
+        for (let c = oldCols - 1; c >= 0; c--) {
+            const newRow = [];
+            for (let r = 0; r < oldRows; r++) {
+                newRow.push(matrix[r][c]);
+            }
+            newMatrix.push(newRow);
+        }
+        
+        setMatrix(newMatrix);
+    }
+
+    // --- State & History ---
+
+    function pushHistory(state, isInitial = false) {
+        const stateStr = JSON.stringify(state);
+        if (historyPointer >= 0 && historyStack[historyPointer] === stateStr && !isInitial) return;
+
+        if (historyPointer < historyStack.length - 1) {
+            historyStack.splice(historyPointer + 1);
+        }
+        historyStack.push(stateStr);
+        if (historyStack.length > MAX_HISTORY) historyStack.shift();
+        else historyPointer++;
+
+        updateUndoRedoUI();
+    }
+
+    function undo() {
+        if (historyPointer > 0) {
+            historyPointer--;
+            restoreStateFromHistory();
+        }
+    }
+
+    function redo() {
+        if (historyPointer < historyStack.length - 1) {
+            historyPointer++;
+            restoreStateFromHistory();
+        }
+    }
+
+    function restoreStateFromHistory() {
+        appState = JSON.parse(historyStack[historyPointer]);
+        saveToLocal();
+        renderVisual();
+        renderCode();
+        updateToolbarState();
+        updateUndoRedoUI();
+    }
+
+    function updateUndoRedoUI() {
+        btnUndo.disabled = historyPointer <= 0;
+        btnRedo.disabled = historyPointer >= historyStack.length - 1;
+    }
+
+    function updateState(newState, recordHistory = true) {
+        appState = newState;
+        ensureAlignmentsSync();
+        saveToLocal();
+        if (recordHistory) pushHistory(appState);
+    }
+
+    function ensureAlignmentsSync() {
+        const count = appState.headers.length;
+        while(appState.alignments.length < count) appState.alignments.push('left');
+        if(appState.alignments.length > count) appState.alignments = appState.alignments.slice(0, count);
+    }
+
+    function saveToLocal() {
+        setStatus('syncing');
+        localStorage.setItem('flux_v005', JSON.stringify(appState));
+        setTimeout(() => setStatus('ready'), 200);
+    }
+
+    function setStatus(state) {
+        statusLight.style.backgroundColor = state === 'syncing' ? 'var(--status-red)' : 'var(--status-green)';
+    }
+
+    // --- Visual Rendering ---
+
+    function renderVisual() {
+        gridEl.innerHTML = '';
+        const colCount = appState.headers.length;
+        gridEl.style.gridTemplateColumns = `repeat(${colCount}, minmax(100px, 1fr))`;
+
+        appState.headers.forEach((text, colIndex) => {
+            gridEl.appendChild(createCell(-1, colIndex, text, true));
+        });
+
+        appState.rows.forEach((row, rowIndex) => {
+            while(row.length < colCount) row.push("");
+            row.forEach((text, colIndex) => {
+                gridEl.appendChild(createCell(rowIndex, colIndex, text, false));
+            });
+        });
+
+        restoreFocus();
+    }
+
+    function createCell(row, col, text, isHeader) {
+        const cell = document.createElement('div');
+        cell.className = isHeader ? 'cell cell-header' : 'cell';
+        cell.contentEditable = true;
+        
+        const align = appState.alignments[col] || 'left';
+        cell.classList.add(`align-${align}`);
+        if(isHeader) cell.style.textAlign = align;
+
+        cell.dataset.row = row;
+        cell.dataset.col = col;
+
+        const isFocused = (currentFocus.row === row && currentFocus.col === col);
+        
+        if (isFocused && document.activeElement === cell) {
+            cell.innerText = text;
+        } else {
+            cell.innerHTML = parseMarkdownToHTML(text);
+        }
+
+        cell.addEventListener('compositionstart', () => { isComposing = true; });
+        cell.addEventListener('compositionend', (e) => { 
+            isComposing = false; 
+            handleCellInput(e.target, row, col); 
+        });
+
+        cell.onfocus = () => {
+            currentFocus = { row, col };
+            if (cell.innerHTML !== text) cell.innerText = appState.rows[row] ? appState.rows[row][col] : appState.headers[col];
+            updateToolbarState();
+            selectionInfo.innerText = isHeader ? `HEAD: ${col+1}` : `ROW: ${row+1} COL: ${col+1}`;
+        };
+        
+        cell.onblur = () => {
+             if (cell.innerText === text) cell.innerHTML = parseMarkdownToHTML(text);
+             pushHistory(appState);
+        };
+
+        cell.oninput = (e) => {
+            if (isComposing) return;
+            handleCellInput(e.target, row, col);
+        };
+
+        cell.onkeydown = (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                // Allow default (newline)
+            }
+        };
+
+        return cell;
+    }
+
+    function handleCellInput(target, row, col) {
+        const val = target.innerText;
+        if (row === -1) appState.headers[col] = val;
+        else appState.rows[row][col] = val;
+        
+        saveToLocal();
+        renderCode();
+    }
+
+    // --- Code Logic (Fixed Sync) ---
+
+    function renderCode() {
+        const mode = document.getElementById('codeMode').value;
+        let output = "";
+        ensureAlignmentsSync();
+
+        if (mode === 'markdown') {
+            output += "| " + appState.headers.join(" | ") + " |\n";
+            output += "|";
+            for(let i=0; i < appState.headers.length; i++) {
+                const a = appState.alignments[i] || 'left';
+                output += (a === 'center' ? " :---: |" : (a === 'right' ? " ---: |" : " :--- |"));
+            }
+            output += "\n";
+            appState.rows.forEach(row => {
+                output += "| " + row.map(c => (c||"").replace(/\n/g, "<br>")).join(" | ") + " |\n";
+            });
+        } else {
+            output += appState.headers.join(",") + "\n";
+            appState.rows.forEach(row => output += row.join(",") + "\n");
+        }
+        editorEl.value = output;
+    }
+
+    function handleCodeInput() {
+        const lines = editorEl.value.trim().split("\n");
+        const mode = document.getElementById('codeMode').value;
+        
+        if (mode === 'markdown') {
+            const dataLines = lines.filter(l => l.includes("|") && !l.includes("---"));
+            // BUG FIX: Capture dashed line for alignment
+            const dashLine = lines.find(l => l.includes("---") && l.includes("|"));
+            
+            if(dataLines.length > 0) {
+                const newHeaders = dataLines[0].split("|").slice(1,-1).map(s=>s.trim());
+                if (newHeaders.length > 0) {
+                    appState.headers = newHeaders;
+                    
+                    // Update Alignments from Dash Line if present
+                    if (dashLine) {
+                        const alignParts = dashLine.split("|").slice(1,-1).map(s => s.trim());
+                        if (alignParts.length === newHeaders.length) {
+                             appState.alignments = alignParts.map(s => {
+                                 if (s.startsWith(":") && s.endsWith(":")) return "center";
+                                 if (s.endsWith(":")) return "right";
+                                 return "left";
+                             });
+                        }
+                    }
+                    ensureAlignmentsSync();
+
+                    if(dataLines.length > 1) {
+                        appState.rows = dataLines.slice(1).map(l => {
+                            return l.split("|").slice(1,-1).map(s=>s.trim().replace(/<br>/g, "\n"));
+                        });
+                    } else {
+                        appState.rows = [];
+                    }
+                }
+            }
+        }
+        updateState(appState);
+        renderVisual();
+    }
+
+    // --- Toolbar & Utils ---
+
+    function runColumnOp(op) {
+        if (!op || currentFocus.col === undefined) return;
+        const col = currentFocus.col;
+        
+        if (op === 'clear') {
+             if(confirm('Clear this column?')) {
+                 appState.rows.forEach(r => r[col] = "");
+             }
+        } else if (op === 'upper') {
+            appState.rows.forEach(r => { if(r[col]) r[col] = r[col].toUpperCase(); });
+            appState.headers[col] = appState.headers[col].toUpperCase();
+        } else if (op === 'wrap') {
+            appState.rows.forEach(r => { if(r[col]) r[col] = `(${r[col]})`; });
+        }
+        
+        updateState(appState);
+        renderVisual();
+        renderCode();
+    }
+
+    function deleteTarget() {
+        // Deletes Row OR Col based on what was last clicked? 
+        // Or specific logic. Let's assume Row delete for standard Del, 
+        // but UI has specific buttons. This generic button will ask or default.
+        // Let's make it delete Row by default, or implement better context.
+        // For now, mapping to deleteRow
+        deleteRow(); 
+    }
+
+    function insertRow() {
+        const newRow = new Array(appState.headers.length).fill("");
+        appState.rows.splice(currentFocus.row + 1, 0, newRow);
+        updateState(appState);
+        renderVisual();
+        renderCode();
+    }
+
+    function deleteRow() {
+        if (currentFocus.row === -1) return;
+        appState.rows.splice(currentFocus.row, 1);
+        if (currentFocus.row >= appState.rows.length) currentFocus.row--;
+        updateState(appState);
+        renderVisual();
+        renderCode();
+    }
+
+    function insertCol() {
+        appState.headers.splice(currentFocus.col + 1, 0, "New");
+        appState.alignments.splice(currentFocus.col + 1, 0, "left");
+        appState.rows.forEach(r => r.splice(currentFocus.col + 1, 0, ""));
+        currentFocus.col++;
+        updateState(appState);
+        renderVisual();
+        renderCode();
+    }
+
+    function deleteCol() {
+        if(appState.headers.length <= 1) return;
+        appState.headers.splice(currentFocus.col, 1);
+        appState.alignments.splice(currentFocus.col, 1);
+        appState.rows.forEach(r => r.splice(currentFocus.col, 1));
+        if(currentFocus.col >= appState.headers.length) currentFocus.col--;
+        updateState(appState);
+        renderVisual();
+        renderCode();
+    }
+
+    function formatText(syntax) {
+        const { row, col } = currentFocus;
+        if (col === undefined) return;
+        let val = row === -1 ? appState.headers[col] : appState.rows[row][col];
+        val = val || "";
+        if (val.includes(syntax)) val = val.split(syntax).join("");
+        else val = syntax + val + syntax;
+        if (row === -1) appState.headers[col] = val;
+        else appState.rows[row][col] = val;
+        updateState(appState);
+        renderVisual();
+        renderCode();
+    }
+
+    function setColAlign(align) {
+        if (currentFocus.col === undefined) return;
+        appState.alignments[currentFocus.col] = align;
+        updateState(appState);
+        renderVisual();
+        renderCode();
+    }
+
+    function updateToolbarState() {
+        let text = "";
+        if (currentFocus.row === -1) text = appState.headers[currentFocus.col] || "";
+        else if (appState.rows[currentFocus.row]) text = appState.rows[currentFocus.row][currentFocus.col] || "";
+
+        btnMap.bold.classList.toggle('active', /\*\*.*\*\*/.test(text));
+        btnMap.italic.classList.toggle('active', /\*.*\*/.test(text));
+        btnMap.strike.classList.toggle('active', /~~.*~~/.test(text));
+        btnMap.code.classList.toggle('active', /`.*`/.test(text));
+
+        const align = appState.alignments[currentFocus.col] || 'left';
+        btnMap.left.classList.toggle('active', align === 'left');
+        btnMap.center.classList.toggle('active', align === 'center');
+        btnMap.right.classList.toggle('active', align === 'right');
+    }
+
+    function setupGlobalKeys() {
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); if(e.shiftKey) redo(); else undo(); }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'b') { e.preventDefault(); formatText('**'); }
+        });
+    }
+
+    function parseMarkdownToHTML(text) {
+        if (!text) return "";
+        return text.replace(/</g, "&lt;").replace(/>/g, "&gt;")
+            .replace(/\*\*(.*?)\*\*/g, '<span class="md-bold">$1</span>')
+            .replace(/\*(.*?)\*/g, '<span class="md-italic">$1</span>')
+            .replace(/~~(.*?)~~/g, '<span class="md-strike">$1</span>')
+            .replace(/`(.*?)`/g, '<span class="md-code">$1</span>')
+            .replace(/\n/g, '<br>');
+    }
+    
+    function restoreFocus() {
+        const el = document.querySelector(`.cell[data-row="${currentFocus.row}"][data-col="${currentFocus.col}"]`);
+        if (el) el.focus();
+    }
+
+    function switchCodeMode() { renderCode(); }
+    
+    function copyCode() { editorEl.select(); document.execCommand('copy'); }
+    
+    function downloadCode() {
+        const text = editorEl.value;
+        const mode = document.getElementById('codeMode').value;
+        const blob = new Blob([text], { type: 'text/plain' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = mode === 'markdown' ? 'table.md' : 'table.csv';
+        a.click();
+    }
+
+    init();
+
+</script>
+</body>
+</html>
