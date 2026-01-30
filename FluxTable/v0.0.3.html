@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FluxTable v0.0.3</title>
+    <style>
+        :root {
+            --bg-body: #121212;
+            --bg-panel: #1e1e1e;
+            --bg-input: #222;
+            --border-color: #333;
+            --border-hover: #555;
+            --accent-color: #ccc;
+            --highlight: #ff9800; /* Industrial Orange */
+            --status-green: #00ff41;
+            --status-red: #ff3333;
+            --font-mono: 'JetBrains Mono', 'Roboto Mono', 'Consolas', monospace;
+            --header-height: 42px;
+        }
+
+        * { box-sizing: border-box; outline: none; }
+
+        body {
+            background-color: var(--bg-body);
+            color: var(--accent-color);
+            font-family: var(--font-mono);
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            font-size: 13px;
+        }
+
+        /* --- Compact Toolbar --- */
+        header {
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: var(--header-height);
+            user-select: none;
+        }
+
+        .brand {
+            font-weight: 800;
+            letter-spacing: 1px;
+            font-size: 1rem;
+            color: #fff;
+            text-transform: uppercase;
+            margin-right: 20px;
+        }
+
+        .toolbar-section {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .toolbar-group {
+            display: flex;
+            background: var(--border-color);
+            border: 1px solid var(--border-color);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .btn {
+            background: var(--bg-panel);
+            color: #777;
+            border: none;
+            padding: 0 12px;
+            height: 24px;
+            cursor: pointer;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            transition: all 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-right: 1px solid #2a2a2a;
+        }
+        .btn:last-child { border-right: none; }
+
+        .btn:hover { background: #333; color: #fff; }
+        .btn:active { background: #222; }
+        
+        /* Active State (Industrial Orange) */
+        .btn.active {
+            background: #333;
+            color: var(--highlight);
+            box-shadow: inset 0 -2px 0 var(--highlight);
+        }
+        
+        /* --- Self-Reflective Styles for Buttons --- */
+        #btn-bold { font-weight: 900; color: #aaa; }
+        #btn-bold:hover { color: #fff; }
+        
+        #btn-italic { font-style: italic; font-family: 'Times New Roman', serif; font-size: 13px; color: #aaa; }
+        #btn-italic:hover { color: #fff; }
+        
+        #btn-strike { text-decoration: line-through; color: #aaa; }
+        #btn-strike:hover { color: #fff; }
+
+        #btn-code { font-family: 'Courier New', monospace; font-weight: bold; color: #aaa; letter-spacing: -1px; }
+        #btn-code:hover { color: #fff; }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 10px;
+            color: #555;
+            text-transform: uppercase;
+        }
+        .status-dot {
+            width: 6px; height: 6px; background: #333; border-radius: 50%;
+        }
+
+        /* --- Main Workspace --- */
+        .workspace {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            border-top: 1px solid #000;
+        }
+
+        .pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border-color);
+            min-width: 0;
+            position: relative;
+        }
+
+        .pane-header {
+            background: #181818;
+            padding: 4px 10px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: #666;
+            height: 28px;
+        }
+
+        /* --- Visual Grid --- */
+        .visual-container {
+            flex: 1;
+            overflow: auto;
+            padding: 20px;
+            background: #141414;
+            /* Subtle grid background */
+            background-image: 
+                linear-gradient(var(--border-color) 1px, transparent 1px),
+                linear-gradient(90deg, var(--border-color) 1px, transparent 1px);
+            background-size: 100px 100px;
+            background-position: -1px -1px;
+        }
+
+        .flux-table {
+            display: grid;
+            gap: 1px;
+            background: var(--border-color);
+            border: 1px solid var(--border-color);
+            width: fit-content;
+            min-width: 100%;
+            box-shadow: 4px 4px 0 rgba(0,0,0,0.3);
+        }
+
+        .cell {
+            background: var(--bg-panel);
+            color: var(--accent-color);
+            padding: 8px 12px;
+            min-height: 36px;
+            outline: none;
+            white-space: pre-wrap; /* Critical for newlines */
+            word-break: break-word;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        
+        .cell:hover { background: #252525; }
+
+        .cell:focus {
+            background: #000;
+            color: #fff;
+            box-shadow: inset 0 0 0 1px var(--highlight);
+            z-index: 10;
+        }
+
+        .cell-header {
+            background: #222;
+            font-weight: 700;
+            color: #888;
+            text-align: center;
+            user-select: none; /* headers not editable in v1, but we made them editable */
+        }
+        .cell-header:focus { color: #fff; background: #000; }
+
+        /* Rendered Markdown Styles in Grid */
+        .md-bold { font-weight: bold; color: #fff; }
+        .md-italic { font-style: italic; }
+        .md-strike { text-decoration: line-through; opacity: 0.6; }
+        .md-code { background: #333; padding: 2px 4px; border-radius: 2px; color: #aaffaa; font-family: monospace; font-size: 0.9em; }
+
+        /* Helpers */
+        .align-left { text-align: left; }
+        .align-center { text-align: center; }
+        .align-right { text-align: right; }
+
+        /* --- Code Editor --- */
+        .code-editor {
+            flex: 1;
+            background: var(--bg-input);
+            color: #ccc;
+            border: none;
+            resize: none;
+            padding: 20px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            white-space: pre;
+            overflow: auto;
+        }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-body); }
+        ::-webkit-scrollbar-thumb { background: #444; }
+        ::-webkit-scrollbar-thumb:hover { background: #666; }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="toolbar-section">
+        <div class="brand">FluxTable <span style="color:#666; font-size: 0.8em;">v0.0.3</span></div>
+        
+        <!-- Format Group -->
+        <div class="toolbar-group">
+            <button class="btn" id="btn-bold" onclick="formatText('**')" title="Bold (Cmd+B)">B</button>
+            <button class="btn" id="btn-italic" onclick="formatText('*')" title="Italic (Cmd+I)">I</button>
+            <button class="btn" id="btn-strike" onclick="formatText('~~')" title="Strike">S</button>
+            <button class="btn" id="btn-code" onclick="formatText('`')" title="Code">&lt;/&gt;</button>
+        </div>
+
+        <!-- Align Group -->
+        <div class="toolbar-group">
+            <button class="btn" id="btn-left" onclick="setColAlign('left')" title="Align Left">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h12v-2H3v2zm0-7v2h18V6H3z"/></svg>
+            </button>
+            <button class="btn" id="btn-center" onclick="setColAlign('center')" title="Align Center">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm4-5h10v-2H7v2zm-4-7v2h18V6H3z"/></svg>
+            </button>
+            <button class="btn" id="btn-right" onclick="setColAlign('right')" title="Align Right">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm6-5h12v-2H9v2zm-6-7v2h18V6H3z"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <div class="toolbar-section">
+        <!-- Edit Group -->
+        <div class="toolbar-group">
+            <button class="btn" onclick="insertRow()" title="Insert Row Below">+ Row</button>
+            <button class="btn" onclick="deleteRow()" title="Delete Selected Row" style="color:#aa4444;">×</button>
+        </div>
+        <div class="toolbar-group">
+            <button class="btn" onclick="insertCol()" title="Insert Column Right">+ Col</button>
+            <button class="btn" onclick="deleteCol()" title="Delete Selected Column" style="color:#aa4444;">×</button>
+        </div>
+        
+        <!-- Utility -->
+        <button class="btn" style="color: var(--highlight); border:1px solid #333; background:transparent;" onclick="mockTranslate()">AUTO-TRSL</button>
+        
+        <div class="status-indicator">
+            <div id="statusLight" class="status-dot" style="background: var(--status-green);"></div>
+        </div>
+    </div>
+</header>
+
+<div class="workspace">
+    <!-- Left Pane: Visual -->
+    <div class="pane">
+        <div class="pane-header">
+            <span>VISUAL GRID</span>
+            <span style="font-size:0.9em; color:#444;" id="selectionInfo">No Selection</span>
+        </div>
+        <div class="visual-container" id="visualContainer">
+            <div id="grid" class="flux-table">
+                <!-- Grid items generated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Pane: Code -->
+    <div class="pane">
+        <div class="pane-header">
+            <select id="codeMode" style="background:transparent; color:#888; border:none; cursor:pointer;" onchange="switchCodeMode()">
+                <option value="markdown">MARKDOWN SOURCE</option>
+                <option value="csv">CSV DATA</option>
+            </select>
+        </div>
+        <textarea id="codeEditor" class="code-editor" spellcheck="false"></textarea>
+    </div>
+</div>
+
+<script>
+    // --- FluxTable v0.0.3 Logic ---
+
+    // Default Data
+    const defaultState = {
+        headers: ["Component", "Specs", "Status"],
+        rows: [
+            ["Engine", "V8 Biturbo\n(Twin-scroll)", "**Optimal**"],
+            ["Chassis", "Carbon Fiber", "In Production"]
+        ],
+        alignments: ["left", "left", "center"]
+    };
+
+    let appState = JSON.parse(localStorage.getItem('flux_v003')) || defaultState;
+    
+    // Focus Tracking: -1 = Header, 0+ = Row Index
+    let currentFocus = { row: 0, col: 0 }; 
+
+    // DOM
+    const gridEl = document.getElementById('grid');
+    const editorEl = document.getElementById('codeEditor');
+    const statusLight = document.getElementById('statusLight');
+    const selectionInfo = document.getElementById('selectionInfo');
+
+    // UI Buttons
+    const btnMap = {
+        bold: document.getElementById('btn-bold'),
+        italic: document.getElementById('btn-italic'),
+        strike: document.getElementById('btn-strike'),
+        code: document.getElementById('btn-code'),
+        left: document.getElementById('btn-left'),
+        center: document.getElementById('btn-center'),
+        right: document.getElementById('btn-right'),
+    };
+
+    function init() {
+        renderVisual();
+        renderCode();
+        updateToolbarState(); 
+        
+        // Code Editor Sync
+        editorEl.addEventListener('input', () => {
+            setStatus('syncing');
+            clearTimeout(window.saveTimer);
+            window.saveTimer = setTimeout(handleCodeInput, 600);
+        });
+    }
+
+    // --- State Management ---
+    function saveState() {
+        setStatus('syncing');
+        localStorage.setItem('flux_v003', JSON.stringify(appState));
+        setTimeout(() => setStatus('ready'), 200);
+    }
+
+    function setStatus(state) {
+        statusLight.style.backgroundColor = state === 'syncing' ? 'var(--status-red)' : 'var(--status-green)';
+    }
+
+    // --- Visual Rendering (With Markdown Parsing) ---
+    function renderVisual() {
+        // Save focus position logic omitted for v0.0.3 simplicity, 
+        // relying on re-focusing after build.
+        
+        gridEl.innerHTML = '';
+        const colCount = appState.headers.length;
+        gridEl.style.gridTemplateColumns = `repeat(${colCount}, minmax(100px, 1fr))`;
+
+        // 1. Headers
+        appState.headers.forEach((text, colIndex) => {
+            const cell = createCell(-1, colIndex, text, true);
+            gridEl.appendChild(cell);
+        });
+
+        // 2. Body
+        appState.rows.forEach((row, rowIndex) => {
+            // Fill gaps
+            while(row.length < colCount) row.push("");
+            
+            row.forEach((text, colIndex) => {
+                const cell = createCell(rowIndex, colIndex, text, false);
+                gridEl.appendChild(cell);
+            });
+        });
+
+        restoreFocus();
+    }
+
+    function createCell(row, col, text, isHeader) {
+        const cell = document.createElement('div');
+        cell.className = isHeader ? 'cell cell-header' : 'cell';
+        cell.contentEditable = true;
+        
+        // Alignment Class
+        const align = appState.alignments[col] || 'left';
+        cell.classList.add(`align-${align}`);
+        if(isHeader) cell.style.textAlign = align; 
+
+        // Data Attributes
+        cell.dataset.row = row;
+        cell.dataset.col = col;
+
+        const isFocused = (currentFocus.row === row && currentFocus.col === col);
+        
+        if (isFocused && document.activeElement === cell) {
+            cell.innerText = text; // Raw for editing
+        } else {
+            cell.innerHTML = parseMarkdownToHTML(text); // Pretty for viewing
+        }
+
+        // Events
+        cell.onfocus = () => {
+            currentFocus = { row, col };
+            cell.innerText = appState.rows[row] ? appState.rows[row][col] : appState.headers[col]; // Switch to raw
+            updateToolbarState();
+            selectionInfo.innerText = isHeader ? `HEAD: ${col+1}` : `ROW: ${row+1} COL: ${col+1}`;
+        };
+        
+        cell.onblur = () => {
+             // Revert to HTML view on blur
+             if (cell.innerText === text) cell.innerHTML = parseMarkdownToHTML(text);
+        };
+
+        cell.oninput = (e) => {
+            const val = cell.innerText;
+            if (row === -1) appState.headers[col] = val;
+            else appState.rows[row][col] = val;
+            
+            localStorage.setItem('flux_v003', JSON.stringify(appState));
+            renderCode();
+            updateToolbarState(); 
+        };
+
+        cell.onkeydown = (e) => {
+            // [Feature] Enter = New Line, Shift+Enter = Move Down
+            if (e.key === 'Enter') {
+                if (e.shiftKey) {
+                    // Shift + Enter: Move Down
+                    e.preventDefault();
+                    moveFocus(1, 0);
+                } else {
+                    // Enter: Insert New Line
+                    e.preventDefault(); 
+                    document.execCommand('insertLineBreak');
+                }
+            }
+        };
+
+        return cell;
+    }
+
+    // --- Markdown Parser ---
+    function parseMarkdownToHTML(text) {
+        if (!text) return "";
+        let html = text
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/\*\*(.*?)\*\*/g, '<span class="md-bold">$1</span>')
+            .replace(/\*(.*?)\*/g, '<span class="md-italic">$1</span>')
+            .replace(/~~(.*?)~~/g, '<span class="md-strike">$1</span>')
+            .replace(/`(.*?)`/g, '<span class="md-code">$1</span>')
+            .replace(/\n/g, '<br>');
+        return html;
+    }
+
+    // --- Toolbar Actions ---
+
+    function updateToolbarState() {
+        let text = "";
+        if (currentFocus.row === -1) text = appState.headers[currentFocus.col] || "";
+        else if (appState.rows[currentFocus.row]) text = appState.rows[currentFocus.row][currentFocus.col] || "";
+
+        btnMap.bold.classList.toggle('active', /\*\*.*\*\*/.test(text));
+        btnMap.italic.classList.toggle('active', /\*.*\*/.test(text) && !/\*\*.*\*\*/.test(text)); 
+        btnMap.strike.classList.toggle('active', /~~.*~~/.test(text));
+        btnMap.code.classList.toggle('active', /`.*`/.test(text));
+
+        const align = appState.alignments[currentFocus.col] || 'left';
+        btnMap.left.classList.toggle('active', align === 'left');
+        btnMap.center.classList.toggle('active', align === 'center');
+        btnMap.right.classList.toggle('active', align === 'right');
+    }
+
+    function formatText(syntax) {
+        const { row, col } = currentFocus;
+        if (col === undefined) return;
+
+        let val = row === -1 ? appState.headers[col] : appState.rows[row][col];
+        val = val || "";
+
+        if (val.includes(syntax)) {
+            val = val.split(syntax).join("");
+        } else {
+            val = syntax + val + syntax;
+        }
+
+        if (row === -1) appState.headers[col] = val;
+        else appState.rows[row][col] = val;
+
+        saveState();
+        renderVisual();
+        renderCode();
+    }
+
+    function setColAlign(align) {
+        if (currentFocus.col === undefined) return;
+        appState.alignments[currentFocus.col] = align;
+        saveState();
+        renderVisual();
+        renderCode();
+    }
+
+    // --- Insert / Delete Logic ---
+    function insertRow() {
+        const newRow = new Array(appState.headers.length).fill("");
+        const targetIndex = currentFocus.row + 1;
+        appState.rows.splice(targetIndex, 0, newRow);
+        saveState();
+        renderVisual();
+        renderCode();
+    }
+
+    function deleteRow() {
+        if (currentFocus.row === -1) return; 
+        appState.rows.splice(currentFocus.row, 1);
+        if (currentFocus.row >= appState.rows.length) currentFocus.row--;
+        saveState();
+        renderVisual();
+        renderCode();
+    }
+
+    function insertCol() {
+        const targetCol = currentFocus.col + 1;
+        appState.headers.splice(targetCol, 0, "New Header");
+        appState.alignments.splice(targetCol, 0, "left");
+        appState.rows.forEach(row => row.splice(targetCol, 0, ""));
+        currentFocus.col = targetCol;
+        saveState();
+        renderVisual();
+        renderCode();
+    }
+
+    function deleteCol() {
+        if (appState.headers.length <= 1) return;
+        appState.headers.splice(currentFocus.col, 1);
+        appState.alignments.splice(currentFocus.col, 1);
+        appState.rows.forEach(row => row.splice(currentFocus.col, 1));
+        if (currentFocus.col >= appState.headers.length) currentFocus.col--;
+        saveState();
+        renderVisual();
+        renderCode();
+    }
+
+    // --- Helpers ---
+    function restoreFocus() {
+        const selector = `.cell[data-row="${currentFocus.row}"][data-col="${currentFocus.col}"]`;
+        const el = document.querySelector(selector);
+        if (el) {
+            el.focus();
+        }
+    }
+
+    function moveFocus(dRow, dCol) {
+        currentFocus.row = Math.min(Math.max(-1, currentFocus.row + dRow), appState.rows.length - 1);
+        currentFocus.col = Math.min(Math.max(0, currentFocus.col + dCol), appState.headers.length - 1);
+        renderVisual(); 
+    }
+
+    // --- Code Pane Logic ---
+    function renderCode() {
+        const mode = document.getElementById('codeMode').value;
+        let output = "";
+
+        if (mode === 'markdown') {
+            output += "| " + appState.headers.join(" | ") + " |\n";
+            output += "|";
+            appState.alignments.forEach(a => {
+                output += (a === 'center' ? " :---: |" : (a === 'right' ? " ---: |" : " :--- |"));
+            });
+            output += "\n";
+            appState.rows.forEach(row => {
+                output += "| " + row.map(c => (c||"").replace(/\n/g, "<br>")).join(" | ") + " |\n";
+            });
+        } else {
+            // CSV
+            output += appState.headers.join(",") + "\n";
+            appState.rows.forEach(row => output += row.join(",") + "\n");
+        }
+        editorEl.value = output;
+    }
+    
+    function switchCodeMode() { renderCode(); }
+    
+    function handleCodeInput() {
+        const lines = editorEl.value.trim().split("\n");
+        if (document.getElementById('codeMode').value === 'markdown') {
+            const dataLines = lines.filter(l => l.includes("|") && !l.includes("---"));
+            if(dataLines.length > 0) {
+                appState.headers = dataLines[0].split("|").slice(1,-1).map(s=>s.trim());
+                if(dataLines.length > 1) {
+                    appState.rows = dataLines.slice(1).map(l => l.split("|").slice(1,-1).map(s=>s.trim()));
+                }
+            }
+        }
+        saveState();
+        renderVisual();
+    }
+
+    function mockTranslate() {
+        if(currentFocus.col < 0) return;
+        appState.rows.forEach(row => {
+           if(row[currentFocus.col]) row[currentFocus.col] += " (T)";
+        });
+        saveState();
+        renderVisual();
+        renderCode();
+    }
+
+    init();
+
+</script>
+</body>
+</html>
