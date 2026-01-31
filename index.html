@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>我的專案索引</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f4f4f9; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); text-decoration: none; color: #333; text-align: center; transition: 0.3s; }
+        .card:hover { transform: translateY(-5px); background: #eef2ff; }
+    </style>
+</head>
+<body>
+    <h1>📂 我的小品集</h1>
+    <div id="list" class="grid">載入中...</div>
+
+    <script>
+        const USER = '你的帳號'; 
+        const REPO = '你的Repo名稱';
+        
+        async function loadProjects() {
+            const response = await fetch(`https://api.github.com/repos/${USER}/${REPO}/contents/`);
+            const data = await response.json();
+            const listElement = document.getElementById('list');
+            listElement.innerHTML = '';
+
+            data.forEach(item => {
+                // 過濾：只要是資料夾，且不是以點開頭的 (隱藏資料夾)
+                if (item.type === 'dir' && !item.name.startsWith('.')) {
+                    const card = document.createElement('a');
+                    card.className = 'card';
+                    card.href = `./${item.name}/`; // 假設每個資料夾內都有 index.html
+                    card.textContent = item.name;
+                    listElement.appendChild(card);
+                }
+            });
+        }
+        loadProjects();
+    </script>
+</body>
+</html>
