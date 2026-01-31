@@ -2,40 +2,74 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <title>我的專案索引</title>
+    <title>我的小品專案索引</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f4f4f9; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); text-decoration: none; color: #333; text-align: center; transition: 0.3s; }
-        .card:hover { transform: translateY(-5px); background: #eef2ff; }
+        body { font-family: -apple-system, sans-serif; line-height: 1.6; padding: 40px; background: #fafafa; color: #333; }
+        .project-group { background: white; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 20px; overflow: hidden; }
+        .project-title { background: #f0f0f0; padding: 10px 20px; font-weight: bold; border-bottom: 1px solid #ddd; }
+        .file-list { padding: 10px 20px; list-style: none; margin: 0; }
+        .file-item { margin: 5px 0; }
+        a { color: #0366d6; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .version-tag { font-size: 0.85em; color: #666; background: #eee; padding: 2px 6px; border-radius: 4px; margin-right: 8px; }
     </style>
 </head>
 <body>
-    <h1>📂 我的小品集</h1>
-    <div id="list" class="grid">載入中...</div>
+    <h1>🚀 專案自動索引</h1>
+    <div id="container">載入中...</div>
 
     <script>
         const USER = 'klhrd'; 
         const REPO = 'tools';
-        
-        async function loadProjects() {
-            const response = await fetch(`https://api.github.com/repos/${USER}/${REPO}/contents/`);
-            const data = await response.json();
-            const listElement = document.getElementById('list');
-            listElement.innerHTML = '';
+        // 使用 recursive=1 抓取所有層級的檔案
+        const API_URL = `https://api.github.com/repos/${USER}/${REPO}/git/trees/main?recursive=1`;
 
-            data.forEach(item => {
-                // 過濾：只要是資料夾，且不是以點開頭的 (隱藏資料夾)
-                if (item.type === 'dir' && !item.name.startsWith('.')) {
-                    const card = document.createElement('a');
-                    card.className = 'card';
-                    card.href = `./${item.name}/`; // 假設每個資料夾內都有 index.html
-                    card.textContent = item.name;
-                    listElement.appendChild(card);
+        async function init() {
+            try {
+                const res = await fetch(API_URL);
+                const json = await res.json();
+                const container = document.getElementById('container');
+                container.innerHTML = '';
+
+                // 1. 篩選出所有的 HTML 檔案（排除掉 index.html 自身）
+                const htmlFiles = json.tree.filter(item => 
+                    item.path.endsWith('.html') && item.path !== 'index.html'
+                );
+
+                // 2. 依照第一層資料夾名稱分組
+                const groups = {};
+                htmlFiles.forEach(file => {
+                    const parts = file.path.split('/');
+                    const groupName = parts.length > 1 ? parts[0] : '根目錄專案';
+                    if (!groups[groupName]) groups[groupName] = [];
+                    groups[groupName].push(file);
+                });
+
+                // 3. 渲染畫面
+                for (const [name, files] of Object.entries(groups)) {
+                    const section = document.createElement('div');
+                    section.className = 'project-group';
+                    section.innerHTML = `<div class="project-title">📁 ${name}</div>`;
+                    
+                    const ul = document.createElement('ul');
+                    ul.className = 'file-list';
+                    
+                    files.forEach(f => {
+                        const li = document.createElement('li');
+                        li.className = 'file-item';
+                        // 顯示完整路徑或檔案名
+                        li.innerHTML = `<a href="./${f.path}">📄 ${f.path.replace(name + '/', '')}</a>`;
+                        ul.appendChild(li);
+                    });
+                    
+                    section.appendChild(ul);
+                    container.appendChild(section);
                 }
-            });
+            } catch (e) {
+                container.innerHTML = '讀取失敗，請確認帳號與 Repo 名稱是否正確。';
+            }
         }
-        loadProjects();
+        init();
     </script>
 </body>
 </html>
