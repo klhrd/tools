@@ -2,73 +2,321 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <title>我的小品專案索引</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | My Tools Library</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 使用 Marked 處理 Markdown 渲染 -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { font-family: -apple-system, sans-serif; line-height: 1.6; padding: 40px; background: #fafafa; color: #333; }
-        .project-group { background: white; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 20px; overflow: hidden; }
-        .project-title { background: #f0f0f0; padding: 10px 20px; font-weight: bold; border-bottom: 1px solid #ddd; }
-        .file-list { padding: 10px 20px; list-style: none; margin: 0; }
-        .file-item { margin: 5px 0; }
-        a { color: #0366d6; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        .version-tag { font-size: 0.85em; color: #666; background: #eee; padding: 2px 6px; border-radius: 4px; margin-right: 8px; }
+        body {
+            background: #f8fafc;
+            min-height: 100vh;
+            color: #334155;
+            overflow-x: hidden;
+        }
+        .glass-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .glass-card:hover {
+            border-color: #3b82f6;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.05);
+        }
+        .detail-view {
+            display: none;
+            position: fixed;
+            top: 0; right: 0; bottom: 0; left: 0;
+            background: #ffffff;
+            z-index: 50;
+            overflow-y: auto;
+        }
+        /* Markdown 樣式優化 */
+        .readme-content img { max-width: 100%; border-radius: 12px; margin: 1rem 0; }
+        .readme-content pre { background: #f1f5f9; padding: 1.25rem; border-radius: 12px; overflow-x: auto; margin: 1.5rem 0; font-size: 0.9rem; }
+        .readme-content code { font-family: 'ui-monospace', monospace; background: #f1f5f9; padding: 0.2rem 0.4rem; border-radius: 4px; }
+        .readme-content h1, .readme-content h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.75rem; margin-top: 2rem; margin-bottom: 1.25rem; font-weight: 800; color: #1e293b; }
+        .readme-content h1 { font-size: 1.75rem; }
+        .readme-content h2 { font-size: 1.4rem; }
+        .readme-content p { margin-bottom: 1rem; line-height: 1.7; }
+        
+        /* 滾動條樣式 */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f8fafc; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; border: 2px solid #f8fafc; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     </style>
 </head>
-<body>
-    <h1>🚀 專案自動索引</h1>
-    <div id="container">載入中...</div>
+<body class="p-4 md:p-8">
+
+    <!-- 主視圖 -->
+    <div id="main-view" class="max-w-6xl mx-auto">
+        <header class="flex flex-col md:flex-row justify-between items-center mb-10 gap-6">
+            <div class="flex items-center space-x-4">
+                <div class="w-11 h-11 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-100">
+                    <i class="fa-solid fa-compass text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-extrabold text-slate-900 tracking-tight">Tools Hub</h1>
+                    <p class="text-[11px] font-medium text-slate-400">管理與存取您的開發專案</p>
+                </div>
+            </div>
+            <div class="relative w-full md:w-72">
+                <i class="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                <input type="text" id="search" placeholder="搜尋專案名稱..." 
+                    class="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-slate-200 outline-none focus:ring-4 ring-blue-500/5 focus:border-blue-400 transition-all font-medium">
+            </div>
+        </header>
+
+        <div id="loading-state" class="flex flex-col items-center justify-center py-32 space-y-4">
+            <div class="animate-spin h-7 w-7 border-[3px] border-blue-600 border-t-transparent rounded-full"></div>
+            <p class="text-xs font-bold text-slate-400">正在同步 GitHub 資源與提交時間...</p>
+        </div>
+
+        <div id="project-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 hidden">
+            <!-- 卡片動態生成 -->
+        </div>
+    </div>
+
+    <!-- 詳情視圖 (Overlay) -->
+    <div id="detail-view" class="detail-view p-4 md:p-12">
+        <div class="max-w-5xl mx-auto">
+            <button onclick="closeDetail()" class="mb-10 flex items-center text-slate-500 hover:text-blue-600 font-bold transition-all px-4 py-2 rounded-xl hover:bg-slate-100">
+                <i class="fa-solid fa-chevron-left mr-2 text-xs"></i> 返回清單
+            </button>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-12">
+                <!-- 左側：版本與資訊 -->
+                <div class="lg:col-span-1">
+                    <div class="inline-block px-2.5 py-1 rounded-lg bg-blue-50 text-blue-600 text-[10px] font-bold mb-3" id="detail-title-id">
+                        Project ID
+                    </div>
+                    <h1 id="detail-title" class="text-3xl font-extrabold text-slate-900 mb-4 leading-tight">專案標題</h1>
+                    <p id="detail-time" class="text-[11px] text-slate-400 mb-8 flex items-center">
+                        <i class="fa-regular fa-clock mr-1.5"></i> 載入更新時間中...
+                    </p>
+                    
+                    <div class="space-y-8">
+                        <div>
+                            <p class="text-[11px] font-bold text-slate-400 mb-4 flex items-center">
+                                <i class="fa-solid fa-list-ul mr-2"></i> 可用版本
+                            </p>
+                            <div id="detail-versions" class="flex flex-col gap-2">
+                                <!-- 版本連結 -->
+                            </div>
+                        </div>
+                        <div class="pt-8 border-t border-slate-100">
+                            <p class="text-[11px] font-bold text-slate-400 mb-4 flex items-center">
+                                <i class="fa-solid fa-circle-info mr-2"></i> 專案細節
+                            </p>
+                            <div id="detail-stats" class="text-xs space-y-3 font-semibold text-slate-600">
+                                <!-- 統計 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側：README 內容 -->
+                <div class="lg:col-span-2 bg-slate-50/50 rounded-[2rem] p-6 md:p-10 border border-slate-100">
+                    <div class="flex items-center justify-between mb-8">
+                        <span class="text-[11px] font-bold text-slate-400">說明文件內容</span>
+                        <div class="flex space-x-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full bg-slate-200"></span>
+                            <span class="w-1.5 h-1.5 rounded-full bg-slate-200"></span>
+                            <span class="w-1.5 h-1.5 rounded-full bg-slate-200"></span>
+                        </div>
+                    </div>
+                    <div id="readme-box" class="readme-content text-slate-600 text-sm">
+                        <!-- 說明文件內容 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
-        const USER = 'klhrd'; 
-        const REPO = 'tools';
-        // 使用 recursive=1 抓取所有層級的檔案
-        const API_URL = `https://api.github.com/repos/${USER}/${REPO}/git/trees/main?recursive=1`;
+        const CONFIG = { USER: 'klhrd', REPO: 'tools', BRANCH: 'main' };
+        const TREE_API = `https://api.github.com/repos/${CONFIG.USER}/${CONFIG.REPO}/git/trees/${CONFIG.BRANCH}?recursive=1`;
+        const COMMITS_API = `https://api.github.com/repos/${CONFIG.USER}/${CONFIG.REPO}/commits?sha=${CONFIG.BRANCH}`;
+        const RAW_BASE = `https://raw.githubusercontent.com/${CONFIG.USER}/${CONFIG.REPO}/${CONFIG.BRANCH}`;
+        
+        let projectsData = {};
+
+        // 設定 Marked 選項
+        marked.setOptions({
+            breaks: true,
+            gfm: true
+        });
 
         async function init() {
             try {
-                const res = await fetch(API_URL);
-                const json = await res.json();
-                const container = document.getElementById('container');
-                container.innerHTML = '';
+                // 平行抓取 Tree 和最近的 Commits
+                const [treeRes, commitsRes] = await Promise.all([
+                    fetch(TREE_API),
+                    fetch(COMMITS_API)
+                ]);
+                
+                const treeData = await treeRes.json();
+                const commitsData = await commitsRes.json();
+                
+                const lastUpdated = commitsData.length > 0 ? new Date(commitsData[0].commit.committer.date).toLocaleString('zh-TW') : '未知';
 
-                // 1. 篩選出所有的 HTML 檔案（排除掉 index.html 自身）
-                const htmlFiles = json.tree.filter(item => 
-                    item.path.endsWith('.html') && item.path !== 'index.html'
-                );
+                const htmlFiles = treeData.tree.filter(item => item.path.endsWith('.html') && item.path !== 'index.html');
+                const readmes = treeData.tree.filter(item => item.path.toLowerCase().endsWith('readme.md'));
 
-                // 2. 依照第一層資料夾名稱分組
-                const groups = {};
-                htmlFiles.forEach(file => {
-                    const parts = file.path.split('/');
-                    const groupName = parts.length > 1 ? parts[0] : '根目錄專案';
-                    if (!groups[groupName]) groups[groupName] = [];
-                    groups[groupName].push(file);
-                });
-
-                // 3. 渲染畫面
-                for (const [name, files] of Object.entries(groups)) {
-                    const section = document.createElement('div');
-                    section.className = 'project-group';
-                    section.innerHTML = `<div class="project-title">📁 ${name}</div>`;
-                    
-                    const ul = document.createElement('ul');
-                    ul.className = 'file-list';
-                    
-                    files.forEach(f => {
-                        const li = document.createElement('li');
-                        li.className = 'file-item';
-                        // 顯示完整路徑或檔案名
-                        li.innerHTML = `<a href="./${f.path}">📄 ${f.path.replace(name + '/', '')}</a>`;
-                        ul.appendChild(li);
-                    });
-                    
-                    section.appendChild(ul);
-                    container.appendChild(section);
-                }
-            } catch (e) {
-                container.innerHTML = '讀取失敗，請確認帳號與 Repo 名稱是否正確。';
+                projectsData = groupData(htmlFiles, readmes, lastUpdated);
+                await renderGrid(projectsData);
+                handleUrlHash();
+            } catch (err) {
+                document.getElementById('loading-state').innerHTML = '<p class="text-red-500 font-bold">同步失敗，請確認倉庫設定或網路連線</p>';
             }
         }
+
+        window.addEventListener('hashchange', handleUrlHash);
+
+        function handleUrlHash() {
+            const hashId = window.location.hash.replace('#', '');
+            if (hashId && projectsData[hashId]) {
+                openDetail(hashId, false);
+            } else if (!hashId) {
+                closeDetail(false);
+            }
+        }
+
+        function groupData(files, readmes, defaultTime) {
+            const groups = {};
+            files.forEach(file => {
+                const folder = file.path.split('/')[0];
+                if (!groups[folder]) {
+                    groups[folder] = {
+                        id: folder,
+                        displayName: folder,
+                        files: [],
+                        updatedAt: defaultTime,
+                        readme: readmes.find(r => r.path.startsWith(folder)) || null
+                    };
+                }
+                const label = file.path.replace(folder + '/', '').replace('.html', '').replace('/index', '') || '主程式';
+                groups[folder].files.push({ path: file.path, label, isMain: label === '主程式' });
+            });
+            return groups;
+        }
+
+        function cleanTitle(text) {
+            if (!text) return null;
+            const mdLinkMatch = text.match(/\[(.*?)\]\(.*?\)/);
+            if (mdLinkMatch) return mdLinkMatch[1].trim();
+            const h1Match = text.match(/^#\s+(.*)/m);
+            return h1Match ? h1Match[1].trim() : text.trim();
+        }
+
+        async function renderGrid(groups) {
+            const grid = document.getElementById('project-grid');
+            const list = Object.values(groups);
+
+            grid.innerHTML = '';
+            for (const group of list) {
+                const entry = group.files.find(f => f.isMain) || group.files[0];
+                
+                let displayTitle = group.id;
+                if (group.readme) {
+                    try {
+                        const r = await fetch(`${RAW_BASE}/${group.readme.path}`);
+                        const t = await r.text();
+                        displayTitle = cleanTitle(t) || group.id;
+                        group.fullReadme = t; 
+                        group.displayName = displayTitle;
+                    } catch(e) {}
+                }
+
+                const card = document.createElement('div');
+                card.className = 'glass-card rounded-2xl p-5 flex flex-col h-full cursor-default';
+                card.dataset.search = (group.id + displayTitle).toLowerCase();
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-center mb-5">
+                        <span class="text-[10px] font-bold bg-slate-900 text-white px-2 py-0.5 rounded-lg shadow-sm">${group.id}</span>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-[10px] text-slate-500 font-bold"><i class="fa-regular fa-clock"></i></span>
+                            <span class="text-[10px] text-slate-600 font-bold bg-white px-2 py-0.5 rounded-lg border border-slate-200">${group.files.length} 檔案</span>
+                        </div>
+                    </div>
+                    
+                    <a href="./${entry.path}" class="text-[17px] font-bold text-slate-800 hover:text-blue-600 transition-colors mb-6 block leading-snug">
+                        ${displayTitle}
+                    </a>
+                    
+                    <div class="mt-auto pt-4 border-t border-slate-50 flex items-center justify-between">
+                        <button onclick="location.hash='${group.id}'" class="text-xs font-bold text-slate-400 hover:text-blue-600 transition-all flex items-center group">
+                            查看詳情 <i class="fa-solid fa-arrow-right-long ml-2 transition-transform group-hover:translate-x-1"></i>
+                        </button>
+                        <span class="text-[9px] text-slate-300 font-medium italic">最近更新：${group.updatedAt.split(' ')[0]}</span>
+                    </div>
+                `;
+                grid.appendChild(card);
+            }
+            document.getElementById('loading-state').classList.add('hidden');
+            grid.classList.remove('hidden');
+        }
+
+        function openDetail(id, updateHash = true) {
+            const group = projectsData[id];
+            if (!group) return;
+
+            const view = document.getElementById('detail-view');
+            document.getElementById('detail-title-id').textContent = group.id;
+            document.getElementById('detail-title').textContent = group.displayName;
+            document.getElementById('detail-time').innerHTML = `<i class="fa-regular fa-clock mr-1.5"></i> 最後更新時間：${group.updatedAt}`;
+            
+            const vBox = document.getElementById('detail-versions');
+            vBox.innerHTML = group.files.map(f => `
+                <a href="./${f.path}" class="flex items-center justify-between p-3.5 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50/50 transition-all group bg-white shadow-sm">
+                    <span class="text-sm font-semibold text-slate-700 group-hover:text-blue-700">${f.label}</span>
+                    <i class="fa-solid fa-external-link text-[10px] text-slate-300 group-hover:text-blue-500"></i>
+                </a>
+            `).join('');
+
+            document.getElementById('detail-stats').innerHTML = `
+                <div class="flex justify-between p-2.5 bg-white rounded-lg border border-slate-100 shadow-sm">
+                    <span class="text-slate-400">版本總計</span>
+                    <span class="text-slate-900">${group.files.length}</span>
+                </div>
+                <div class="flex flex-col p-2.5 bg-white rounded-lg border border-slate-100 shadow-sm space-y-1">
+                    <span class="text-slate-400">預設進入點</span>
+                    <span class="text-blue-600 truncate italic text-[10px] underline">${group.files[0].path}</span>
+                </div>
+            `;
+
+            const readmeBox = document.getElementById('readme-box');
+            if (group.fullReadme) {
+                readmeBox.innerHTML = marked.parse(group.fullReadme);
+            } else {
+                readmeBox.innerHTML = '<p class="text-slate-400 italic py-10 text-center">此專案暫無說明文件。</p>';
+            }
+
+            if (updateHash) location.hash = id;
+            view.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeDetail(updateHash = true) {
+            document.getElementById('detail-view').style.display = 'none';
+            document.body.style.overflow = 'auto';
+            if (updateHash) {
+                // 修復：在沙盒環境中使用 location.hash 清除代替 history.pushState 以避免 SecurityError
+                location.hash = '';
+            }
+        }
+
+        document.getElementById('search').addEventListener('input', (e) => {
+            const q = e.target.value.toLowerCase();
+            document.querySelectorAll('.glass-card').forEach(c => {
+                c.style.display = c.dataset.search.includes(q) ? 'flex' : 'none';
+            });
+        });
+
         init();
     </script>
 </body>
