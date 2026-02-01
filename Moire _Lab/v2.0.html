@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Moiré Lab v2.0 - FULL SYSTEM (75 MODES)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #050505;
+            --primary: #0f0;
+            --accent: #0ff;
+            --warning: #f0f;
+            --danger: #f00;
+            --glass: rgba(0, 20, 0, 0.6);
+            --border: rgba(0, 255, 0, 0.3);
+            --font-main: 'Share Tech Mono', monospace;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background-color: var(--bg-color); overflow: hidden;
+            font-family: var(--font-main); color: var(--primary);
+        }
+
+        canvas { display: block; position: absolute; top: 0; left: 0; z-index: 1; }
+
+        .crt-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background-size: 100% 2px, 3px 100%; pointer-events: none; z-index: 900;
+            box-shadow: inset 0 0 100px rgba(0,0,0,0.7);
+        }
+
+        #hud-top {
+            position: absolute; top: 0; left: 0; width: 100%; height: 50px;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 15px; background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);
+            z-index: 100; border-bottom: 1px solid var(--border); backdrop-filter: blur(5px);
+        }
+
+        .brand-box { display: flex; flex-direction: column; line-height: 1; }
+        .brand { font-size: 18px; font-weight: bold; color: #fff; letter-spacing: 2px; text-shadow: 0 0 5px var(--primary); }
+        .version { font-size: 10px; color: var(--danger); letter-spacing: 1px; animation: blink 2s infinite; }
+
+        .nav-controls { display: flex; gap: 15px; align-items: center; }
+        .nav-btn {
+            background: transparent; border: 1px solid var(--primary); color: var(--primary);
+            padding: 5px 12px; cursor: pointer; font-family: var(--font-main); font-size: 14px;
+            text-transform: uppercase; transition: all 0.2s;
+            clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%);
+        }
+        .nav-btn:hover { background: var(--primary); color: #000; box-shadow: 0 0 10px var(--primary); }
+        .nav-btn.disabled { opacity: 0.3; pointer-events: none; border-color: #555; color: #555; }
+
+        #hud-bottom {
+            position: absolute; bottom: 20px; left: 20px; right: 20px;
+            display: flex; justify-content: space-between; align-items: flex-end;
+            z-index: 100; pointer-events: none;
+        }
+
+        .param-box {
+            background: rgba(0, 0, 0, 0.6); border-left: 3px solid var(--primary);
+            padding: 10px; font-size: 14px; backdrop-filter: blur(3px); min-width: 200px;
+        }
+        .param-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .param-label { color: #888; margin-right: 10px; }
+        .param-val { color: #fff; font-weight: bold; }
+
+        #dashboard {
+            position: absolute; top: 50px; left: 0; width: 100%; bottom: 0;
+            background: rgba(0, 0, 0, 0.9); z-index: 800;
+            display: flex; flex-direction: column; align-items: center;
+            overflow-y: auto; padding: 20px; backdrop-filter: blur(10px);
+            transition: opacity 0.3s;
+        }
+        #dashboard.hidden { opacity: 0; pointer-events: none; }
+
+        .category-title {
+            width: 100%; max-width: 1000px; color: var(--accent);
+            border-bottom: 1px solid var(--border); margin: 30px 0 15px 0;
+            padding-bottom: 5px; font-size: 14px; letter-spacing: 2px; text-transform: uppercase;
+        }
+        .grid-container {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 10px; width: 100%; max-width: 1000px;
+        }
+
+        .card {
+            background: rgba(0, 20, 0, 0.3); border: 1px solid #333; padding: 12px;
+            cursor: pointer; transition: all 0.2s; position: relative;
+            overflow: hidden; text-decoration: none; display: block;
+        }
+        .card:hover {
+            border-color: var(--primary); background: rgba(0, 255, 0, 0.05);
+            transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0, 255, 0, 0.1);
+        }
+        .card::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 3px; height: 100%;
+            background: var(--primary); opacity: 0; transition: opacity 0.2s;
+        }
+        .card:hover::before { opacity: 1; }
+        .card-num { font-size: 10px; color: #555; margin-bottom: 5px; }
+        .card-title { color: #fff; font-size: 14px; font-weight: bold; margin-bottom: 5px; }
+        .card-desc { font-size: 11px; color: #888; line-height: 1.3; }
+
+        .card.danger { border-color: #500; }
+        .card.danger:hover { border-color: var(--danger); box-shadow: 0 4px 15px rgba(255, 0, 0, 0.1); }
+        .card.danger .card-title { color: #f88; }
+        .card.danger::before { background: var(--danger); }
+
+        .hint-overlay {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            pointer-events: none; opacity: 0; transition: opacity 0.5s; z-index: 50; text-align: center;
+        }
+        .hint-icon { font-size: 40px; animation: float 2s infinite ease-in-out; color: rgba(255, 255, 255, 0.5); }
+        .hint-text { margin-top: 10px; font-size: 12px; color: rgba(255, 255, 255, 0.5); text-transform: uppercase; letter-spacing: 2px; }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+    </style>
+</head>
+<body>
+
+    <div class="crt-overlay"></div>
+
+    <header id="hud-top">
+        <div class="brand-box">
+            <span class="brand">MOIRÉ LAB</span>
+            <span class="version">V2.0 // FULL SYSTEM (75)</span>
+        </div>
+        <div class="nav-controls">
+            <button id="btn-prev" class="nav-btn">&lt;</button>
+            <button id="btn-menu" class="nav-btn">MENU</button>
+            <button id="btn-next" class="nav-btn">&gt;</button>
+        </div>
+    </header>
+
+    <div id="dashboard">
+        <h1 style="color:white; letter-spacing:5px; text-shadow: 0 0 10px var(--danger); margin-top: 40px;">SELECT PROTOCOL</h1>
+        
+        <div class="category-title">I. GEOMETRIC INTERFERENCE</div><div class="grid-container" id="grid-cat-1"></div>
+        <div class="category-title">II. COMPUTATIONAL ERRORS</div><div class="grid-container" id="grid-cat-2"></div>
+        <div class="category-title">III. HARDWARE STRESS</div><div class="grid-container" id="grid-cat-3"></div>
+        <div class="category-title">IV. OPTICAL OVERLOAD</div><div class="grid-container" id="grid-cat-4"></div>
+        <div class="category-title">V. ALGORITHMIC CHAOS</div><div class="grid-container" id="grid-cat-5"></div>
+        <div class="category-title">VI. DEEP SYSTEM</div><div class="grid-container" id="grid-cat-6"></div>
+        <div class="category-title">VII. HYPER FREQUENCY</div><div class="grid-container" id="grid-cat-7"></div>
+        <div class="category-title">VIII. VISUAL DISASTER</div><div class="grid-container" id="grid-cat-8"></div>
+        <div class="category-title">IX. HARDWARE VOLTAGE</div><div class="grid-container" id="grid-cat-9"></div>
+        <div class="category-title">X. LOGIC DESTRUCTION</div><div class="grid-container" id="grid-cat-10"></div>
+        <div class="category-title">XI. ENCODER NIGHTMARE</div><div class="grid-container" id="grid-cat-11"></div>
+        <div class="category-title">XII. NEURAL SHOCK</div><div class="grid-container" id="grid-cat-12"></div>
+        
+        <div style="height: 50px;"></div>
+    </div>
+
+    <div id="hud-bottom">
+        <div class="param-box">
+            <div class="param-row"><span class="param-label">MODE:</span><span class="param-val" id="hud-mode">IDLE</span></div>
+            <div class="param-row"><span class="param-label">X-AXIS:</span><span class="param-val" id="hud-x">N/A</span></div>
+            <div class="param-row"><span class="param-label">Y-AXIS:</span><span class="param-val" id="hud-y">N/A</span></div>
+            <div class="param-row" style="margin-top:5px; border-top:1px solid #333; padding-top:2px;">
+                <span class="param-label">FPS:</span><span class="param-val" id="hud-fps">60</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="hint-overlay" class="hint-overlay">
+        <div class="hint-icon">✜</div>
+        <div class="hint-text">Move Cursor to Interact</div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        // --- Metadata (75 ITEMS) ---
+        const experiments = [
+            // I. GEOMETRIC
+            { id: 'spiral', cat: 1, title: 'Fermat Spiral', desc: '極座標點陣干涉', pX: 'Density', pY: 'N/A' },
+            { id: 'target', cat: 1, title: 'Target Plate', desc: '密集同心圓取樣', pX: 'Spacing', pY: 'Line Width' },
+            { id: 'xor', cat: 1, title: 'XOR Logic', desc: '二進位邏輯紋理', pX: 'Zoom', pY: 'Color' },
+            { id: 'sierpinski', cat: 1, title: 'Sierpinski', desc: '碎形三角對齊錯誤', pX: 'Scale', pY: 'N/A' },
+            { id: 'scanline', cat: 1, title: 'Scanlines', desc: '掃描線混疊', pX: 'Pitch', pY: 'Shift' },
+            
+            // II. ERRORS
+            { id: 'float', cat: 2, title: 'Float Error', desc: '浮點精度崩潰', pX: 'Factor A', pY: 'Factor B' },
+            { id: 'fractal', cat: 2, title: 'Mandelbrot', desc: '分形邊緣噪點', pX: 'Pan', pY: 'Zoom' },
+            { id: 'hilbert', cat: 2, title: 'Hilbert Curve', desc: '空間填充曲線', pX: 'Order', pY: 'Width' },
+            { id: 'bitshift', cat: 2, title: 'Bit-Shift', desc: '位元移位運算', pX: 'Mask', pY: 'Zoom' },
+            { id: 'subpixel', cat: 2, title: 'Sub-pixel', desc: '非整數寬度線條', pX: 'Space', pY: 'Mode' },
+
+            // III. STRESS
+            { id: 'dither', cat: 3, title: 'Dither Chaos', desc: 'Bayer 抖動', pX: 'Offset', pY: 'Thresh' },
+            { id: 'inversion', cat: 3, title: 'Inversion', desc: '極性反轉測試', pX: 'Phase', pY: 'Flicker' },
+            { id: 'sinewave', cat: 3, title: 'Singularity', desc: '中心無限頻率', pX: 'Scale', pY: 'N/A' },
+            { id: 'julia', cat: 3, title: 'Julia Webs', desc: '殘影神經元', pX: 'Pan', pY: 'Zoom' },
+            { id: 'ant', cat: 3, title: 'Langton Ant', desc: '細胞自動機路徑', pX: 'N/A', pY: 'N/A' },
+
+            // IV. OPTICAL
+            { id: 'carpet', cat: 4, title: 'Carpet', desc: '地毯濾波', pX: 'Zoom', pY: 'Noise' },
+            { id: 'zone', cat: 4, title: 'Zone Plate', desc: '正弦頻率折疊', pX: 'Freq', pY: 'Mix' },
+            { id: 'bitplane', cat: 4, title: 'Bit-Plane', desc: '最低位元雜訊', pX: 'Freq', pY: 'Bit' },
+            { id: 'life', cat: 4, title: 'Game of Life', desc: '高密度渲染', pX: 'Inject', pY: 'N/A' },
+            { id: 'interlace', cat: 4, title: 'Interlace', desc: '交錯掃描色偏', pX: 'N/A', pY: 'Mode' },
+
+            // V. ALGORITHMIC
+            { id: 'quillet', cat: 5, title: 'Quillet', desc: '自指公式噪點', pX: 'Param', pY: 'Zoom' },
+            { id: 'bitstir', cat: 5, title: 'Bit-Stir', desc: '暴力位元攪拌', pX: 'Flow', pY: 'Mode' },
+            { id: 'ramanujan', cat: 5, title: 'Ramanujan', desc: '連分數細絲', pX: 'Freq', pY: 'N/A' },
+            { id: 'walk', cat: 5, title: 'Random Walk', desc: '動態補償過載', pX: 'Glitch', pY: 'N/A' },
+            { id: 'checker', cat: 5, title: 'Checker', desc: '高頻棋盤位移', pX: 'N/A', pY: 'N/A' },
+
+            // VI. DEEP SYSTEM
+            { id: 'bluenoise', cat: 6, title: 'Blue Noise', desc: '誤差擴散誤判', pX: 'Freq', pY: 'Shift' },
+            { id: 'peano', cat: 6, title: 'Peano Curve', desc: '高階填充混疊', pX: 'Order', pY: 'Scale' },
+            { id: 'drift', cat: 6, title: 'Grid Drift', desc: '網格漂移誤差', pX: 'Speed', pY: 'Gap' },
+            { id: 'prbs', cat: 6, title: 'PRBS Noise', desc: '偽隨機序列', pX: 'Seed', pY: 'Clock' },
+            { id: 'virus', cat: 6, title: 'Virus Auto', desc: '馮諾依曼增長', pX: 'Mutate', pY: 'N/A' },
+            { id: 'lorenz', cat: 6, title: 'Lorenz', desc: '混沌系統投影', pX: 'Rho', pY: 'Yaw' },
+            { id: 'invattack', cat: 6, title: 'Inv. Attack', desc: 'VCOM 反轉攻擊', pX: 'Pattern', pY: 'Flicker', danger: true },
+            { id: 'hermann', cat: 6, title: 'Hermann', desc: '視覺柵格幻覺', pX: 'Grid', pY: 'Blur' },
+            { id: 'voronoi', cat: 6, title: 'Voronoi', desc: '極限細分光柵化', pX: 'Density', pY: 'Seed' },
+            { id: 'bitslice', cat: 6, title: 'Bit Slice', desc: '異質位元干涉', pX: 'Contrast', pY: 'Layer' },
+
+            // VII. HYPER FREQUENCY
+            { id: 'rainbow', cat: 7, title: 'Rainbow Diff', desc: '亞像素彩虹', pX: 'Shift', pY: 'Gap' },
+            { id: 'bitflip', cat: 7, title: 'Bit-Flip', desc: 'LSB 位元翻轉', pX: 'Scale', pY: 'Wave' },
+            { id: 'floyd', cat: 7, title: 'Floyd Maze', desc: '誤差擴散迷宮', pX: 'Grad', pY: 'Bias' },
+            { id: 'chaikin', cat: 7, title: 'Chaikin', desc: '無限切角過載', pX: 'Iter', pY: 'Noise' },
+            { id: 'cyclexor', cat: 7, title: 'Cycle XOR', desc: '循環互斥掃描', pX: 'K-Fact', pY: 'Time' },
+            { id: 'dragon', cat: 7, title: 'Dragon', desc: '龍形曲線混疊', pX: 'Iter', pY: 'Zoom' },
+            { id: 'checker2', cat: 7, title: 'Check 2x2', desc: '2x2 極性反轉', pX: 'Drift', pY: 'N/A', danger: true },
+            { id: 'chirp', cat: 7, title: 'Freq Chirp', desc: '漸變頻率掃描', pX: 'Rate', pY: 'Scroll', danger: true },
+            { id: 'kelly', cat: 7, title: 'Kelly Noise', desc: '擬凱利噪點', pX: 'Filter', pY: 'Amp' },
+            { id: 'spiralbit', cat: 7, title: 'Spiral Bit', desc: '位元移位螺旋', pX: 'Twist', pY: 'Shift' },
+
+            // VIII. VISUAL DISASTER
+            { id: 'subcheck', cat: 8, title: 'Sub-Check', desc: '亞像素色散', pX: 'Shift', pY: 'Cycle', danger: true },
+            { id: 'randsine', cat: 8, title: 'Rand Phase', desc: '隨機相位熱浪', pX: 'Freq', pY: 'Time' },
+            { id: 'cantor', cat: 8, title: 'Cantor Dust', desc: '測度為零塵埃', pX: 'Depth', pY: 'Zoom' },
+            { id: 'floatmod', cat: 8, title: 'Float Mod', desc: '餘數誤差波紋', pX: 'Div', pY: 'Scale' },
+            { id: 'clouds', cat: 8, title: 'Moiré Clouds', desc: '雙層極細干涉', pX: 'Offset', pY: 'Mix' },
+            { id: 'blue1bit', cat: 8, title: '1-Bit Blue', desc: '藍噪點量化', pX: 'Dens', pY: 'Grad' },
+            { id: 'bitfeed', cat: 8, title: 'Bit Feed', desc: '位元死循環', pX: 'Shift', pY: 'Mask' },
+            { id: 'cycshift', cat: 8, title: 'Cyc Shift', desc: '逐行像素偏移', pX: 'Slope', pY: 'Gap' },
+            { id: 'dynhermann', cat: 8, title: 'Dyn Hermann', desc: '呼吸赫曼柵格', pX: 'Pulse', pY: 'Grid' },
+            { id: 'graytog', cat: 8, title: 'Gray Toggle', desc: '254/255 極限', pX: 'N/A', pY: 'N/A', danger: true },
+
+            // IX. HARDWARE VOLTAGE (New)
+            { id: 'subint', cat: 9, title: 'Sub-Int', desc: 'R/B 垂直交錯', pX: 'Shift', pY: 'Gap', danger: true },
+            { id: 'dcbias', cat: 9, title: 'DC-Bias', desc: '127/128 偏置', pX: 'Grid', pY: 'Level' },
+            { id: 'phaseshift', cat: 9, title: 'Phase Shift', desc: '掃描線相位偏', pX: 'Freq', pY: 'Phase' },
+            { id: 'rgbdrift', cat: 9, title: 'RGB Drift', desc: '三原色循環偏', pX: 'Speed', pY: 'Gap' },
+            { id: 'negflicker', cat: 9, title: 'Neg Flicker', desc: '負空間背光閃', pX: 'Dens', pY: 'Rate', danger: true },
+
+            // X. LOGIC DESTRUCTION (New)
+            { id: 'hamming', cat: 10, title: 'Hamming', desc: '漢明距離噪點', pX: 'Scale', pY: 'Mode' },
+            { id: 'phispiral', cat: 10, title: 'Phi-Spiral', desc: '黃金螺旋混疊', pX: 'Dens', pY: 'Zoom' },
+            { id: 'modcollapse', cat: 10, title: 'Mod Col.', desc: '大數餘數塌陷', pX: 'Base', pY: 'Exp' },
+            { id: 'erosion', cat: 10, title: 'Erosion', desc: '碎形孔洞侵蝕', pX: 'Zoom', pY: 'XOR' },
+            { id: 'bitrev', cat: 10, title: 'Bit Rev', desc: '位元倒置掃描', pX: 'Shift', pY: 'Zoom' },
+
+            // XI. ENCODER NIGHTMARE (New)
+            { id: 'entropy', cat: 11, title: 'Entropy', desc: '純隨機1-Bit', pX: 'Seed', pY: 'Noise', danger: true },
+            { id: 'fakemotion', cat: 11, title: 'Fake Motion', desc: '偽運動向量', pX: 'Freq', pY: 'Amp' },
+            { id: 'bleed', cat: 11, title: 'Color Bleed', desc: '洋紅青色滲透', pX: 'Width', pY: 'Shift' },
+            { id: 'macroblock', cat: 11, title: 'Macroblock', desc: '塊狀邊界誘發', pX: 'Grid', pY: 'Cont' },
+            { id: 'shimmer', cat: 11, title: 'Shimmer', desc: '時間隨機亮度', pX: 'Rate', pY: 'Delta' },
+
+            // XII. NEURAL SHOCK (New)
+            { id: 'periflicker', cat: 12, title: 'Peri-Flick', desc: '周邊視覺頻閃', pX: 'Rad', pY: 'Freq', danger: true },
+            { id: 'impgrad', cat: 12, title: 'Imp. Grad', desc: '馬赫帶階梯', pX: 'Steps', pY: 'Curve' },
+            { id: 'chromashad', cat: 12, title: 'Chroma Shad', desc: '黑白網格幻覺', pX: 'Grid', pY: 'Color' },
+            { id: 'negafter', cat: 12, title: 'Neg After', desc: '補色殘留對比', pX: 'Flash', pY: 'Color', danger: true },
+            { id: 'flickermoire', cat: 12, title: 'Flick Moiré', desc: '閃爍誘導圖案', pX: 'Beat', pY: 'Pat', danger: true }
+        ];
+
+        // --- Core ---
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        const dashboard = document.getElementById('dashboard');
+        const hudMode = document.getElementById('hud-mode');
+        const hudX = document.getElementById('hud-x');
+        const hudY = document.getElementById('hud-y');
+        const hudFps = document.getElementById('hud-fps');
+        const hintOverlay = document.getElementById('hint-overlay');
+
+        let width, height, centerX, centerY;
+        let animationId;
+        let currentExpIndex = -1;
+        let frameCount = 0;
+        let lastTime = 0;
+        let mouseX = 1, mouseY = 1;
+
+        // Buffers & State
+        let pixelBuffer = null, pixelData32 = null;
+        let antX, antY, antDir;
+        let lifeGridA, lifeGridB;
+        let virusGridA, virusGridB;
+        let walkers = [];
+        let lorenzPoints = [], voronoiPoints = [], dragonPoints = [];
+
+        function initUI() {
+            experiments.forEach((exp, idx) => {
+                const container = document.getElementById(`grid-cat-${exp.cat}`);
+                if (container) {
+                    const card = document.createElement('a');
+                    card.className = `card ${exp.danger ? 'danger' : ''}`;
+                    card.href = `#${exp.id}`;
+                    card.innerHTML = `<div class="card-num">NO. ${String(idx+1).padStart(2,'0')}</div><div class="card-title">${exp.title}</div><div class="card-desc">${exp.desc}</div>`;
+                    card.onclick = (e) => { e.preventDefault(); loadExperiment(idx); };
+                    container.appendChild(card);
+                }
+            });
+            document.getElementById('btn-menu').onclick = toggleMenu;
+            document.getElementById('btn-prev').onclick = () => navigate(-1);
+            document.getElementById('btn-next').onclick = () => navigate(1);
+        }
+
+        function toggleMenu() { currentExpIndex = -1; updateRoute(); }
+        function navigate(dir) {
+            if (currentExpIndex === -1) { if (dir === 1) loadExperiment(0); return; }
+            let nextIdx = currentExpIndex + dir;
+            if (nextIdx < 0) nextIdx = experiments.length - 1;
+            if (nextIdx >= experiments.length) nextIdx = 0;
+            loadExperiment(nextIdx);
+        }
+        function loadExperiment(idx) { currentExpIndex = idx; updateRoute(); }
+
+        function updateRoute() {
+            const exp = experiments[currentExpIndex];
+            if (animationId) cancelAnimationFrame(animationId);
+            
+            if (currentExpIndex === -1) {
+                dashboard.classList.remove('hidden'); canvas.style.opacity = '0.1';
+                document.getElementById('btn-prev').classList.add('disabled');
+                document.getElementById('btn-next').classList.add('disabled');
+                document.getElementById('btn-menu').classList.add('disabled');
+                hudMode.innerText = "DASHBOARD"; hudX.innerText = "N/A"; hudY.innerText = "N/A";
+                window.location.hash = '';
+                currentScene = scenes['home']; if(currentScene.init) currentScene.init(); loop();
+            } else {
+                dashboard.classList.add('hidden'); canvas.style.opacity = '1';
+                document.getElementById('btn-prev').classList.remove('disabled');
+                document.getElementById('btn-next').classList.remove('disabled');
+                document.getElementById('btn-menu').classList.remove('disabled');
+                window.location.hash = exp.id;
+                hudMode.innerText = exp.title.toUpperCase();
+                
+                const sceneKey = exp.id;
+                currentScene = scenes[sceneKey];
+                
+                // Auto rendering list
+                const autoRender = ['scanline', 'hilbert', 'subpixel', 'lorenz', 'peano', 'hermann', 'rainbow', 'dragon', 'chirp', 'chaikin', 'clouds', 'dynhermann', 'subcheck', 'subint', 'phaseshift', 'impgrad', 'chromashad', 'walk'];
+                canvas.style.imageRendering = autoRender.includes(sceneKey) ? 'auto' : 'pixelated';
+
+                if (currentScene && currentScene.init) currentScene.init();
+                hintOverlay.style.opacity = 1; setTimeout(() => hintOverlay.style.opacity = 0, 2000);
+                loop();
+            }
+        }
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            centerX = width / 2; centerY = height / 2;
+            
+            if (currentExpIndex !== -1) {
+                const id = experiments[currentExpIndex].id;
+                const noBuffer = ['clouds'];
+                if (!noBuffer.includes(id)) initBufferMode();
+                // Special inits
+                if(['ant','life','virus','walk','lorenz','voronoi','dragon'].includes(id)) {
+                    if(id==='ant') initAnt(); if(id==='life') initLife(); if(id==='virus') initVirus();
+                    if(id==='walk') initWalk(); if(id==='lorenz') initLorenz(); if(id==='voronoi') initVoronoi();
+                    if(id==='dragon') initDragon();
+                }
+            } else { scenes['home'].init(); }
+        }
+
+        function updateMouse(e) {
+            mouseX = e.clientX || 1; mouseY = e.clientY || 1;
+            if (currentExpIndex !== -1) {
+                const exp = experiments[currentExpIndex];
+                const pctX = ((mouseX / width) * 100).toFixed(0);
+                const pctY = ((mouseY / height) * 100).toFixed(0);
+                hudX.innerText = exp.pX !== 'N/A' ? `${exp.pX} ${pctX}%` : 'N/A';
+                hudY.innerText = exp.pY !== 'N/A' ? `${exp.pY} ${pctY}%` : 'N/A';
+            }
+        }
+
+        function loop(timestamp) {
+            if (!lastTime) lastTime = timestamp;
+            const delta = timestamp - lastTime;
+            if (delta >= 1000) { hudFps.innerText = Math.round((frameCount * 1000) / delta); frameCount = 0; lastTime = timestamp; }
+            if (currentScene && currentScene.draw) currentScene.draw();
+            if(currentExpIndex !== -1 || currentScene === scenes['home']) frameCount++; 
+            animationId = requestAnimationFrame(loop);
+        }
+
+        function initBufferMode() { pixelBuffer = ctx.createImageData(width, height); pixelData32 = new Uint32Array(pixelBuffer.data.buffer); }
+
+        // --- SCENE IMPLEMENTATIONS (75 ITEMS) ---
+        
+        let drops = [];
+        function initHome() { ctx.fillStyle = '#000'; ctx.fillRect(0,0,width,height); drops = Array(Math.floor(width/20)).fill(1); }
+        function drawHome() { ctx.fillStyle = 'rgba(0,0,0,0.1)'; ctx.fillRect(0,0,width,height); ctx.fillStyle = '#0f0'; ctx.font = '15px monospace'; for(let i=0; i<drops.length; i++) { const text = Math.random()>0.5?'1':'0'; ctx.fillText(text, i*20, drops[i]*20); if(drops[i]*20 > height && Math.random()>0.975) drops[i]=0; drops[i]++; } }
+
+        function initSpiral(){} function drawSpiral(){ctx.fillStyle='#000';ctx.fillRect(0,0,width,height);ctx.fillStyle='#fff';const sp=0.3+(mouseX/width)*2,c=5000,rot=performance.now()*0.0005;for(let i=0;i<c;i++){const a=i*2.399+rot,r=sp*Math.sqrt(i);ctx.fillRect(centerX+r*Math.cos(a),centerY+r*Math.sin(a),1,1);}}
+        function initTarget(){} function drawTarget(){ctx.fillStyle='#000';ctx.fillRect(0,0,width,height);ctx.strokeStyle='#fff';const g=1+(mouseX/width)*2,m=Math.max(width,height);ctx.lineWidth=1;ctx.beginPath();for(let r=0;r<m;r+=g){ctx.moveTo(centerX+r,centerY);ctx.arc(centerX,centerY,r,0,Math.PI*2);}ctx.stroke();}
+        function drawXor(){const t=performance.now()*0.1,z=0.1+(mouseX/width)*20;for(let y=0;y<height;y++){const yz=(y*z)|0,yi=y*width;for(let x=0;x<width;x++){const v=((x*z)^yz)+t;pixelData32[yi+x]=(255<<24)|(((v*3)&255)<<16)|(((v*2)&255)<<8)|(v&255);}}ctx.putImageData(pixelBuffer,0,0);}
+        function drawSierpinski(){const z=1+(mouseX/width)*100,t=performance.now()*0.1;for(let y=0;y<height;y++){const yi=y*width,sy=(y+t)*z;for(let x=0;x<width;x++){const sx=(x+t)*z;pixelData32[yi+x]=(((sx&sy)&0xFF)===0)?0xFF00FF00:0xFF000000;}}ctx.putImageData(pixelBuffer,0,0);}
+        function initScanline(){canvas.style.imageRendering='auto';} function drawScanline(){ctx.fillStyle='#000';ctx.fillRect(0,0,width,height);const sp=1.1+(mouseX/width);for(let x=0;x<width;x+=sp){ctx.fillStyle='rgba(255,0,0,0.8)';ctx.fillRect(x,0,0.5,height);ctx.fillStyle='rgba(0,0,255,0.8)';ctx.fillRect(x+0.5,0,0.5,height);}}
+        function drawFloat(){const t=performance.now()*0.001,fx=1e5+mouseX*1e4;for(let y=0;y<height;y++){const yi=y*width,ny=Math.sin(y*2e5+t);for(let x=0;x<width;x++){const n=(Math.sin(x*fx+ny)+1)*127,v=n&0xFF;pixelData32[yi+x]=(255<<24)|(v<<16)|(v<<8)|v;}}ctx.putImageData(pixelBuffer,0,0);}
+        function drawFractal(){const max=16, zm=0.005/(1+(mouseY/height)), pX=-2.0+(mouseX/width), pY=0; for(let y=0;y<height;y++){const yIdx=y*width, cIm=(y-height/2)*zm+pY; for(let x=0;x<width;x++){let cRe=(x-width/2)*zm+pX, zr=0, zi=0, n=0; for(;n<max;n++){const zr2=zr*zr, zi2=zi*zi; if(zr2+zi2>4)break; zi=2*zr*zi+cIm; zr=zr2-zi2+cRe;} const c=(n==max)?0:((n*32)&255); pixelData32[yIdx+x]=(255<<24)|(c<<16)|(c<<8)|c;}} ctx.putImageData(pixelBuffer,0,0);}
+        function initHilbert(){canvas.style.imageRendering='auto';} function drawHilbert(){ctx.fillStyle='#000';ctx.fillRect(0,0,width,height);ctx.strokeStyle='#0f0';const ord=4+((mouseX/width)*4)|0, N=1<<ord, sz=Math.min(width,height)*0.9, offX=(width-sz)/2, offY=(height-sz)/2, len=sz/N; ctx.lineWidth=1+(mouseY/height); ctx.beginPath(); const tot=N*N; for(let i=0;i<tot;i++){let t=i,x=0,y=0; for(let s=1;s<N;s*=2){let rx=1&(t/2), ry=1&(t^rx); if(ry===0){if(rx===1){x=s-1-x;y=s-1-y;}let tmp=x;x=y;y=tmp;} x+=s*rx; y+=s*ry; t/=4;} ctx.lineTo(offX+x*len, offY+y*len);} ctx.stroke();}
+        function drawBitShift(){const t=performance.now()*0.1, mX=(mouseX/10)|0, mY=(mouseY/10)+1|0; for(let y=0;y<height;y++){const yIdx=y*width; for(let x=0;x<width;x++){let v=((x+t)^(y+t))*((x+mX)&(y+mY)); v=(v>>3)&255; pixelData32[yIdx+x]=(255<<24)|(v<<16)|((v*0.5)<<8)|(v*2);}} ctx.putImageData(pixelBuffer,0,0);}
+        function initSubpixel(){canvas.style.imageRendering='auto';} function drawSubpixel(){ctx.fillStyle='#fff';ctx.fillRect(0,0,width,height);const lw=1.33, sp=1.66+(mouseX/width); ctx.fillStyle='#000'; for(let x=0;x<width;x+=sp) ctx.fillRect(x,0,lw,height); if(mouseY>height/2){ctx.fillStyle='rgba(0,0,0,0.5)';for(let y=0;y<height;y+=sp*1.01)ctx.fillRect(0,y,width,lw);}}
+        const bayer=[0,48,12,60,3,51,15,63,32,16,44,28,35,19,47,31,8,56,4,52,11,59,7,55,40,24,36,20,43,27,39,23,2,50,14,62,1,49,13,61,34,18,46,30,33,17,45,29,10,58,6,54,9,57,5,53,42,26,38,22,41,25,37,21];
+        function drawDither(){const sx=(mouseX/10)|0,t=performance.now()*0.01;for(let y=0;y<height;y++){const yi=y*width,by=(y+sx)&7;for(let x=0;x<width;x++){const m=bayer[by*8+((x+sx)&7)],w=Math.sin((x+y)*0.01+t)*32+32,v=(w>m)?255:0;pixelData32[yi+x]=(255<<24)|(v<<16)|(v<<8)|v;}}ctx.putImageData(pixelBuffer,0,0);}
+        function drawInversion(){const p=(mouseX%20)/10;for(let y=0;y<height;y++){const yi=y*width;for(let x=0;x<width;x++){let v=((x+p)+y)%2<1?255:0;if(Math.random()>0.99)v=255-v;pixelData32[yi+x]=(255<<24)|(v<<16)|(v<<8)|v;}}ctx.putImageData(pixelBuffer,0,0);}
+        function drawSineWave(){const sc=0.05+(mouseX/width)*0.5, t=performance.now()*0.005; for(let y=0;y<height;y++){const yIdx=y*width, dy=y-centerY; for(let x=0;x<width;x++){const d=Math.sqrt((x-centerX)**2+dy**2); let v=Math.sin(100.0/(d*sc+0.01)-t); v=(v+1)*127.5; pixelData32[yIdx+x]=(255<<24)|(v<<16)|(v<<8)|v;}} ctx.putImageData(pixelBuffer,0,0);}
+        function drawJulia(){const z=0.003/(1+mouseY/height),px=(mouseX-width/2)*0.005;for(let y=0;y<height;y++){const yi=y*width,ni=(y-height/2)*z;for(let x=0;x<width;x++){let nr=(x-width/2)*z+px,i=0,or=nr,oi=ni;for(;i<32;i++){const r2=or*or,i2=oi*oi;if(r2+i2>4)break;oi=2*or*oi+0.156;or=r2-i2-0.8;}const v=(i%2===0)?0:255;pixelData32[yi+x]=(255<<24)|(v<<16)|(v<<8)|v;}}ctx.putImageData(pixelBuffer,0,0);}
+        function initAnt(){initBufferMode();pixelData32.fill(0xFFFFFFFF);antX=(width/2)|0;antY=(height/2)|0;antDir=0;}function drawAnt(){for(let i=0;i<2000;i++){const idx=antY*width+antX,w=(pixelData32[idx]&0xFF)>128;if(w){antDir=(antDir+1)%4;pixelData32[idx]=0xFF000000;}else{antDir=(antDir+3)%4;pixelData32[idx]=0xFFFFFFFF;}if(antDir===0)antY--;else if(antDir===1)antX++;else if(antDir===2)antY++;else if(antDir===3)antX--;if(antX<0)antX=width-1;else if(antX>=width)antX=0;if(antY<0)antY=height-1;else if(antY>=height)antY=0;}ctx.putImageData(pixelBuffer,0,0);}
+        function drawCarpet() { const z=1+(mouseX/width)*20, ox=performance.now()*0.1, oy=performance.now()*0.05; for(let y=0;y<height;y++){const yIdx=y*width, sy=((y+oy)*z)|0; for(let x=0;x<width;x++){const sx=((x+ox)*z)|0; let cx=sx, cy=sy, h=false; while(cx>0||cy>0){if(cx%3===1 && cy%3===1){h=true;break;} cx=(cx/3)|0; cy=(cy/3)|0;} if(h){pixelData32[yIdx+x]=0xFF000000;}else{let v=255; if(mouseY>height/2) v=(sx^sy)&255; pixelData32[yIdx+x]=(255<<24)|(v<<16)|(v<<8)|v;}}} ctx.putImageData(pixelBuffer,0,0); }
+        function drawZone() { const sc=0.001+(mouseX/width)*0.5, mix=(mouseY/height); for(let y=0;y<height;y++){const yIdx=y*width, y2=y*y; for(let x=0;x<width;x++){let v=Math.sin((x*x+y2)*sc); v=(v+1)*127.5; let r=v, g=v, b=v; if(mix>0.1){const iv=v|0; r=iv^x; g=iv^y; b=iv; if(mix<0.8){r=(r*mix+v*(1-mix)); g=(g*mix+v*(1-mix)); b=(b*mix+v*(1-mix));}} pixelData32[yIdx+x]=(255<<24)|(b<<16)|(g<<8)|r;}} ctx.putImageData(pixelBuffer,0,0); }
+        function drawBitPlane() { const t=performance.now()*0.1, f=0.01+(mouseX/width)*0.05; for(let y=0;y<height;y++){const yIdx=y*width, sy=Math.sin(y*f+t*0.05); for(let x=0;x<width;x++){const v=(Math.sin(x*f)+sy)*100000, bit=((mouseY/height)*8)|0, p=((v|0)>>bit)&1, c=p*255; pixelData32[yIdx+x]=(255<<24)|(c<<16)|(c<<8)|c;}} ctx.putImageData(pixelBuffer,0,0); }
+        function initLife(){ initBufferMode(); lifeGridA=new Uint8Array(width*height); lifeGridB=new Uint8Array(width*height); for(let i=0;i<width*height;i++) lifeGridA[i]=Math.random()>0.5?1:0; } function drawLife(){const cur=(frameCount%2===0)?lifeGridA:lifeGridB, nxt=(frameCount%2===0)?lifeGridB:lifeGridA; for(let y=1;y<height-1;y++){const ro=y*width; for(let x=1;x<width-1;x++){const idx=ro+x, n=cur[ro-width+x-1]+cur[ro-width+x]+cur[ro-width+x+1]+cur[ro+x-1]+cur[ro+x+1]+cur[ro+width+x-1]+cur[ro+width+x]+cur[ro+width+x+1]; nxt[idx]=(cur[idx]===1 && (n===2||n===3)) || (cur[idx]===0 && n===3) ? 1 : 0; const c=nxt[idx]?255:0; pixelData32[idx]=(255<<24)|(c<<16)|(c<<8)|c;}} if(mouseX>0 && mouseX<width) {const r=20; for(let dy=-r;dy<r;dy++)for(let dx=-r;dx<r;dx++){const i=(mouseY+dy)*width+(mouseX+dx); if(i>=0 && i<width*height) nxt[i]=Math.random()>0.5?1:0;}} ctx.putImageData(pixelBuffer,0,0); }
+        function drawInterlace() { const rgb=mouseY>height/2; for(let y=0;y<height;y++){const yIdx=y*width, ev=(y%2===0); for(let x=0;x<width;x++){let r=0,g=0,b=0; if(rgb){const s=x%3; if(s===0)r=255;else if(s===1)g=255;else b=255; if(ev){let t=r;r=b;b=g;g=t;}}else{const gr=((x%2)^(y%2))===0, v=gr?255:0; r=g=b=v;} pixelData32[yIdx+x]=(255<<24)|(b<<16)|(g<<8)|r;}} ctx.putImageData(pixelBuffer,0,0); }
+        function drawQuillet() { const t=performance.now()*0.1, p=(mouseX/width)*100, z=1+(mouseY/height)*10; for(let y=0;y<height;y++){const yIdx=y*width, sy=(y+t)*z; for(let x=0;x<width;x++){const sx=(x+t)*z; let v=((sx>>4)^(sy>>4))*p; v=(v&sy)^(sx%17); const c=(v%2)*255; pixelData32[yIdx+x]=(255<<24)|(c<<16)|(c<<8)|c;}} ctx.putImageData(pixelBuffer,0,0); }
+        function drawBitStir() { const m=mouseY>height/2, t=performance.now()*0.1; for(let y=0;y<height;y++){const yIdx=y*width; for(let x=0;x<width;x++){let v=0; if(m){v=((x+t)<<1)^((y+t)<<1); v&=255;}else{v=((x*y)%(((x+t)^(y+t))|1))&255;} pixelData32[yIdx+x]=(255<<24)|(v<<16)|((v*2)%255<<8)|((v*4)%255);}} ctx.putImageData(pixelBuffer,0,0); }
+        function drawRamanujan() { const f=0.1+(mouseX/width)*0.5, t=performance.now()*0.005; for(let y=0;y<height;y++){const yIdx=y*width, sy=Math.sin(y*f+t); for(let x=0;x<width;x++){const v=Math.sin(x*f+sy+Math.sin(x*f*0.5)), c=(Math.abs(v)<0.1)?255:0; pixelData32[yIdx+x]=(255<<24)|(c<<16)|(c<<8)|c;}} ctx.putImageData(pixelBuffer,0,0); }
+        function initWalk() { canvas.style.imageRendering='auto'; ctx.fillStyle='#000'; ctx.fillRect(0,0,width,height); walkers=[]; for(let i=0;i<2000;i++) walkers.push({x:Math.random()*width, y:Math.random()*height, c:`hsl(${Math.random()*360},100%,50%)`}); }
+        function drawWalk() { for(let w of walkers){w.x+=(Math.random()-0.5)*4; w.y+=(Math.random()-0.5)*4; if(w.x<0)w.x=width;if(w.x>width)w.x=0;if(w.y<0)w.y=height;if(w.y>height)w.y=0; ctx.fillStyle=w.c; ctx.fillRect(w.x,w.y,1,1);} if(Math.random()>0.9){const rw=(Math.random()*50+1)|0, rh=(Math.random()*50+1)|0, rx=(Math.random()*width)|0, ry=(Math.random()*height)|0, img=ctx.getImageData(rx,ry,rw,rh); ctx.putImageData(img, rx+(Math.random()-0.5)*10, ry+(Math.random()-0.5)*10);} }
+        function drawChecker() { const s=0.1, off=performance.now()*s; for(let y=0;y<height;y++){const yIdx=y*width, yOff=y+off; for(let x=0;x<width;x++){const chk=((x+yOff)&1)===0, c=chk?255:0; pixelData32[yIdx+x]=(255<<24)|(c<<16)|(c<<8)|c;}} ctx.putImageData(pixelBuffer,0,0); }
+        function drawBlueNoise(){const t=performance.now()*0.1, sh=(mouseY/height)*10; for(let y=0;y<height;y++){const yIdx=y*width, sy=(y+t)*12.9898; for(let x=0;x<width;x++){let n=(Math.sin((x+t)*78.233+sy)*43758.5453)%1; n=(n+1)%1; const v=n>0.5?255:0; pixelData32[yIdx+x]=(Math.random()>0.95)?(255<<24)|(Math.random()*255<<16)|(Math.random()*255<<8)|(Math.random()*255):(255<<24)|(v<<16)|(v<<8)|v;}} ctx.putImageData(pixelBuffer,0,0);}
+        function initPeano(){canvas.style.imageRendering='auto';} function drawPeano(){ctx.fillStyle='#000';ctx.fillRect(0,0,width,height);ctx.strokeStyle='#0ff';const o=1+((mouseX/width)*5)|0, N=Math.pow(3,o), sz=Math.min(width,height)*0.9, ox=(width-sz)/2, oy=(height-sz)/2; ctx.lineWidth=1+(mouseY/height); ctx.beginPath(); if(o>3){const st=sz/N; for(let y=oy;y<oy+sz;y+=st*2){ctx.moveTo(ox,y);ctx.lineTo(ox+sz,y);} for(let x=ox;x<ox+sz;x+=st*2){ctx.moveTo(x,oy);ctx.lineTo(x,oy+sz);}}else{peano(ox,oy,sz,o);} ctx.stroke();} function peano(x,y,s,n){if(n===0){ctx.rect(x,y,s,s);return;}const s3=s/3;for(let i=0;i<3;i++)for(let j=0;j<3;j++)peano(x+i*s3,y+j*s3,s3,n-1);}
+        function drawDrift(){const d=performance.now()*0.0001, g=2+(mouseY/height)*4; for(let y=0;y<height;y++){const yIdx=y*width, g1=(y%g)<1, g2=((y+d)%g)<1, v=(g1^g2)?128:0; for(let x=0;x<width;x++){const gx1=(x%g)<1, gx2=((x+d)%g)<1, h=(gx1^gx2)?128:0, c=v+h; pixelData32[yIdx+x]=(255<<24)|(c<<16)|(c<<8)|c;}} ctx.putImageData(pixelBuffer,0,0);}
+        function drawPRBS(){let r=0xACE1+mouseX; for(let i=0;i<width*height;i++){const b=((r>>0)^(r>>2)^(r>>3)^(r>>5))&1; r=(r>>1)|(b<<15); const v=(r&1)*255; pixelData32[i]=(255<<24)|(v<<16)|(v<<8)|v;} ctx.putImageData(pixelBuffer,0,0);}
+        function initVirus(){initBufferMode();virusGridA=new Uint8Array(width*height);virusGridB=new Uint8Array(width*height);virusGridA[(height/2|0)*width+(width/2|0)]=1;} function drawVirus(){const c=frameCount%2===0?virusGridA:virusGridB, n=frameCount%2===0?virusGridB:virusGridA, w=width, h=height; for(let i=0;i<w*h;i++){if(c[i]>0){n[i]=(c[i]+1)%255; if(Math.random()>0.8){if(i+1<w*h)n[i+1]=1;if(i-1>=0)n[i-1]=1;if(i+w<w*h)n[i+w]=1;if(i-w>=0)n[i-w]=1;}}else{n[i]=c[i];} const v=n[i]; pixelData32[i]=(255<<24)|(v<<16)|((v*2)%255<<8)|((v*5)%255);} if(Math.random()>0.99)initVirus(); ctx.putImageData(pixelBuffer,0,0);}
+        function initLorenz(){initHermann();ctx.fillStyle='#000';ctx.fillRect(0,0,width,height);lorenzPoints=[{x:0.1,y:0,z:0}];} function drawLorenz(){ctx.fillStyle='rgba(0,0,0,0.05)';ctx.fillRect(0,0,width,height); const dt=0.01, sigma=10, beta=8/3, rho=28*(mouseX/width*2); let p=lorenzPoints[0]; ctx.beginPath(); ctx.strokeStyle='#0f0'; for(let i=0;i<100;i++){const dx=sigma*(p.y-p.x), dy=p.x*(rho-p.z)-p.y, dz=p.x*p.y-beta*p.z; p.x+=dx*dt; p.y+=dy*dt; p.z+=dz*dt; const sc=10+(mouseY/height)*10; ctx.lineTo(centerX+p.x*sc, centerY+p.y*sc);} ctx.stroke();}
+        function drawInvAttack(){const fl=frameCount%2===0; for(let y=0;y<height;y++){const yIdx=y*width; for(let x=0;x<width;x++){const p=((x+y)%2===0), a=(mouseY>height/2)?(p^fl):p; pixelData32[yIdx+x]=a?0xFF00FF00:0xFFFF00FF;}} ctx.putImageData(pixelBuffer,0,0);}
+        function initHermann(){canvas.style.imageRendering='auto';} function drawHermann(){ctx.fillStyle='#000';ctx.fillRect(0,0,width,height);const g=20+(mouseX/width)*50, l=2+(mouseY/height)*10; ctx.fillStyle='#fff'; for(let x=0;x<width;x+=g)ctx.fillRect(x,0,l,height); for(let y=0;y<height;y+=g)ctx.fillRect(0,y,width,l);}
+        function initVoronoi(){initBufferMode();voronoiPoints=[];for(let i=0;i<100;i++)voronoiPoints.push({x:Math.random()*width,y:Math.random()*height,vx:Math.random()-0.5,vy:Math.random()-0.5});} function drawVoronoi(){for(let p of voronoiPoints){p.x+=p.vx*5;p.y+=p.vy*5;if(p.x<0||p.x>width)p.vx*=-1;if(p.y<0||p.y>height)p.vy*=-1;} const w=width,h=height; for(let y=0;y<h;y+=2){const yIdx=y*w; for(let x=0;x<w;x+=2){let m=99999; for(let p of voronoiPoints){const d=Math.abs(x-p.x)+Math.abs(y-p.y); if(d<m)m=d;} const c=(m%20)*12; pixelData32[yIdx+x]=(255<<24)|(c<<16)|(c<<8)|c; if(x+1<w)pixelData32[yIdx+x+1]=pixelData32[yIdx+x]; if(y+1<h){pixelData32[yIdx+w+x]=pixelData32[yIdx+x]; pixelData32[yIdx+w+x+1]=pixelData32[yIdx+x];}}} ctx.putImageData(pixelBuffer,0,0);}
+        function drawBitSlice(){const t=performance.now()*0.002, cut=(mouseY/height)*255; for(let y=0;y<height;y++){const yIdx=y*width; for(let x=0;x<width;x++){const A=(x*y)&255, B=(Math.sin(x*0.05+t)+Math.cos(y*0.05))*127+128; let v=(A&0xF0)|((B&0xF0)>>4); v=v>cut?255:0; pixelData32[yIdx+x]=(255<<24)|(v<<16)|(v<<8)|v;}} ctx.putImageData(pixelBuffer,0,0);}
+        function initRainbow() { canvas.style.imageRendering='auto'; } function drawRainbow() { ctx.fillStyle = '#000'; ctx.fillRect(0,0,width,height); const w = 1.5; const gap = 3 + (mouseY/height); const shift = performance.now() * 0.1 * (mouseX/width); ctx.fillStyle = '#fff'; for (let x = 0; x < width; x += gap) { ctx.fillRect(x + shift % gap, 0, w, height); } }
+        function drawBitFlip() { const t = performance.now() * 0.005; const scale = 0.01 + (mouseX/width)*0.1; for (let y = 0; y < height; y++) { const yIdx = y * width; const sy = Math.sin(y * scale + t); for (let x = 0; x < width; x++) { const sx = Math.sin(x * scale); const val = (sx + sy) * 10000; const c = (Math.floor(val) & 1) * 255; pixelData32[yIdx + x] = (255 << 24) | (c << 16) | (c << 8) | c; } } ctx.putImageData(pixelBuffer, 0, 0); }
+        function drawFloyd() { const t = performance.now() * 0.001; const bias = (mouseY/height) * 0.2; for (let y = 0; y < height; y++) { const yIdx = y * width; for (let x = 0; x < width; x++) { let v = 0.5 + Math.sin(x*0.01 + y*0.01 + t)*0.1 + bias; v += (Math.random() - 0.5) * 0.1; const pixel = v > 0.5 ? 255 : 0; pixelData32[yIdx + x] = (255 << 24) | (pixel << 16) | (pixel << 8) | pixel; } } ctx.putImageData(pixelBuffer, 0, 0); }
+        function initChaikin() { canvas.style.imageRendering='auto'; } function drawChaikin() { ctx.fillStyle = '#000'; ctx.fillRect(0,0,width,height); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; let points = []; const num = 10 + (mouseY/height)*20; for(let i=0; i<num; i++) points.push({x: Math.random()*width, y: Math.random()*height}); const iters = 1 + Math.floor((mouseX/width)*8); for(let k=0; k<iters; k++) { const newPoints = []; for(let i=0; i<points.length; i++) { const p1 = points[i]; const p2 = points[(i+1)%points.length]; newPoints.push({ x: 0.75*p1.x + 0.25*p2.x, y: 0.75*p1.y + 0.25*p2.y }); newPoints.push({ x: 0.25*p1.x + 0.75*p2.x, y: 0.25*p1.y + 0.75*p2.y }); } points = newPoints; } ctx.beginPath(); if(points.length > 0) { ctx.moveTo(points[0].x, points[0].y); for(let i=1; i<points.length; i++) ctx.lineTo(points[i].x, points[i].y); ctx.closePath(); } ctx.stroke(); }
+        function drawCycleXOR() { const k = (performance.now() * 0.0005) + (mouseX/width)*0.1; const mk = k * 100; for (let y = 0; y < height; y++) { const yIdx = y * width; const yk = y * mk; for (let x = 0; x < width; x++) { const val = ((x * mk) ^ yk) & 255; pixelData32[yIdx + x] = (255 << 24) | (val << 16) | (val << 8) | val; } } ctx.putImageData(pixelBuffer, 0, 0); }
+        function initDragon() { canvas.style.imageRendering='auto'; dragonPoints = getDragonPoints(14); } function getDragonPoints(iter) { let turns = []; for (let i = 0; i < iter; i++) { let newTurns = [...turns]; newTurns.push(1); for (let j = turns.length - 1; j >= 0; j--) { newTurns.push(-turns[j]); } turns = newTurns; } return turns; } function drawDragon() { ctx.fillStyle = '#000'; ctx.fillRect(0,0,width,height); ctx.strokeStyle = '#0f0'; ctx.lineWidth = 1; const zoom = 1 + (mouseX/width)*10; const startX = width/2; const startY = height/2; const len = 2 * zoom; let x = startX; let y = startY; let angle = frameCount * 0.01; ctx.beginPath(); ctx.moveTo(x, y); for (let i = 0; i < dragonPoints.length; i++) { const turn = dragonPoints[i]; angle += turn * (Math.PI / 2); x += len * Math.cos(angle); y += len * Math.sin(angle); ctx.lineTo(x, y); } ctx.stroke(); }
+        function drawChecker2(){const d=performance.now()*0.1;for(let y=0;y<height;y++){const yi=y*width,yo=(y+d)|0;for(let x=0;x<width;x++){const c=((x>>1)^(yo>>1))&1?255:0;pixelData32[yi+x]=(255<<24)|(c<<16)|(c<<8)|c;}}ctx.putImageData(pixelBuffer,0,0);}
+        function drawChirp() { ctx.fillStyle = '#000'; ctx.fillRect(0,0,width,height); const rate = 0.001 + (mouseX/width)*0.05; const scroll = performance.now() * 0.2; ctx.fillStyle = '#fff'; for(let x=0; x<width; x++) { const val = Math.sin(rate * (x+scroll) * (x+scroll)); if (val > 0) { ctx.fillRect(x, 0, 1, height); } } }
+        function drawKelly() { const t = performance.now(); const amp = (mouseY/height) * 255; for (let y = 0; y < height; y++) { const yIdx = y * width; for (let x = 0; x < width; x++) { const n1 = Math.random() * 255; const n2 = Math.random() * 255; let val = (n1 - n2) + 128; if (val > 128) val += amp; else val -= amp; if (val < 0) val = 0; if (val > 255) val = 255; pixelData32[yIdx + x] = (255 << 24) | (val << 16) | (val << 8) | val; } } ctx.putImageData(pixelBuffer, 0, 0); }
+        function drawSpiralBit() { const twist = 1 + (mouseX/width)*10; const shift = (performance.now() * 0.01) | 0; for (let y = 0; y < height; y++) { const yIdx = y * width; const dy = y - centerY; for (let x = 0; x < width; x++) { const dx = x - centerX; const r = Math.sqrt(dx*dx + dy*dy); const th = Math.atan2(dy, dx) * twist * 10; const ir = (r + shift) | 0; const ith = (th * 10) | 0; const val = (ir ^ ith) & 255; pixelData32[yIdx + x] = (255 << 24) | (val << 16) | (val << 8) | val; } } ctx.putImageData(pixelBuffer, 0, 0); }
+        function drawSubCheck(){const t=(frameCount%3);for(let y=0;y<height;y++){const yi=y*width,s=(y+t)%3;for(let x=0;x<width;x++){const sb=(x+s)%3,r=sb===0?255:0,g=sb===1?255:0,b=sb===2?255:0;pixelData32[yi+x]=(255<<24)|(b<<16)|(g<<8)|r;}}ctx.putImageData(pixelBuffer,0,0);}
+        function drawRandSine(){const t=performance.now()*0.01;for(let y=0;y<height;y++){const yi=y*width;for(let x=0;x<width;x++){const p=Math.sin(x*12.9+y*78.2)*43758.5;const v=Math.sin(t+p)*127+128;const c=v&255;pixelData32[yi+x]=(255<<24)|(c<<16)|(c<<8)|c;}}ctx.putImageData(pixelBuffer,0,0);}
+        function drawCantor(){const d=4+((mouseX/width)*4)|0, z=1+(mouseY/height)*2, ox=frameCount, oy=frameCount*0.5; for(let y=0;y<height;y++){const yi=y*width, cy=((y+oy)*z)|0; for(let x=0;x<width;x++){let v=255, cx=((x+ox)*z)|0, ty=cy; for(let i=0;i<d;i++){if((cx%3===1)||(ty%3===1)){v=0;break;} cx=(cx/3)|0; ty=(ty/3)|0;} pixelData32[yi+x]=(255<<24)|(v<<16)|(v<<8)|v;}} ctx.putImageData(pixelBuffer,0,0);}
+        function drawFloatMod(){const sc=1000+(mouseY/height)*5000, d=0.001+(mouseX/width)*0.005; for(let y=0;y<height;y++){const yi=y*width, dy=y-centerY; for(let x=0;x<width;x++){const dx=x-centerX, v=(dx/(dy+0.1))%d, c=Math.abs(v*sc)%255; pixelData32[yi+x]=(255<<24)|(c<<16)|(c<<8)|c;}} ctx.putImageData(pixelBuffer,0,0);}
+        function initClouds(){canvas.style.imageRendering='auto';} function drawClouds(){ctx.fillStyle='#fff';ctx.fillRect(0,0,width,height);const off=(mouseX/width)*10;ctx.globalCompositeOperation='difference';const p=ctx.createPattern(circCanvas(),'repeat');ctx.fillStyle=p;ctx.fillRect(0,0,width,height);ctx.save();ctx.translate(width/2,height/2);ctx.rotate(0.02);ctx.translate(-width/2-off,-height/2-off);ctx.fillRect(-100,-100,width+200,height+200);ctx.restore();ctx.globalCompositeOperation='source-over';} function circCanvas(){const c=document.createElement('canvas');c.width=20;c.height=20;const x=c.getContext('2d');x.beginPath();x.arc(10,10,8,0,Math.PI*2);x.stroke();return c;}
+        function drawBlue1Bit(){const t=performance.now()*0.005; for(let y=0;y<height;y++){const yi=y*width; for(let x=0;x<width;x++){const dx=x-centerX, dy=y-centerY, g=1-(Math.sqrt(dx*dx+dy*dy)/(width*0.4)), n=(Math.sin(x*123.4+y*234.5+t)*43758.5453)%1, v=(g+n>0.8)?255:0; pixelData32[yi+x]=(255<<24)|(v<<16)|(v<<8)|v;}} ctx.putImageData(pixelBuffer,0,0);}
+        function drawBitFeed(){for(let i=0;i<width*height;i++){const o=pixelData32[i]&255, cx=i%width, cy=(i/width)|0; let v=(o<<1)^(cx^cy); v&=255; if(Math.random()>0.99)v=0; pixelData32[i]=(255<<24)|(v<<16)|((v>>1)<<8)|v;} ctx.putImageData(pixelBuffer,0,0);}
+        function drawCycShift(){const s=0.05+(mouseX/width)*0.1, g=2; for(let y=0;y<height;y++){const yi=y*width, sh=y*s; for(let x=0;x<width;x++){const v=((x+sh)%g)<1?255:0; pixelData32[yi+x]=(255<<24)|(v<<16)|(v<<8)|v;}} ctx.putImageData(pixelBuffer,0,0);}
+        function drawDynHermann(){initHermann();ctx.fillStyle='#000';ctx.fillRect(0,0,width,height);const p=(Math.sin(performance.now()*0.005)+1.5)*5, g=30+(mouseX/width)*20; ctx.fillStyle='#fff'; for(let x=0;x<width;x+=g)ctx.fillRect(x,0,p,height); for(let y=0;y<height;y+=g)ctx.fillRect(0,y,width,p);}
+        function drawGrayTog(){const v=(frameCount%2===0)?254:255, c=(255<<24)|(v<<16)|(v<<8)|v; pixelData32.fill(c); ctx.putImageData(pixelBuffer,0,0);}
+        
+        // --- NEW MODES (56-75) ---
+        function drawSubInt(){const s=(mouseX/width)*10; for(let y=0;y<height;y++){const yi=y*width; for(let x=0;x<width;x++){const c=(x%2===0), r=c?255:0, b=c?0:255; pixelData32[yi+x]=(255<<24)|(b<<16)|(0<<8)|r;}} ctx.putImageData(pixelBuffer,0,0);}
+        function drawDCBias(){for(let y=0;y<height;y++){const yi=y*width; for(let x=0;x<width;x++){const v=((x^y)&1)?128:127; pixelData32[yi+x]=(255<<24)|(v<<16)|(v<<8)|v;}} ctx.putImageData(pixelBuffer,0,0);}
+        function drawPhaseShift(){const p=(performance.now()*0.05)%10; for(let y=0;y<height;y++){const yi=y*width, v=(Math.sin(y*0.5+p)>0)?255:0; for(let x=0;x<width;x++)pixelData32[yi+x]=(255<<24)|(v<<16)|(v<<8)|v;} ctx.putImageData(pixelBuffer,0,0);}
+        function drawRGBDrift(){const o=(frameCount*(mouseX/width)*5)|0; for(let y=0;y<height;y++){const yi=y*width, t=(y+o)%3; let c=0; if(t===0)c=255; else if(t===1)c=255<<8; else c=255<<16; for(let x=0;x<width;x++)pixelData32[yi+x]=(255<<24)|c;} ctx.putImageData(pixelBuffer,0,0);}
+        function drawNegFlicker(){const d=0.01+(mouseX/width)*0.05; for(let i=0;i<width*height;i++){pixelData32[i]=(Math.random()<d)?0xFF000000:0xFFFFFFFF;} ctx.putImageData(pixelBuffer,0,0);}
+        function drawHamming(){const s=1+(mouseX/width)*5; for(let y=0;y<height;y++){const yi=y*width, sy=(y*s)|0; for(let x=0;x<width;x++){const sx=(x*s)|0; let v=sx^sy, d=0; while(v){d++;v&=v-1;} const c=(d*16)%255; pixelData32[yi+x]=(255<<24)|(c<<16)|(c<<8)|c;}} ctx.putImageData(pixelBuffer,0,0);}
+        function drawPhiSpiral(){const p=2.399963, t=performance.now()*0.0001, d=0.5+(mouseX/width), cx=width/2, cy=height/2; pixelData32.fill(0xFF000000); for(let i=0;i<20000;i++){const r=d*Math.sqrt(i), a=i*(p+t), x=(cx+r*Math.cos(a))|0, y=(cy+r*Math.sin(a))|0; if(x>=0&&x<width&&y>=0&&y<height) pixelData32[y*width+x]=0xFFFFFFFF;} ctx.putImageData(pixelBuffer,0,0);}
+        function drawModCollapse(){const t=frameCount; for(let y=0;y<height;y++){const yi=y*width; for(let x=0;x<width;x++){const c=((x*y)**2)&255; pixelData32[yi+x]=(255<<24)|(c<<16)|(c<<8)|c;}} ctx.putImageData(pixelBuffer,0,0);}
+        function drawErosion(){const z=1+(mouseX/width)*20; for(let y=0;y<height;y++){const yi=y*width, sy=(y*z)|0; for(let x=0;x<width;x++){const sx=(x*z)|0; let cx=sx, cy=sy, h=false; while(cx>0||cy>0){if((cx%3===1)&&(cy%3===1)){h=true;break;} cx=(cx/3)|0; cy=(cy/3)|0;} if((sx^sy)%5===0) h=!h; const c=h?0:255; pixelData32[yi+x]=(255<<24)|(c<<16)|(c<<8)|c;}} ctx.putImageData(pixelBuffer,0,0);}
+        function drawBitRev(){const s=(mouseX/width)*10|0; function r8(n){n=((n>>1)&0x55)|((n&0x55)<<1);n=((n>>2)&0x33)|((n&0x33)<<2);n=((n>>4)&0x0F)|((n&0x0F)<<4);return n;} for(let y=0;y<height;y++){const yi=y*width, ry=r8(y&255); for(let x=0;x<width;x++){const rx=r8((x+s)&255), c=rx^ry; pixelData32[yi+x]=(255<<24)|(c<<16)|(c<<8)|c;}} ctx.putImageData(pixelBuffer,0,0);}
+        function drawEntropy(){for(let i=0;i<width*height;i++){const c=Math.random()>0.5?255:0; pixelData32[i]=(255<<24)|(c<<16)|(c<<8)|c;} ctx.putImageData(pixelBuffer,0,0);}
+        function drawFakeMotion(){const o=(frameCount%2===0)?0:2; for(let y=0;y<height;y++){const yi=y*width; for(let x=0;x<width;x++){const g=((x+o)%4<2)^((y+o)%4<2), c=g?255:0; pixelData32[yi+x]=(255<<24)|(c<<16)|(c<<8)|c;}} ctx.putImageData(pixelBuffer,0,0);}
+        function drawBleed(){for(let y=0;y<height;y++){const yi=y*width; for(let x=0;x<width;x++){pixelData32[yi+x]=(x%2===0)?0xFFFF00FF:0xFFFFFF00;}} ctx.putImageData(pixelBuffer,0,0);}
+        function drawMacroblock(){for(let y=0;y<height;y++){const yi=y*width, by=(y>>3)&1; for(let x=0;x<width;x++){const bx=(x>>3)&1, c=(bx^by)?255:0; pixelData32[yi+x]=(255<<24)|(c<<16)|(c<<8)|c;}} ctx.putImageData(pixelBuffer,0,0);}
+        function drawShimmer(){const b=128, d=(Math.random()>0.5)?5:-5, v=b+d; pixelData32.fill((255<<24)|(v<<16)|(v<<8)|v); ctx.putImageData(pixelBuffer,0,0);}
+        function drawPeriFlicker(){const cx=width/2, cy=height/2, t=frameCount%2, r=200; for(let y=0;y<height;y++){const yi=y*width, dy=y-cy; for(let x=0;x<width;x++){const dx=x-cx, d=Math.sqrt(dx*dx+dy*dy); let c=128; if(d>r) c=t?255:0; pixelData32[yi+x]=(255<<24)|(c<<16)|(c<<8)|c;}} ctx.putImageData(pixelBuffer,0,0);}
+        function drawImpGrad(){const b=16, w=width/b; for(let x=0;x<width;x++){const v=((x/w)|0)/b*255; for(let y=0;y<height;y++) pixelData32[y*width+x]=(255<<24)|(v<<16)|(v<<8)|v;} ctx.putImageData(pixelBuffer,0,0);}
+        function drawChromaShad(){const g=40; for(let y=0;y<height;y++){const yi=y*width; for(let x=0;x<width;x++){const on=(x%g<4)||(y%g<4); let c=0xFF000000; if(on)c=0xFFFFFFFF; else if(x%5===0)c=0xFF0000FF; pixelData32[yi+x]=c;}} ctx.putImageData(pixelBuffer,0,0);}
+        function drawNegAfter(){const t=(frameCount/30)|0, c=(t%2===0)?0xFF00FFFF:0xFFFF0000; pixelData32.fill(c); ctx.putImageData(pixelBuffer,0,0);}
+        function drawFlickerMoire(){const f1=frameCount%2===0, f2=frameCount%3===0; for(let y=0;y<height;y++){const yi=y*width; for(let x=0;x<width;x++){const p1=((x+y)%4<2)&&f1, p2=((x-y)%4<2)&&f2, c=(p1^p2)?255:0; pixelData32[yi+x]=(255<<24)|(c<<16)|(c<<8)|c;}} ctx.putImageData(pixelBuffer,0,0);}
+
+        // --- Scene Map ---
+        const scenes = {
+            'home':{init:initHome,draw:drawHome}, 'spiral':{init:initSpiral,draw:drawSpiral}, 'target':{init:initTarget,draw:drawTarget}, 'xor':{init:initBufferMode,draw:drawXor}, 'sierpinski':{init:initBufferMode,draw:drawSierpinski}, 'scanline':{init:initScanline,draw:drawScanline}, 'float':{init:initBufferMode,draw:drawFloat}, 'fractal':{init:initBufferMode,draw:drawFractal}, 'hilbert':{init:initHilbert,draw:drawHilbert}, 'bitshift':{init:initBufferMode,draw:drawBitShift}, 'subpixel':{init:initSubpixel,draw:drawSubpixel},
+            'dither':{init:initBufferMode,draw:drawDither}, 'inversion':{init:initBufferMode,draw:drawInversion}, 'sinewave':{init:initBufferMode,draw:drawSineWave}, 'julia':{init:initBufferMode,draw:drawJulia}, 'ant':{init:initAnt,draw:drawAnt},
+            'carpet':{init:initBufferMode,draw:drawCarpet}, 'zone':{init:initBufferMode,draw:drawZone}, 'bitplane':{init:initBufferMode,draw:drawBitPlane}, 'life':{init:initLife,draw:drawLife}, 'interlace':{init:initBufferMode,draw:drawInterlace},
+            'quillet':{init:initBufferMode,draw:drawQuillet}, 'bitstir':{init:initBufferMode,draw:drawBitStir}, 'ramanujan':{init:initBufferMode,draw:drawRamanujan}, 'walk':{init:initWalk,draw:drawWalk}, 'checker':{init:initBufferMode,draw:drawChecker},
+            'bluenoise':{init:initBufferMode,draw:drawBlueNoise}, 'peano':{init:initPeano,draw:drawPeano}, 'drift':{init:initBufferMode,draw:drawDrift}, 'prbs':{init:initBufferMode,draw:drawPRBS}, 'virus':{init:initVirus,draw:drawVirus}, 'lorenz':{init:initLorenz,draw:drawLorenz}, 'invattack':{init:initBufferMode,draw:drawInvAttack}, 'hermann':{init:initHermann,draw:drawHermann}, 'voronoi':{init:initVoronoi,draw:drawVoronoi}, 'bitslice':{init:initBufferMode,draw:drawBitSlice},
+            'rainbow':{init:initRainbow,draw:drawRainbow}, 'bitflip':{init:initBufferMode,draw:drawBitFlip}, 'floyd':{init:initBufferMode,draw:drawFloyd}, 'chaikin':{init:initChaikin,draw:drawChaikin}, 'cyclexor':{init:initBufferMode,draw:drawCycleXOR}, 'dragon':{init:initDragon,draw:drawDragon}, 'checker2':{init:initBufferMode,draw:drawChecker2}, 'chirp':{init:initRainbow,draw:drawChirp}, 'kelly':{init:initBufferMode,draw:drawKelly}, 'spiralbit':{init:initBufferMode,draw:drawSpiralBit},
+            'subcheck':{init:initBufferMode,draw:drawSubCheck}, 'randsine':{init:initBufferMode,draw:drawRandSine}, 'cantor':{init:initBufferMode,draw:drawCantor}, 'floatmod':{init:initBufferMode,draw:drawFloatMod}, 'clouds':{init:initClouds,draw:drawClouds}, 'blue1bit':{init:initBufferMode,draw:drawBlue1Bit}, 'bitfeed':{init:initBufferMode,draw:drawBitFeed}, 'cycshift':{init:initBufferMode,draw:drawCycShift}, 'dynhermann':{init:initHermann,draw:drawDynHermann}, 'graytog':{init:initBufferMode,draw:drawGrayTog},
+            'subint':{init:initBufferMode,draw:drawSubInt}, 'dcbias':{init:initBufferMode,draw:drawDCBias}, 'phaseshift':{init:initBufferMode,draw:drawPhaseShift}, 'rgbdrift':{init:initBufferMode,draw:drawRGBDrift}, 'negflicker':{init:initBufferMode,draw:drawNegFlicker},
+            'hamming':{init:initBufferMode,draw:drawHamming}, 'phispiral':{init:initBufferMode,draw:drawPhiSpiral}, 'modcollapse':{init:initBufferMode,draw:drawModCollapse}, 'erosion':{init:initBufferMode,draw:drawErosion}, 'bitrev':{init:initBufferMode,draw:drawBitRev},
+            'entropy':{init:initBufferMode,draw:drawEntropy}, 'fakemotion':{init:initBufferMode,draw:drawFakeMotion}, 'bleed':{init:initBufferMode,draw:drawBleed}, 'macroblock':{init:initBufferMode,draw:drawMacroblock}, 'shimmer':{init:initBufferMode,draw:drawShimmer},
+            'periflicker':{init:initBufferMode,draw:drawPeriFlicker}, 'impgrad':{init:initBufferMode,draw:drawImpGrad}, 'chromashad':{init:initBufferMode,draw:drawChromaShad}, 'negafter':{init:initBufferMode,draw:drawNegAfter}, 'flickermoire':{init:initBufferMode,draw:drawFlickerMoire}
+        };
+
+        // Init
+        initUI();
+        window.addEventListener('resize', resize);
+        window.addEventListener('mousemove', updateMouse);
+        window.addEventListener('touchmove', (e) => { e.preventDefault(); updateMouse(e.touches[0]); }, { passive: false });
+        
+        const initialHash = window.location.hash.replace('#', '');
+        resize();
+        if (initialHash) {
+            const idx = experiments.findIndex(e => e.id === initialHash);
+            if (idx !== -1) loadExperiment(idx);
+            else updateRoute();
+        } else {
+            updateRoute();
+        }
+
+    </script>
+</body>
+</html>
