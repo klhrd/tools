@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brainfuck 視覺化與偵錯工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;700&display=swap');
+
+        body {
+            font-family: "Inter", sans-serif;
+            background-color: #f8fafc;
+        }
+        
+        .code-font {
+            font-family: 'Fira Code', monospace;
+        }
+
+        .tape-cell {
+            width: 54px;
+            height: 64px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background-color: #ffffff;
+            font-weight: bold;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .tape-cell.active {
+            background-color: #3b82f6;
+            color: white;
+            border-color: #2563eb;
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.3);
+        }
+
+        .tape-cell.active .ascii-char { color: #bfdbfe; }
+
+        .ascii-char {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            margin-top: 2px;
+            height: 1.2em;
+        }
+
+        .code-char {
+            display: inline-block;
+            padding: 0 1px;
+            border-radius: 2px;
+        }
+
+        .code-char.current-instruction {
+            background-color: #fbbf24;
+            color: #000;
+            font-weight: bold;
+            box-shadow: 0 0 0 2px #fbbf24;
+        }
+
+        .error-overlay {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid #ef4444;
+            color: #b91c1c;
+        }
+
+        /* 隱藏捲動條但保留功能 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="p-4 md:p-6 lg:p-10">
+    <div class="max-w-6xl mx-auto">
+        <header class="mb-8 text-center">
+            <h1 class="text-4xl font-black text-slate-800 mb-2">Brainfuck 視覺化工具</h1>
+            <p class="text-slate-500">深入理解極簡主義程式語言的運作邏輯</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- 左側控制面板 -->
+            <div class="lg:col-span-5 space-y-6">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <div class="flex justify-between items-end mb-3">
+                        <label class="text-sm font-bold text-slate-700">程式碼編輯器</label>
+                        <select id="exampleSelect" class="text-xs bg-slate-100 border-none rounded-md px-2 py-1 text-slate-600 cursor-pointer hover:bg-slate-200 transition">
+                            <option value="">載入範例...</option>
+                            <option value="hello">Hello World</option>
+                            <option value="add">簡易加法 (2+5)</option>
+                            <option value="fib">斐波那契數列</option>
+                        </select>
+                    </div>
+                    
+                    <textarea id="brainfuckCode" class="w-full h-48 p-4 code-font text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none bg-slate-50" placeholder="輸入 Brainfuck 程式碼..."></textarea>
+                    
+                    <div id="bracketWarning" class="mt-2 hidden text-xs p-2 rounded-lg error-overlay font-medium">
+                        ⚠️ 括號 [ ] 不對稱，執行可能會出錯。
+                    </div>
+
+                    <div class="mt-6 flex flex-wrap gap-2">
+                        <button id="runBtn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-sm disabled:opacity-50 transition-all">執行</button>
+                        <button id="stepBtn" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-sm disabled:opacity-50 transition-all">單步</button>
+                        <button id="pauseBtn" class="bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 px-6 rounded-xl shadow-sm disabled:opacity-50 transition-all">暫停</button>
+                        <button id="resetBtn" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2.5 px-6 rounded-xl transition-all">重置</button>
+                    </div>
+
+                    <div class="mt-6">
+                        <div class="flex justify-between text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">
+                            <span>執行速度</span>
+                            <span><span id="speedValue">100</span> ms</span>
+                        </div>
+                        <input type="range" id="speedSlider" min="10" max="1000" step="10" value="100" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                        <label class="block text-xs font-bold text-slate-500 mb-2 uppercase">程式輸入 (Input)</label>
+                        <input id="programInput" type="text" class="w-full p-2 border border-slate-100 rounded-lg text-sm bg-slate-50 focus:outline-none focus:ring-1 focus:ring-blue-400" placeholder="字元資料...">
+                    </div>
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                        <label class="block text-xs font-bold text-slate-500 mb-2 uppercase">程式輸出 (Output)</label>
+                        <div id="programOutputDisplay" class="w-full p-2 text-sm font-bold text-blue-600 break-all min-h-[40px]"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右側視覺化面板 -->
+            <div class="lg:col-span-7 space-y-6">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h3 class="text-sm font-bold text-slate-700 mb-4 flex items-center">
+                        <span class="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+                        記憶體狀態 (Memory Tape)
+                    </h3>
+                    <div id="memoryTape" class="flex gap-3 overflow-x-auto py-4 no-scrollbar scroll-smooth">
+                        <!-- 由 JS 渲染 -->
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 p-6 rounded-2xl shadow-xl overflow-hidden relative">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">目前執行區段</h3>
+                        <div id="statusIndicator" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">READY</div>
+                    </div>
+                    <div id="codeDisplay" class="code-font text-slate-300 text-sm leading-relaxed max-h-64 overflow-y-auto no-scrollbar scroll-smooth">
+                        <!-- 由 JS 渲染 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 範例程式碼資料庫 ---
+        const EXAMPLES = {
+            hello: "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++.",
+            add: "++>+++++[<+>-]<.", // 2+5 並輸出對應 ASCII
+            fib: "+++++++[>+>+<<-]>>[<[>+>+<<-]>>[<+>-]<<<-]++++++++++[>++++++++++<-]>++++." // 計算一些數值並輸出
+        };
+
+        // --- 核心狀態 ---
+        const MEMORY_SIZE = 1024;
+        let memory = new Uint8Array(MEMORY_SIZE);
+        let dataPointer = 0;
+        let instructionPointer = 0;
+        let bfCode = '';
+        let inputBuffer = [];
+        let outputBuffer = '';
+        let loopStack = [];
+        let isRunning = false;
+        let executionInterval = null;
+        let executionSpeed = 100;
+
+        // --- DOM 元素 ---
+        const els = {
+            code: document.getElementById('brainfuckCode'),
+            input: document.getElementById('programInput'),
+            output: document.getElementById('programOutputDisplay'),
+            memory: document.getElementById('memoryTape'),
+            codeView: document.getElementById('codeDisplay'),
+            run: document.getElementById('runBtn'),
+            step: document.getElementById('stepBtn'),
+            pause: document.getElementById('pauseBtn'),
+            reset: document.getElementById('resetBtn'),
+            speed: document.getElementById('speedSlider'),
+            speedVal: document.getElementById('speedValue'),
+            examples: document.getElementById('exampleSelect'),
+            warning: document.getElementById('bracketWarning'),
+            status: document.getElementById('statusIndicator')
+        };
+
+        // --- 初始化與重置 ---
+        function init(isSoftReset = false) {
+            if (!isSoftReset) {
+                memory.fill(0);
+                dataPointer = 0;
+                instructionPointer = 0;
+                outputBuffer = '';
+                loopStack = [];
+                els.output.textContent = '';
+            }
+            
+            bfCode = els.code.value.replace(/[^+\-<>.,[\]]/g, '');
+            checkBrackets();
+            render();
+            updateUI();
+        }
+
+        function checkBrackets() {
+            let balance = 0;
+            for (let char of bfCode) {
+                if (char === '[') balance++;
+                if (char === ']') balance--;
+                if (balance < 0) break;
+            }
+            els.warning.classList.toggle('hidden', balance === 0);
+        }
+
+        // --- 解釋器核心 ---
+        function step() {
+            if (instructionPointer >= bfCode.length) {
+                stop();
+                els.status.textContent = "FINISHED";
+                els.status.className = "text-[10px] px-2 py-0.5 rounded-full bg-emerald-900 text-emerald-300";
+                return;
+            }
+
+            const inst = bfCode[instructionPointer];
+            switch (inst) {
+                case '>': dataPointer = (dataPointer + 1) % MEMORY_SIZE; break;
+                case '<': dataPointer = (dataPointer - 1 + MEMORY_SIZE) % MEMORY_SIZE; break;
+                case '+': memory[dataPointer]++; break;
+                case '-': memory[dataPointer]--; break;
+                case '.': 
+                    outputBuffer += String.fromCharCode(memory[dataPointer]);
+                    els.output.textContent = outputBuffer;
+                    break;
+                case ',':
+                    const inputVal = els.input.value;
+                    if (inputVal.length > 0) {
+                        memory[dataPointer] = inputVal.charCodeAt(0);
+                        els.input.value = inputVal.substring(1);
+                    } else {
+                        memory[dataPointer] = 0;
+                    }
+                    break;
+                case '[':
+                    if (memory[dataPointer] === 0) {
+                        let depth = 1;
+                        while (depth > 0) {
+                            instructionPointer++;
+                            if (bfCode[instructionPointer] === '[') depth++;
+                            if (bfCode[instructionPointer] === ']') depth--;
+                        }
+                    } else {
+                        loopStack.push(instructionPointer);
+                    }
+                    break;
+                case ']':
+                    if (memory[dataPointer] !== 0) {
+                        instructionPointer = loopStack[loopStack.length - 1];
+                    } else {
+                        loopStack.pop();
+                    }
+                    break;
+            }
+            instructionPointer++;
+            render();
+        }
+
+        function play() {
+            if (isRunning) return;
+            if (instructionPointer >= bfCode.length) init();
+            isRunning = true;
+            els.status.textContent = "RUNNING";
+            els.status.className = "text-[10px] px-2 py-0.5 rounded-full bg-blue-900 text-blue-300";
+            executionInterval = setInterval(step, executionSpeed);
+            updateUI();
+        }
+
+        function stop() {
+            isRunning = false;
+            clearInterval(executionInterval);
+            els.status.textContent = "PAUSED";
+            els.status.className = "text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400";
+            updateUI();
+        }
+
+        // --- 渲染 ---
+        function render() {
+            // 渲染帶子 (只顯示指標附近，提升效能)
+            els.memory.innerHTML = '';
+            const range = 15;
+            let start = Math.max(0, dataPointer - 7);
+            let end = Math.min(MEMORY_SIZE, start + 15);
+            if (end === MEMORY_SIZE) start = Math.max(0, end - 15);
+
+            for (let i = start; i < end; i++) {
+                const cell = document.createElement('div');
+                cell.className = `tape-cell ${i === dataPointer ? 'active' : ''}`;
+                const charCode = memory[i];
+                const charDisplay = (charCode >= 32 && charCode <= 126) ? String.fromCharCode(charCode) : '';
+                
+                cell.innerHTML = `
+                    <div class="text-[10px] text-slate-400 absolute top-1 left-1.5 font-normal">${i}</div>
+                    <div class="text-lg">${memory[i]}</div>
+                    <div class="ascii-char font-mono">${charDisplay}</div>
+                `;
+                els.memory.appendChild(cell);
+                if (i === dataPointer) {
+                    cell.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                }
+            }
+
+            // 渲染代碼視圖
+            els.codeView.innerHTML = '';
+            bfCode.split('').forEach((char, idx) => {
+                const span = document.createElement('span');
+                span.className = `code-char ${idx === instructionPointer ? 'current-instruction' : ''}`;
+                span.textContent = char;
+                els.codeView.appendChild(span);
+                if (idx === instructionPointer) {
+                    span.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            });
+        }
+
+        function updateUI() {
+            els.run.disabled = isRunning;
+            els.step.disabled = isRunning;
+            els.pause.disabled = !isRunning;
+        }
+
+        // --- 事件監聽 ---
+        els.run.addEventListener('click', play);
+        els.step.addEventListener('click', step);
+        els.pause.addEventListener('click', stop);
+        els.reset.addEventListener('click', () => { stop(); init(); });
+        
+        els.speed.addEventListener('input', (e) => {
+            executionSpeed = e.target.value;
+            els.speedVal.textContent = executionSpeed;
+            if (isRunning) { stop(); play(); }
+        });
+
+        els.code.addEventListener('input', () => { if (!isRunning) init(true); });
+
+        els.examples.addEventListener('change', (e) => {
+            if (e.target.value) {
+                stop();
+                els.code.value = EXAMPLES[e.target.value];
+                init();
+            }
+        });
+
+        // 啟動
+        window.onload = init;
+    </script>
+</body>
+</html>
