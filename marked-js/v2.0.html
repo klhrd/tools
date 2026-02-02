@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown 專業實作優化版</title>
+    
+    <!-- 1. 核心解析庫：Marked.js -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <!-- 2. 安全過濾庫：DOMPurify (防範 XSS) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+
+    <!-- 3. 程式碼高亮：Highlight.js -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+
+    <!-- 4. 預覽樣式：GitHub Markdown CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown.min.css">
+
+    <style>
+        :root {
+            --header-bg: #24292e;
+            --accent-color: #0969da;
+            --editor-bg: #f6f8fa;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            height: 50px;
+            background: var(--header-bg);
+            color: white;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            justify-content: space-between;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* 區塊通用設定 */
+        .panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .label {
+            padding: 8px 15px;
+            background: #eee;
+            font-size: 11px;
+            font-weight: bold;
+            color: #666;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* 編輯器設定 */
+        #editor {
+            flex: 1;
+            padding: 20px;
+            font-family: 'Fira Code', 'Cascadia Code', Consolas, monospace;
+            font-size: 15px;
+            line-height: 1.6;
+            border: none;
+            outline: none;
+            resize: none;
+            background: var(--editor-bg);
+            color: #24292e;
+            border-right: 1px solid #ddd;
+        }
+
+        /* 預覽區設定 */
+        #preview-container {
+            flex: 1;
+            padding: 0;
+            overflow-y: auto;
+            background: white;
+            scroll-behavior: smooth;
+        }
+
+        #preview {
+            padding: 30px 45px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        /* 狀態標籤 */
+        .badge {
+            background: #e1e4e8;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        /* 手機板適應 */
+        @media (max-width: 768px) {
+            .container { flex-direction: column; }
+            #editor { border-right: none; border-bottom: 1px solid #ddd; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div style="display: flex; align-items: center; gap: 10px;">
+        <svg height="24" viewBox="0 0 16 16" width="24" fill="white"><path d="M14.85 3H1.15C.52 3 0 3.52 0 4.15v7.69C0 12.48.52 13 1.15 13h13.69c.63 0 1.15-.52 1.15-1.15v-7.7C16 3.52 15.48 3 14.85 3zM9 11H7V8L5.5 9.92 4 8v3H2V5h2l1.5 2L7 5h2v6zm2.99.5L10.5 9.75h1V5h1.5v4.75h1l-1.49 1.75z"></path></svg>
+        <strong>Markdown Pro Editor</strong>
+    </div>
+    <span id="status" style="font-size: 12px; font-family: monospace;">準備就緒</span>
+</header>
+
+<div class="container">
+    <!-- 左側編輯 -->
+    <section class="panel">
+        <div class="label">
+            <span>MARKDOWN EDITOR</span>
+            <span id="char-count" class="badge">0 字</span>
+        </div>
+        <textarea id="editor" placeholder="在此開始輸入 Markdown..." spellcheck="false"></textarea>
+    </section>
+
+    <!-- 右側預覽 -->
+    <section class="panel">
+        <div class="label">
+            <span>HTML PREVIEW</span>
+            <span id="render-time" class="badge">0ms</span>
+        </div>
+        <div id="preview-container">
+            <div id="preview" class="markdown-body"></div>
+        </div>
+    </section>
+</div>
+
+<script>
+    const editor = document.getElementById('editor');
+    const preview = document.getElementById('preview');
+    const previewContainer = document.getElementById('preview-container');
+    const status = document.getElementById('status');
+    const charCount = document.getElementById('char-count');
+    const renderTimeDisplay = document.getElementById('render-time');
+
+    /**
+     * 1. 設定 Marked 與 Highlight.js 整合
+     */
+    marked.setOptions({
+        highlight: function(code, lang) {
+            const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+            return hljs.highlight(code, { language }).value;
+        },
+        langPrefix: 'hljs language-',
+        breaks: true, // 支援換行符
+        gfm: true     // GitHub Flavored Markdown
+    });
+
+    /**
+     * 2. 渲染邏輯 (含安全過濾)
+     */
+    function render() {
+        const start = performance.now();
+        const rawValue = editor.value;
+
+        // 解析並過濾 XSS
+        const html = marked.parse(rawValue);
+        const cleanHtml = DOMPurify.sanitize(html);
+        
+        preview.innerHTML = cleanHtml;
+
+        // 更新狀態資訊
+        const end = performance.now();
+        renderTimeDisplay.innerText = `${(end - start).toFixed(1)}ms`;
+        charCount.innerText = `${rawValue.length} 字`;
+        status.innerText = `已存檔 ${new Date().toLocaleTimeString()}`;
+
+        // 本地儲存
+        localStorage.setItem('md_content', rawValue);
+    }
+
+    /**
+     * 3. 防抖機制 (Debounce)
+     * 避免使用者輸入每一個字都觸發高成本的渲染
+     */
+    function debounce(fn, delay) {
+        let timeout;
+        return function() {
+            status.innerText = "同步中...";
+            clearTimeout(timeout);
+            timeout = setTimeout(() => fn.apply(this, arguments), delay);
+        };
+    }
+
+    const debouncedRender = debounce(render, 300);
+
+    /**
+     * 4. 同步捲動邏輯
+     */
+    let isScrolling = false;
+    editor.addEventListener('scroll', () => {
+        if (!isScrolling) {
+            window.requestAnimationFrame(() => {
+                const percentage = editor.scrollTop / (editor.scrollHeight - editor.clientHeight);
+                previewContainer.scrollTop = percentage * (previewContainer.scrollHeight - previewContainer.clientHeight);
+                isScrolling = false;
+            });
+            isScrolling = true;
+        }
+    });
+
+    /**
+     * 5. 初始化與事件綁定
+     */
+    editor.addEventListener('input', debouncedRender);
+
+    // 恢復草稿或預設值
+    const saved = localStorage.getItem('md_content');
+    if (saved) {
+        editor.value = saved;
+    } else {
+        editor.value = `# 歡迎使用 Markdown Pro
+
+這是一個經過優化的編輯器範例。
+
+## 功能亮點
+1. **防抖渲染**：提高流暢度。
+2. **語法高亮**：
+\`\`\`javascript
+function greet(name) {
+  console.log(\`Hello, \${name}!\`);
+}
+\`\`\`
+3. **安全防護**：自動過濾惡意腳本。
+4. **同步捲動**：左邊動，右邊跟著動。
+
+> 請試著在此處編輯，內容會自動保存！`;
+    }
+
+    render();
+</script>
+
+</body>
+</html>
