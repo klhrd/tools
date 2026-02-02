@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>水墨繪圖板 v0.4.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            overscroll-behavior: none;
+            background-color: #e2e8f0; 
+        }
+        #canvas-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            padding: 20px;
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        canvas {
+            touch-action: none;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            cursor: crosshair;
+        }
+        
+        .tool-btn {
+            transition: all 0.1s;
+        }
+        .tool-btn.active {
+            background-color: #3b82f6;
+            color: white;
+            border-color: #2563eb;
+        }
+        
+        input[type=range] {
+            height: 4px;
+            border-radius: 2px;
+        }
+        
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 50;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 1.5rem;
+        }
+
+        [title]:hover::after {
+            content: attr(title);
+            position: absolute;
+            bottom: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 4px 8px;
+            font-size: 12px;
+            border-radius: 4px;
+            white-space: nowrap;
+            pointer-events: none;
+            z-index: 20;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col font-sans text-slate-800 overflow-hidden">
+
+    <!-- Header -->
+    <header class="bg-white shadow-sm z-10 flex flex-col shrink-0">
+        
+        <div class="px-2 py-1 flex items-center justify-between h-12 md:h-14 border-b border-slate-100">
+            <div class="flex items-center gap-2 mr-2">
+                <div class="bg-slate-800 text-white w-8 h-8 flex items-center justify-center rounded-md">
+                    <i class="fa-solid fa-paintbrush text-sm"></i>
+                </div>
+                <span class="font-bold text-sm hidden sm:block">水墨 v0.4</span>
+            </div>
+
+            <div class="flex flex-1 items-center gap-2 overflow-x-auto scrollbar-hide px-1">
+                
+                <!-- History -->
+                <div class="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0">
+                    <button onclick="undo()" id="btn-undo" class="tool-btn w-8 h-8 rounded flex items-center justify-center text-slate-600 disabled:opacity-30" title="復原">
+                        <i class="fa-solid fa-rotate-left"></i>
+                    </button>
+                    <button onclick="redo()" id="btn-redo" class="tool-btn w-8 h-8 rounded flex items-center justify-center text-slate-600 disabled:opacity-30" title="重做">
+                        <i class="fa-solid fa-rotate-right"></i>
+                    </button>
+                </div>
+
+                <div class="w-px h-6 bg-slate-300 mx-1 shrink-0"></div>
+
+                <!-- Tools -->
+                <div class="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0">
+                    <button onclick="setTool('calligraphy')" id="btn-calligraphy" class="tool-btn active w-8 h-8 rounded flex items-center justify-center text-slate-600" title="分叉毛筆 (有壓感)">
+                        <i class="fa-solid fa-signature"></i>
+                    </button>
+                    <button onclick="setTool('pen')" id="btn-pen" class="tool-btn w-8 h-8 rounded flex items-center justify-center text-slate-600" title="工筆 (細)">
+                        <i class="fa-solid fa-pen"></i>
+                    </button>
+                    <button onclick="setTool('seal')" id="btn-seal" class="tool-btn w-8 h-8 rounded flex items-center justify-center text-slate-600" title="落款印章">
+                        <i class="fa-solid fa-stamp"></i>
+                    </button>
+                    <button onclick="setTool('eraser')" id="btn-eraser" class="tool-btn w-8 h-8 rounded flex items-center justify-center text-slate-600" title="橡皮擦">
+                        <i class="fa-solid fa-eraser"></i>
+                    </button>
+                </div>
+
+                <button onclick="togglePaper()" class="w-8 h-8 rounded flex items-center justify-center text-slate-600 hover:bg-slate-100 shrink-0 border border-transparent hover:border-slate-200" title="切換紙張">
+                    <i class="fa-solid fa-scroll"></i>
+                </button>
+
+                <div class="w-px h-6 bg-slate-300 mx-1 shrink-0"></div>
+
+                <!-- Color & Size -->
+                <div class="flex items-center gap-2 bg-slate-50 px-2 py-1 rounded border border-slate-200 shrink-0">
+                    <div class="relative w-6 h-6 rounded-full border border-slate-300 overflow-hidden shadow-sm">
+                        <input type="color" id="colorPicker" value="#000000" class="absolute -top-4 -left-4 w-12 h-12 cursor-pointer">
+                    </div>
+                    <input type="range" id="brushSize" min="5" max="100" value="25" class="w-16 md:w-24 accent-slate-600 cursor-pointer">
+                </div>
+            </div>
+
+            <div class="flex gap-2 ml-2 shrink-0">
+                <button onclick="clearCanvas()" class="w-8 h-8 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors flex items-center justify-center" title="清空">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+                <div class="relative group">
+                    <button class="bg-indigo-600 hover:bg-indigo-700 text-white w-20 h-8 rounded text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1">
+                        輸出 <i class="fa-solid fa-caret-down"></i>
+                    </button>
+                    <div class="absolute right-0 top-full mt-1 w-28 bg-white rounded shadow-lg border border-slate-100 overflow-hidden hidden group-hover:block z-20">
+                        <button onclick="exportImage('jpeg')" class="block w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50">JPEG</button>
+                        <button onclick="exportPDF()" class="block w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50">PDF</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sub-Header: Seal Input (Hidden by default) -->
+        <div id="text-controls" class="hidden bg-red-50 px-3 py-2 border-b border-red-100 flex items-center gap-2 text-sm justify-center transition-all">
+            <label class="font-bold text-red-800" id="input-label">印章文字:</label>
+            <input type="text" id="textInput" placeholder="輸入名字(限4字)" class="border border-red-300 rounded px-2 py-1 w-48 focus:outline-none focus:border-red-500">
+            <span class="text-xs text-red-600 ml-1"><i class="fa-solid fa-computer-mouse"></i> 點擊畫布蓋章</span>
+        </div>
+    </header>
+
+    <main id="canvas-wrapper">
+        <canvas id="drawingCanvas"></canvas>
+    </main>
+
+    <div id="loading" class="loading-overlay">
+        <div class="flex flex-col items-center">
+            <i class="fa-solid fa-spinner fa-spin mb-2"></i>
+            <span>處理中...</span>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('drawingCanvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        
+        const INITIAL_WIDTH = Math.max(window.innerWidth - 40, 800);
+        const INITIAL_HEIGHT = Math.max(window.innerHeight - 100, 600);
+        
+        canvas.width = INITIAL_WIDTH;
+        canvas.height = INITIAL_HEIGHT;
+
+        const state = {
+            tool: 'calligraphy', 
+            color: '#000000',
+            size: 25,
+            bristles: [],
+            paperType: 'white',
+            history: [],
+            historyStep: -1
+        };
+
+        // --- History ---
+        const MAX_HISTORY = 20;
+
+        function saveState() {
+            if (state.historyStep < state.history.length - 1) {
+                state.history = state.history.slice(0, state.historyStep + 1);
+            }
+            state.history.push(canvas.toDataURL());
+            if (state.history.length > MAX_HISTORY) {
+                state.history.shift();
+            } else {
+                state.historyStep++;
+            }
+            updateUndoRedoUI();
+        }
+
+        function undo() {
+            if (state.historyStep > 0) {
+                state.historyStep--;
+                loadState(state.history[state.historyStep]);
+            }
+            updateUndoRedoUI();
+        }
+
+        function redo() {
+            if (state.historyStep < state.history.length - 1) {
+                state.historyStep++;
+                loadState(state.history[state.historyStep]);
+            }
+            updateUndoRedoUI();
+        }
+
+        function loadState(dataUrl) {
+            const img = new Image();
+            img.onload = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0);
+            };
+            img.src = dataUrl;
+        }
+
+        function updateUndoRedoUI() {
+            document.getElementById('btn-undo').disabled = state.historyStep <= 0;
+            document.getElementById('btn-redo').disabled = state.historyStep >= state.history.length - 1;
+        }
+
+        // --- Backgrounds ---
+        
+        function drawBackground() {
+            if (state.paperType === 'white') {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            } else if (state.paperType === 'rice') {
+                ctx.fillStyle = '#fdfbf7';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            } else if (state.paperType === 'grid') {
+                ctx.fillStyle = '#fdfbf7';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                drawGrid();
+            }
+        }
+
+        function drawGrid() {
+            ctx.save();
+            ctx.strokeStyle = '#e2e8f0'; 
+            ctx.lineWidth = 1;
+            const cellSize = 120; // Bigger grid for calligraphy
+            const rows = Math.ceil(canvas.height / cellSize);
+            const cols = Math.ceil(canvas.width / cellSize);
+
+            ctx.beginPath();
+            for (let i = 0; i <= cols; i++) {
+                ctx.moveTo(i * cellSize, 0);
+                ctx.lineTo(i * cellSize, canvas.height);
+            }
+            for (let i = 0; i <= rows; i++) {
+                ctx.moveTo(0, i * cellSize);
+                ctx.lineTo(canvas.width, i * cellSize);
+            }
+            // Cross
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const x = c * cellSize;
+                    const y = r * cellSize;
+                    ctx.setLineDash([5, 5]);
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(x + cellSize, y + cellSize);
+                    ctx.moveTo(x + cellSize, y);
+                    ctx.lineTo(x, y + cellSize);
+                }
+            }
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function togglePaper() {
+            if(confirm("切換紙張將會清空當前畫布，是否繼續？")) {
+                const types = ['white', 'rice', 'grid'];
+                const currentIdx = types.indexOf(state.paperType);
+                state.paperType = types[(currentIdx + 1) % types.length];
+                drawBackground();
+                state.history = [];
+                state.historyStep = -1;
+                saveState();
+            }
+        }
+
+        drawBackground();
+        saveState();
+
+        // --- Improved Physics Brush ---
+
+        let isDrawing = false;
+        let lastX = 0; let lastY = 0;
+        let lastTime = 0;
+        let currentVelocity = 0;
+
+        function generateBristles() {
+            state.bristles = [];
+            // More bristles for high quality
+            const count = Math.floor(state.size * 2.5) + 20; 
+            for (let i = 0; i < count; i++) {
+                const r = state.size / 2;
+                const angle = Math.random() * 2 * Math.PI;
+                // Bias bristles towards center
+                const distance = Math.pow(Math.random(), 0.5) * r;
+                state.bristles.push({
+                    dx: Math.cos(angle) * distance,
+                    dy: Math.sin(angle) * distance,
+                    // Friction varies to simulate hair spread
+                    friction: 0.2 + Math.random() * 0.6 
+                });
+            }
+        }
+
+        function getPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            let clientX, clientY;
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+
+        function handleInputStart(e) {
+            const pos = getPos(e);
+            
+            if (state.tool === 'seal') {
+                const text = document.getElementById('textInput').value.trim();
+                if (!text) {
+                    const input = document.getElementById('textInput');
+                    input.focus();
+                    input.style.borderColor = "red";
+                    setTimeout(()=>input.style.borderColor = "", 500);
+                    return;
+                }
+                drawSealStamp(pos.x, pos.y, text);
+                saveState();
+                return;
+            }
+
+            isDrawing = true;
+            lastX = pos.x;
+            lastY = pos.y;
+            lastTime = Date.now();
+            currentVelocity = 0;
+            
+            if (state.tool === 'calligraphy') {
+                generateBristles();
+            } else {
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+            }
+        }
+
+        function handleInputMove(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            const pos = getPos(e);
+            
+            if (state.tool === 'eraser') drawEraser(pos.x, pos.y);
+            else if (state.tool === 'pen') drawPen(pos.x, pos.y);
+            else if (state.tool === 'calligraphy') drawCalligraphy(pos.x, pos.y);
+            
+            lastX = pos.x;
+            lastY = pos.y;
+        }
+
+        function handleInputEnd() {
+            if (isDrawing) {
+                isDrawing = false;
+                ctx.beginPath();
+                saveState();
+            }
+        }
+
+        // --- Drawing Tools ---
+
+        function drawPen(x, y) {
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.strokeStyle = state.color;
+            ctx.lineWidth = Math.max(1, state.size / 5); // Pen is thinner relative to brush
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+        }
+
+        function drawEraser(x, y) {
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.strokeStyle = state.paperType === 'white' ? '#ffffff' : '#fdfbf7'; 
+            ctx.lineWidth = state.size;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+        }
+
+        function drawCalligraphy(x, y) {
+            ctx.globalCompositeOperation = 'source-over'; // Blend manually via alpha
+            ctx.fillStyle = state.color;
+            
+            // Velocity calculation
+            const now = Date.now();
+            const dt = Math.max(1, now - lastTime);
+            const dist = Math.hypot(x - lastX, y - lastY);
+            const velocity = dist / dt; // pixels per ms
+            lastTime = now;
+            
+            // Smooth velocity
+            currentVelocity = currentVelocity * 0.7 + velocity * 0.3;
+
+            // Don't draw if too small movement
+            if (dist < 1) return;
+
+            // Physics Logic:
+            // 1. Width: Slower = Thicker, Faster = Thinner
+            // 2. Opacity: Slower = Darker (wet), Faster = Lighter (dry)
+            
+            // Dynamic Size Factor (0.2 to 1.5 of base size)
+            // Velocity 0 -> Factor 1.2
+            // Velocity 5 -> Factor 0.3
+            const velocityFactor = Math.max(0.1, 1 - (currentVelocity / 3)); 
+            const dynamicSize = state.size * (0.4 + 0.8 * velocityFactor);
+            
+            // Dynamic Opacity
+            // Very fast = 0.2, Slow = 1.0
+            const dynamicAlpha = Math.min(1.0, Math.max(0.1, 0.2 + 0.8 * velocityFactor));
+
+            state.bristles.forEach(b => {
+                // Bristle Spread logic
+                // When pressing hard (slow), bristles spread out more
+                const spread = (b.dx * b.dx + b.dy * b.dy) / (state.size * state.size); // normalized distance from center
+                
+                // Only draw core bristles if moving fast
+                if (currentVelocity > 1.5 && spread > 0.4) return; // "Flying White" (飛白) effect
+
+                const bx = x + b.dx * (dynamicSize / state.size);
+                const by = y + b.dy * (dynamicSize / state.size);
+                
+                const lastBx = lastX + b.dx * (dynamicSize / state.size); 
+                const lastBy = lastY + b.dy * (dynamicSize / state.size);
+
+                ctx.beginPath();
+                ctx.moveTo(lastBx, lastBy);
+                ctx.lineTo(bx, by);
+                
+                ctx.strokeStyle = state.color;
+                
+                // Base alpha lowered for stacking effect
+                ctx.globalAlpha = dynamicAlpha * 0.15; 
+                ctx.lineWidth = Math.max(0.5, dynamicSize / 15);
+                
+                ctx.stroke();
+            });
+            ctx.globalAlpha = 1.0;
+        }
+
+        function drawSealStamp(x, y, text) {
+            const size = state.size * 3; 
+            const halfSize = size / 2;
+            
+            ctx.save();
+            
+            // Multiply blend mode makes it look stamped ON the paper
+            ctx.globalCompositeOperation = 'multiply';
+            ctx.fillStyle = '#b91c1c'; // Deep Red
+            
+            // Draw box with slight rotation/imperfection
+            ctx.translate(x, y);
+            const rot = (Math.random() - 0.5) * 0.1; // Slight tilt
+            ctx.rotate(rot);
+            
+            // Rounded rect for seal body
+            ctx.beginPath();
+            ctx.roundRect(-halfSize, -halfSize, size, size, 4);
+            ctx.fill();
+            
+            // Text
+            ctx.globalCompositeOperation = 'source-over'; // Text is "carved out" (white/paper color)
+            // Actually, real seals use white ink or negative space. 
+            // If it's negative seal (red background, white text):
+            ctx.fillStyle = '#ffffff'; 
+            // If paper is rice color, use rice color for text to simulate transparency? 
+            // Simplest is white, which looks like negative space.
+            if (state.paperType !== 'white') ctx.fillStyle = '#fdfbf7';
+
+            ctx.font = `bold ${size * 0.45}px "KaiTi", "STKaiti", serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            if (text.length <= 2) {
+                 ctx.fillText(text, 0, 0);
+            } else {
+                 ctx.font = `bold ${size * 0.25}px "KaiTi", "STKaiti", serif`;
+                 // Draw 2x2 grid
+                 ctx.fillText(text[0] || '', size*0.25, -size*0.25); // Top Right (traditional order: Top R -> Bot R -> Top L -> Bot L? Or classic Z?)
+                 // Traditional seal reading order varies, let's stick to Left-Right Top-Down for modern usability
+                 // Modern: TL, TR, BL, BR
+                 // Let's do simple 4 quadrant
+                 ctx.fillText(text[0] || '', -size*0.2, -size*0.2); 
+                 ctx.fillText(text[1] || '', size*0.2, -size*0.2);
+                 ctx.fillText(text[2] || '', -size*0.2, size*0.2);
+                 ctx.fillText(text[3] || '', size*0.2, size*0.2);
+            }
+
+            ctx.restore();
+        }
+
+        // --- UI ---
+
+        document.getElementById('colorPicker').addEventListener('input', (e) => {
+            state.color = e.target.value;
+        });
+
+        document.getElementById('brushSize').addEventListener('input', (e) => {
+            state.size = parseInt(e.target.value);
+            generateBristles();
+        });
+
+        function setTool(toolName) {
+            state.tool = toolName;
+            
+            document.querySelectorAll('.tool-btn').forEach(btn => {
+                btn.classList.remove('active', 'text-white', 'bg-blue-500');
+                btn.classList.add('text-slate-600');
+            });
+            const btn = document.getElementById(`btn-${toolName}`);
+            btn.classList.add('active');
+            btn.classList.remove('text-slate-600');
+            
+            const textControls = document.getElementById('text-controls');
+            
+            if (toolName === 'seal') {
+                textControls.classList.remove('hidden');
+            } else {
+                textControls.classList.add('hidden');
+            }
+        }
+
+        function clearCanvas() {
+            if(confirm('確定要清空畫布嗎？')) {
+                drawBackground();
+                saveState();
+            }
+        }
+
+        // Events
+        canvas.addEventListener('mousedown', handleInputStart);
+        canvas.addEventListener('mousemove', handleInputMove);
+        window.addEventListener('mouseup', handleInputEnd);
+
+        canvas.addEventListener('touchstart', handleInputStart, {passive: false});
+        canvas.addEventListener('touchmove', handleInputMove, {passive: false});
+        window.addEventListener('touchend', handleInputEnd);
+
+        // Export
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'flex' : 'none';
+        }
+
+        function exportImage(type) {
+            const link = document.createElement('a');
+            const date = new Date().toISOString().slice(0,19).replace(/:/g,"-");
+            if (type === 'jpeg') {
+                link.download = `ink-art-${date}.jpg`;
+                link.href = canvas.toDataURL('image/jpeg', 0.9);
+            }
+            link.click();
+        }
+
+        function exportPDF() {
+            showLoading(true);
+            setTimeout(() => {
+                try {
+                    const { jsPDF } = window.jspdf;
+                    const orientation = canvas.width > canvas.height ? 'l' : 'p';
+                    const doc = new jsPDF({
+                        orientation: orientation,
+                        unit: 'px',
+                        format: [canvas.width, canvas.height]
+                    });
+                    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                    doc.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
+                    doc.save(`ink-art.pdf`);
+                } catch (err) {
+                    alert('PDF Error: ' + err.message);
+                } finally {
+                    showLoading(false);
+                }
+            }, 100);
+        }
+
+        generateBristles();
+
+    </script>
+</body>
+</html>
