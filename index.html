@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard | KLHRD's Tools Library</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 使用 Marked 處理 Markdown 渲染 -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -19,11 +18,24 @@
             background: #ffffff;
             border: 1px solid #e2e8f0;
             transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
         }
         .glass-card:hover {
-            border-color: #3b82f6;
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.05);
+            border-color: #64748b; /* Slate-500 */
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px -6px rgba(0, 0, 0, 0.08);
+            cursor: pointer;
+        }
+        .glass-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; w-full; h-1;
+            background: transparent;
+            transition: background 0.3s;
+        }
+        .glass-card:hover::before {
+            background: #64748b; /* Slate-500 */
         }
         .detail-view {
             display: none;
@@ -33,7 +45,24 @@
             z-index: 50;
             overflow-y: auto;
         }
-        /* Markdown 樣式優化 */
+        .filter-btn.active {
+            background-color: #475569; /* Slate-600 */
+            color: white;
+            border-color: #475569;
+        }
+        .nailed-icon {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: #cbd5e1;
+            transform: rotate(45deg);
+            transition: color 0.3s;
+        }
+        .glass-card:hover .nailed-icon {
+            color: #64748b; /* Slate-500 */
+        }
+        
+        /* Markdown 樣式 */
         .readme-content img { max-width: 100%; border-radius: 12px; margin: 1rem 0; }
         .readme-content pre { background: #f1f5f9; padding: 1.25rem; border-radius: 12px; overflow-x: auto; margin: 1.5rem 0; font-size: 0.9rem; }
         .readme-content code { font-family: 'ui-monospace', monospace; background: #f1f5f9; padding: 0.2rem 0.4rem; border-radius: 4px; }
@@ -42,7 +71,6 @@
         .readme-content h2 { font-size: 1.4rem; }
         .readme-content p { margin-bottom: 1rem; line-height: 1.7; }
         
-        /* 滾動條樣式 */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #f8fafc; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; border: 2px solid #f8fafc; }
@@ -52,64 +80,75 @@
 <body class="p-4 md:p-8">
 
     <!-- 主視圖 -->
-    <div id="main-view" class="max-w-6xl mx-auto">
-        <header class="flex flex-col md:flex-row justify-between items-center mb-10 gap-6">
+    <div id="main-view" class="max-w-7xl mx-auto">
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6">
             <div class="flex items-center space-x-4">
-                <div class="w-11 h-11 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-100">
-                    <i class="fa-solid fa-compass text-lg"></i>
+                <div class="w-12 h-12 bg-slate-700 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-slate-200 transform transition hover:scale-105 hover:rotate-3">
+                    <i class="fa-solid fa-compass text-xl"></i>
                 </div>
                 <div>
-                    <h1 class="text-xl font-extrabold text-slate-900 tracking-tight">Tools Hub</h1>
-                    <p class="text-[11px] font-medium text-slate-400">klhrd's projects</p>
+                    <h1 class="text-2xl font-extrabold text-slate-900">Tools Hub</h1>
+                    <p class="text-xs font-semibold text-slate-400">klhrd's projects</p>
                 </div>
             </div>
-            <div class="relative w-full md:w-72">
-                <i class="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                <input type="text" id="search" placeholder="搜尋專案名稱..." 
-                    class="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-slate-200 outline-none focus:ring-4 ring-blue-500/5 focus:border-blue-400 transition-all font-medium">
+            <div class="relative w-full md:w-80 group">
+                <i class="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm group-hover:text-slate-600 transition-colors"></i>
+                <input type="text" id="search" placeholder="搜尋專案、標籤或描述..." 
+                    class="w-full pl-11 pr-4 py-3 text-sm rounded-2xl border border-slate-200 bg-white outline-none focus:ring-4 ring-slate-500/10 focus:border-slate-500 transition-all font-medium shadow-sm group-hover:shadow-md">
             </div>
         </header>
 
-        <div id="loading-state" class="flex flex-col items-center justify-center py-32 space-y-4">
-            <div class="animate-spin h-7 w-7 border-[3px] border-blue-600 border-t-transparent rounded-full"></div>
-            <p class="text-xs font-bold text-slate-400">正在同步 GitHub 資源與提交時間...</p>
+        <!-- 標籤篩選區 -->
+        <div id="filter-container" class="flex flex-wrap gap-2 mb-8 hidden animate-fade-in">
+            <button class="filter-btn active px-4 py-1.5 rounded-full border border-slate-200 bg-white text-slate-600 text-xs font-bold transition-all hover:bg-slate-100" onclick="filterByTag('all')">
+                All
+            </button>
+            <!-- 動態標籤 -->
         </div>
 
-        <div id="project-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 hidden">
+        <div id="loading-state" class="flex flex-col items-center justify-center py-32 space-y-4">
+            <div class="animate-spin h-8 w-8 border-4 border-slate-600 border-t-transparent rounded-full"></div>
+            <p class="text-sm font-bold text-slate-500 animate-pulse">正在同步 GitHub 資源與解析標籤...</p>
+        </div>
+
+        <div id="project-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 hidden">
             <!-- 卡片動態生成 -->
         </div>
     </div>
 
     <!-- 詳情視圖 (Overlay) -->
     <div id="detail-view" class="detail-view p-4 md:p-12">
-        <div class="max-w-5xl mx-auto">
-            <button onclick="closeDetail()" class="mb-10 flex items-center text-slate-500 hover:text-blue-600 font-bold transition-all px-4 py-2 rounded-xl hover:bg-slate-100">
-                <i class="fa-solid fa-chevron-left mr-2 text-xs"></i> 返回清單
+        <div class="max-w-6xl mx-auto">
+            <button onclick="closeDetail()" class="mb-8 flex items-center text-slate-500 hover:text-slate-800 font-bold transition-all px-4 py-2 rounded-xl hover:bg-slate-100">
+                <i class="fa-solid fa-arrow-left-long mr-2"></i> 返回清單
             </button>
             
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-12">
                 <!-- 左側：版本與資訊 -->
                 <div class="lg:col-span-1">
-                    <div class="inline-block px-2.5 py-1 rounded-lg bg-blue-50 text-blue-600 text-[10px] font-bold mb-3" id="detail-title-id">
-                        Project ID
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-500 text-[10px] font-bold" id="detail-title-id">ID</span>
+                        <div id="detail-tags-container" class="flex gap-1 flex-wrap"></div>
                     </div>
-                    <h1 id="detail-title" class="text-3xl font-extrabold text-slate-900 mb-4 leading-tight">專案標題</h1>
-                    <p id="detail-time" class="text-[11px] text-slate-400 mb-8 flex items-center">
-                        <i class="fa-regular fa-clock mr-1.5"></i> 載入更新時間中...
+                    
+                    <h1 id="detail-title" class="text-4xl font-extrabold text-slate-900 mb-4 leading-tight">...</h1>
+                    <p id="detail-time" class="text-xs font-medium text-slate-400 mb-10 flex items-center bg-slate-50 inline-block px-3 py-1 rounded-full">
+                        <i class="fa-regular fa-clock mr-2"></i> ...
                     </p>
                     
                     <div class="space-y-8">
-                        <div>
+                        <div class="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
                             <p class="text-[11px] font-bold text-slate-400 mb-4 flex items-center">
-                                <i class="fa-solid fa-list-ul mr-2"></i> 可用版本
+                                <i class="fa-solid fa-code-branch mr-2"></i> 可用版本
                             </p>
                             <div id="detail-versions" class="flex flex-col gap-2">
                                 <!-- 版本連結 -->
                             </div>
                         </div>
-                        <div class="pt-8 border-t border-slate-100">
+                        
+                        <div class="bg-slate-50 rounded-2xl p-6">
                             <p class="text-[11px] font-bold text-slate-400 mb-4 flex items-center">
-                                <i class="fa-solid fa-circle-info mr-2"></i> 專案細節
+                                <i class="fa-solid fa-chart-pie mr-2"></i> 專案統計
                             </p>
                             <div id="detail-stats" class="text-xs space-y-3 font-semibold text-slate-600">
                                 <!-- 統計 -->
@@ -119,13 +158,12 @@
                 </div>
 
                 <!-- 右側：README 內容 -->
-                <div class="lg:col-span-2 bg-slate-50/50 rounded-[2rem] p-6 md:p-10 border border-slate-100">
-                    <div class="flex items-center justify-between mb-8">
-                        <span class="text-[11px] font-bold text-slate-400">說明文件內容</span>
+                <div class="lg:col-span-2 bg-white rounded-[2rem] p-8 md:p-12 border border-slate-200 shadow-sm">
+                    <div class="flex items-center justify-between mb-8 pb-4 border-b border-slate-100">
+                        <span class="text-xs font-bold text-slate-400">Project Documentation</span>
                         <div class="flex space-x-1.5">
-                            <span class="w-1.5 h-1.5 rounded-full bg-slate-200"></span>
-                            <span class="w-1.5 h-1.5 rounded-full bg-slate-200"></span>
-                            <span class="w-1.5 h-1.5 rounded-full bg-slate-200"></span>
+                            <span class="w-2 h-2 rounded-full bg-slate-200"></span>
+                            <span class="w-2 h-2 rounded-full bg-slate-200"></span>
                         </div>
                     </div>
                     <div id="readme-box" class="readme-content text-slate-600 text-sm">
@@ -143,45 +181,35 @@
         const RAW_BASE = `https://raw.githubusercontent.com/${CONFIG.USER}/${CONFIG.REPO}/${CONFIG.BRANCH}`;
         
         let projectsData = {};
+        let activeTag = 'all';
 
-        // 設定 Marked 選項
-        marked.setOptions({
-            breaks: true,
-            gfm: true
-        });
+        marked.setOptions({ breaks: true, gfm: true });
 
         async function init() {
             try {
-                // 平行抓取 Tree 和最近的 Commits
-                const [treeRes, commitsRes] = await Promise.all([
-                    fetch(TREE_API),
-                    fetch(COMMITS_API)
-                ]);
-                
+                const [treeRes, commitsRes] = await Promise.all([fetch(TREE_API), fetch(COMMITS_API)]);
                 const treeData = await treeRes.json();
                 const commitsData = await commitsRes.json();
-                
                 const lastUpdated = commitsData.length > 0 ? new Date(commitsData[0].commit.committer.date).toLocaleString('zh-TW') : '未知';
 
                 const htmlFiles = treeData.tree.filter(item => item.path.endsWith('.html') && item.path !== 'index.html');
                 const readmes = treeData.tree.filter(item => item.path.toLowerCase().endsWith('readme.md'));
 
-                projectsData = groupData(htmlFiles, readmes, lastUpdated);
-                await renderGrid(projectsData);
+                // 第一步：分組
+                let rawGroups = groupData(htmlFiles, readmes, lastUpdated);
+                
+                // 第二步：預先抓取所有 README 以解析 Tags 和 Nailed 狀態
+                await enrichWithMetadata(rawGroups);
+
+                // 第三步：排序與儲存
+                projectsData = sortProjects(rawGroups);
+
+                renderFilters(projectsData);
+                renderGrid(projectsData);
                 handleUrlHash();
             } catch (err) {
-                document.getElementById('loading-state').innerHTML = '<p class="text-red-500 font-bold">同步失敗，請確認倉庫設定或網路連線</p>';
-            }
-        }
-
-        window.addEventListener('hashchange', handleUrlHash);
-
-        function handleUrlHash() {
-            const hashId = window.location.hash.replace('#', '');
-            if (hashId && projectsData[hashId]) {
-                openDetail(hashId, false);
-            } else if (!hashId) {
-                closeDetail(false);
+                console.error(err);
+                document.getElementById('loading-state').innerHTML = '<p class="text-slate-500 font-bold">資料同步失敗，請確認倉庫設定</p>';
             }
         }
 
@@ -192,16 +220,50 @@
                 if (!groups[folder]) {
                     groups[folder] = {
                         id: folder,
-                        displayName: folder,
+                        displayName: folder, 
                         files: [],
                         updatedAt: defaultTime,
-                        readme: readmes.find(r => r.path.startsWith(folder)) || null
+                        readmePath: readmes.find(r => r.path.startsWith(folder))?.path || null,
+                        fullReadme: null,
+                        tags: [],
+                        isNailed: false
                     };
                 }
                 const label = file.path.replace(folder + '/', '').replace('.html', '').replace('/index', '') || '主程式';
                 groups[folder].files.push({ path: file.path, label, isMain: label === '主程式' });
             });
             return groups;
+        }
+
+        async function enrichWithMetadata(groups) {
+            const promises = Object.values(groups).map(async (group) => {
+                if (!group.readmePath) return;
+                try {
+                    const res = await fetch(`${RAW_BASE}/${group.readmePath}`);
+                    const text = await res.text();
+                    group.fullReadme = text;
+                    group.displayName = cleanTitle(text) || group.id;
+                    
+                    // 解析隱藏註解中的 JSON tags
+                    const jsonMatch = text.match(/<!--.*?({.*"tags".*?}).*?-->/s);
+                    if (jsonMatch) {
+                        try {
+                            const metadata = JSON.parse(jsonMatch[1]);
+                            if (metadata.tags && Array.isArray(metadata.tags)) {
+                                // 修正：直接使用原始 Tag，不轉小寫
+                                group.tags = metadata.tags;
+                                // 判斷 Nailed 狀態 (這裡為了功能性，檢查時忽略大小寫，但顯示時保留原樣)
+                                group.isNailed = group.tags.some(t => t.toLowerCase() === 'nailed');
+                            }
+                        } catch (e) {
+                            console.warn('Metadata JSON parse error in', group.id);
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Failed to fetch readme for', group.id);
+                }
+            });
+            await Promise.all(promises);
         }
 
         function cleanTitle(text) {
@@ -212,57 +274,116 @@
             return h1Match ? h1Match[1].trim() : text.trim();
         }
 
-        async function renderGrid(groups) {
-            const grid = document.getElementById('project-grid');
+        function sortProjects(groups) {
             const list = Object.values(groups);
+            return list.sort((a, b) => {
+                if (a.isNailed && !b.isNailed) return -1;
+                if (!a.isNailed && b.isNailed) return 1;
+                return a.id.localeCompare(b.id);
+            });
+        }
 
-            grid.innerHTML = '';
-            for (const group of list) {
-                const entry = group.files.find(f => f.isMain) || group.files[0];
-                
-                let displayTitle = group.id;
-                if (group.readme) {
-                    try {
-                        const r = await fetch(`${RAW_BASE}/${group.readme.path}`);
-                        const t = await r.text();
-                        displayTitle = cleanTitle(t) || group.id;
-                        group.fullReadme = t; 
-                        group.displayName = displayTitle;
-                    } catch(e) {}
+        function renderFilters(data) {
+            const allTags = new Set();
+            data.forEach(p => p.tags.forEach(t => {
+                if (t.toLowerCase() !== 'nailed') allTags.add(t); 
+            }));
+
+            const container = document.getElementById('filter-container');
+            if (allTags.size > 0) {
+                container.classList.remove('hidden');
+                allTags.forEach(tag => {
+                    const btn = document.createElement('button');
+                    // 修正：移除 capitalize，使用 slate 顏色
+                    btn.className = `filter-btn px-4 py-1.5 rounded-full border border-slate-200 bg-white text-slate-600 text-xs font-bold transition-all hover:bg-slate-100`;
+                    btn.textContent = tag;
+                    btn.onclick = () => filterByTag(tag, btn);
+                    container.appendChild(btn);
+                });
+            }
+        }
+
+        function filterByTag(tag, btnElement) {
+            activeTag = tag;
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            if (btnElement) {
+                btnElement.classList.add('active');
+            } else {
+                document.querySelector('.filter-btn').classList.add('active'); 
+            }
+            
+            const grid = document.getElementById('project-grid');
+            Array.from(grid.children).forEach(card => {
+                const tags = card.dataset.tags ? card.dataset.tags.split(',') : [];
+                if (tag === 'all' || tags.includes(tag)) {
+                    card.classList.remove('hidden');
+                } else {
+                    card.classList.add('hidden');
                 }
+            });
+        }
 
+        function renderGrid(data) {
+            const grid = document.getElementById('project-grid');
+            grid.innerHTML = '';
+            
+            data.forEach(group => {
+                const entry = group.files.find(f => f.isMain) || group.files[0];
                 const card = document.createElement('div');
-                card.className = 'glass-card rounded-2xl p-5 flex flex-col h-full cursor-default';
-                card.dataset.search = (group.id + displayTitle).toLowerCase();
+                
+                card.className = 'glass-card rounded-3xl p-6 flex flex-col h-full group';
+                card.onclick = () => openDetail(group.id);
+                card.dataset.search = (group.id + group.displayName + group.tags.join(' ')).toLowerCase();
+                card.dataset.tags = group.tags.join(',');
+
+                // 標籤 HTML：移除 capitalize，使用 slate 顏色
+                const tagsHtml = group.tags
+                    .filter(t => t.toLowerCase() !== 'nailed')
+                    .map(t => `<span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">#${t}</span>`)
+                    .join('');
+
+                // Nailed 圖示：使用 slate 顏色
+                const nailedHtml = group.isNailed 
+                    ? `<i class="fa-solid fa-thumbtack text-slate-400 absolute top-6 right-6 text-sm transform rotate-45 z-10"></i>` 
+                    : '';
 
                 card.innerHTML = `
-                    <div class="flex justify-between items-center mb-5">
-                        <span class="text-[10px] font-bold bg-slate-900 text-white px-2 py-0.5 rounded-lg shadow-sm">${group.id}</span>
-                        <div class="flex items-center space-x-2">
-                            <span class="text-[10px] text-slate-500 font-bold"><i class="fa-regular fa-clock"></i></span>
-                            <span class="text-[10px] text-slate-600 font-bold bg-white px-2 py-0.5 rounded-lg border border-slate-200">${group.files.length} 檔案</span>
+                    ${nailedHtml}
+                    <div class="flex flex-col h-full">
+                        <div class="mb-4">
+                            <!-- 修正：移除 uppercase -->
+                            <span class="text-[10px] font-black bg-slate-700 text-white px-2 py-1 rounded-lg">${group.id}</span>
                         </div>
-                    </div>
-                    
-                    <a href="./${entry.path}" class="text-[17px] font-bold text-slate-800 hover:text-blue-600 transition-colors mb-6 block leading-snug">
-                        ${displayTitle}
-                    </a>
-                    
-                    <div class="mt-auto pt-4 border-t border-slate-50 flex items-center justify-between">
-                        <button onclick="location.hash='${group.id}'" class="text-xs font-bold text-slate-400 hover:text-blue-600 transition-all flex items-center group">
-                            查看詳情 <i class="fa-solid fa-arrow-right-long ml-2 transition-transform group-hover:translate-x-1"></i>
-                        </button>
-                        <span class="text-[9px] text-slate-300 font-medium italic">最近更新：${group.updatedAt.split(' ')[0]}</span>
+                        
+                        <!-- 修正：hover 改為 slate-600 -->
+                        <h3 class="text-xl font-extrabold text-slate-800 mb-2 leading-tight group-hover:text-slate-600 transition-colors">
+                            ${group.displayName}
+                        </h3>
+                        
+                        <div class="flex flex-wrap gap-2 mb-6">
+                            ${tagsHtml}
+                        </div>
+                        
+                        <div class="mt-auto pt-5 border-t border-slate-100 flex items-center justify-between">
+                            <!-- 修正：按鈕改為 slate-700 -->
+                            <a href="./${entry.path}" 
+                               onclick="event.stopPropagation()"
+                               class="text-xs font-bold text-white bg-slate-700 px-4 py-2 rounded-xl hover:bg-slate-800 transition-colors shadow-sm hover:shadow-slate-300">
+                                <i class="fa-solid fa-play mr-1"></i> 啟動
+                            </a>
+                            <span class="text-[10px] text-slate-400 font-bold">${group.files.length} 個版本</span>
+                        </div>
                     </div>
                 `;
                 grid.appendChild(card);
-            }
+            });
+            
             document.getElementById('loading-state').classList.add('hidden');
             grid.classList.remove('hidden');
         }
 
         function openDetail(id, updateHash = true) {
-            const group = projectsData[id];
+            const group = projectsData.find(p => p.id === id);
             if (!group) return;
 
             const view = document.getElementById('detail-view');
@@ -270,22 +391,28 @@
             document.getElementById('detail-title').textContent = group.displayName;
             document.getElementById('detail-time').innerHTML = `<i class="fa-regular fa-clock mr-1.5"></i> 最後更新時間：${group.updatedAt}`;
             
+            // 詳情頁 Tags：移除 capitalize，使用 slate
+            const tagsContainer = document.getElementById('detail-tags-container');
+            tagsContainer.innerHTML = group.tags.map(t => 
+                `<span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold border border-slate-200">${t}</span>`
+            ).join('');
+
             const vBox = document.getElementById('detail-versions');
             vBox.innerHTML = group.files.map(f => `
-                <a href="./${f.path}" class="flex items-center justify-between p-3.5 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50/50 transition-all group bg-white shadow-sm">
-                    <span class="text-sm font-semibold text-slate-700 group-hover:text-blue-700">${f.label}</span>
-                    <i class="fa-solid fa-external-link text-[10px] text-slate-300 group-hover:text-blue-500"></i>
+                <a href="./${f.path}" class="flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition-all group bg-white">
+                    <span class="text-sm font-bold text-slate-700 group-hover:text-slate-900">${f.label}</span>
+                    <i class="fa-solid fa-arrow-up-right-from-square text-[11px] text-slate-300 group-hover:text-slate-500"></i>
                 </a>
             `).join('');
 
             document.getElementById('detail-stats').innerHTML = `
-                <div class="flex justify-between p-2.5 bg-white rounded-lg border border-slate-100 shadow-sm">
-                    <span class="text-slate-400">版本總計</span>
+                <div class="flex justify-between">
+                    <span class="text-slate-400">版本數量</span>
                     <span class="text-slate-900">${group.files.length}</span>
                 </div>
-                <div class="flex flex-col p-2.5 bg-white rounded-lg border border-slate-100 shadow-sm space-y-1">
-                    <span class="text-slate-400">預設進入點</span>
-                    <span class="text-blue-600 truncate italic text-[10px] underline">${group.files[0].path}</span>
+                <div class="flex justify-between">
+                    <span class="text-slate-400">主要入口</span>
+                    <span class="text-slate-600 truncate max-w-[150px] underline">${group.files[0].path}</span>
                 </div>
             `;
 
@@ -304,16 +431,32 @@
         function closeDetail(updateHash = true) {
             document.getElementById('detail-view').style.display = 'none';
             document.body.style.overflow = 'auto';
-            if (updateHash) {
-                // 修復：在沙盒環境中使用 location.hash 清除代替 history.pushState 以避免 SecurityError
-                location.hash = '';
+            if (updateHash) location.hash = '';
+        }
+
+        window.addEventListener('hashchange', handleUrlHash);
+        function handleUrlHash() {
+            const hashId = window.location.hash.replace('#', '');
+            if (hashId) {
+                openDetail(hashId, false);
+            } else {
+                closeDetail(false);
             }
         }
 
         document.getElementById('search').addEventListener('input', (e) => {
             const q = e.target.value.toLowerCase();
-            document.querySelectorAll('.glass-card').forEach(c => {
-                c.style.display = c.dataset.search.includes(q) ? 'flex' : 'none';
+            const grid = document.getElementById('project-grid');
+            Array.from(grid.children).forEach(card => {
+                const tags = card.dataset.tags ? card.dataset.tags.split(',') : [];
+                const isTagMatch = activeTag === 'all' || tags.includes(activeTag);
+                const isSearchMatch = card.dataset.search.includes(q);
+                
+                if (isTagMatch && isSearchMatch) {
+                    card.classList.remove('hidden');
+                } else {
+                    card.classList.add('hidden');
+                }
             });
         });
 
