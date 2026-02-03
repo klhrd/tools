@@ -62,15 +62,38 @@
             color: #64748b; /* Slate-500 */
         }
         
-        /* Markdown 樣式 */
-        .readme-content img { max-width: 100%; border-radius: 12px; margin: 1rem 0; }
-        .readme-content pre { background: #f1f5f9; padding: 1.25rem; border-radius: 12px; overflow-x: auto; margin: 1.5rem 0; font-size: 0.9rem; }
-        .readme-content code { font-family: 'ui-monospace', monospace; background: #f1f5f9; padding: 0.2rem 0.4rem; border-radius: 4px; }
-        .readme-content h1, .readme-content h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.75rem; margin-top: 2rem; margin-bottom: 1.25rem; font-weight: 800; color: #1e293b; }
-        .readme-content h1 { font-size: 1.75rem; }
-        .readme-content h2 { font-size: 1.4rem; }
-        .readme-content p { margin-bottom: 1rem; line-height: 1.7; }
+        /* Markdown 樣式修復與優化 */
+        .readme-content { line-height: 1.8; }
+        .readme-content img { max-width: 100%; border-radius: 12px; margin: 1.5rem 0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
         
+        /* 修復列表縮排與樣式 */
+        .readme-content ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 1rem; }
+        .readme-content ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 1rem; }
+        .readme-content li { margin-bottom: 0.25rem; }
+        .readme-content ul ul, .readme-content ol ul { list-style-type: circle; margin-bottom: 0; }
+        
+        /* 引用區塊樣式 */
+        .readme-content blockquote { border-left: 4px solid #cbd5e1; padding-left: 1rem; color: #64748b; margin: 1.5rem 0; font-style: italic; background: #f8fafc; padding: 1rem; border-radius: 0 8px 8px 0; }
+        
+        /* 程式碼區塊 */
+        .readme-content pre { background: #1e293b; color: #e2e8f0; padding: 1.25rem; border-radius: 12px; overflow-x: auto; margin: 1.5rem 0; font-size: 0.9rem; line-height: 1.5; }
+        .readme-content code { font-family: 'ui-monospace', monospace; background: #f1f5f9; padding: 0.2rem 0.4rem; border-radius: 4px; color: #be185d; font-size: 0.9em; }
+        .readme-content pre code { background: transparent; color: inherit; padding: 0; }
+        
+        /* 標題與分隔線 */
+        .readme-content h1 { border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem; margin-top: 2.5rem; margin-bottom: 1.5rem; font-weight: 800; color: #0f172a; font-size: 2rem; line-height: 1.2; }
+        .readme-content h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.5rem; margin-top: 2rem; margin-bottom: 1rem; font-weight: 700; color: #1e293b; font-size: 1.5rem; }
+        .readme-content h3 { margin-top: 1.5rem; margin-bottom: 0.75rem; font-weight: 600; color: #334155; font-size: 1.25rem; }
+        .readme-content p { margin-bottom: 1.25rem; }
+        .readme-content a { color: #2563eb; text-decoration: underline; text-underline-offset: 2px; }
+        .readme-content a:hover { color: #1d4ed8; }
+        .readme-content hr { border-color: #e2e8f0; margin: 2rem 0; }
+        
+        /* 表格樣式 */
+        .readme-content table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        .readme-content th, .readme-content td { border: 1px solid #e2e8f0; padding: 0.75rem; text-align: left; }
+        .readme-content th { background-color: #f8fafc; font-weight: 600; }
+
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #f8fafc; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; border: 2px solid #f8fafc; }
@@ -250,9 +273,7 @@
                         try {
                             const metadata = JSON.parse(jsonMatch[1]);
                             if (metadata.tags && Array.isArray(metadata.tags)) {
-                                // 修正：直接使用原始 Tag，不轉小寫
                                 group.tags = metadata.tags;
-                                // 判斷 Nailed 狀態 (這裡為了功能性，檢查時忽略大小寫，但顯示時保留原樣)
                                 group.isNailed = group.tags.some(t => t.toLowerCase() === 'nailed');
                             }
                         } catch (e) {
@@ -294,7 +315,6 @@
                 container.classList.remove('hidden');
                 allTags.forEach(tag => {
                     const btn = document.createElement('button');
-                    // 修正：移除 capitalize，使用 slate 顏色
                     btn.className = `filter-btn px-4 py-1.5 rounded-full border border-slate-200 bg-white text-slate-600 text-xs font-bold transition-all hover:bg-slate-100`;
                     btn.textContent = tag;
                     btn.onclick = () => filterByTag(tag, btn);
@@ -336,13 +356,11 @@
                 card.dataset.search = (group.id + group.displayName + group.tags.join(' ')).toLowerCase();
                 card.dataset.tags = group.tags.join(',');
 
-                // 標籤 HTML：移除 capitalize，使用 slate 顏色
                 const tagsHtml = group.tags
                     .filter(t => t.toLowerCase() !== 'nailed')
                     .map(t => `<span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">#${t}</span>`)
                     .join('');
 
-                // Nailed 圖示：使用 slate 顏色
                 const nailedHtml = group.isNailed 
                     ? `<i class="fa-solid fa-thumbtack text-slate-400 absolute top-6 right-6 text-sm transform rotate-45 z-10"></i>` 
                     : '';
@@ -351,11 +369,9 @@
                     ${nailedHtml}
                     <div class="flex flex-col h-full">
                         <div class="mb-4">
-                            <!-- 修正：移除 uppercase -->
                             <span class="text-[10px] font-black bg-slate-700 text-white px-2 py-1 rounded-lg">${group.id}</span>
                         </div>
                         
-                        <!-- 修正：hover 改為 slate-600 -->
                         <h3 class="text-xl font-extrabold text-slate-800 mb-2 leading-tight group-hover:text-slate-600 transition-colors">
                             ${group.displayName}
                         </h3>
@@ -365,7 +381,6 @@
                         </div>
                         
                         <div class="mt-auto pt-5 border-t border-slate-100 flex items-center justify-between">
-                            <!-- 修正：按鈕改為 slate-700 -->
                             <a href="./${entry.path}" 
                                onclick="event.stopPropagation()"
                                class="text-xs font-bold text-white bg-slate-700 px-4 py-2 rounded-xl hover:bg-slate-800 transition-colors shadow-sm hover:shadow-slate-300">
@@ -391,7 +406,6 @@
             document.getElementById('detail-title').textContent = group.displayName;
             document.getElementById('detail-time').innerHTML = `<i class="fa-regular fa-clock mr-1.5"></i> 最後更新時間：${group.updatedAt}`;
             
-            // 詳情頁 Tags：移除 capitalize，使用 slate
             const tagsContainer = document.getElementById('detail-tags-container');
             tagsContainer.innerHTML = group.tags.map(t => 
                 `<span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold border border-slate-200">${t}</span>`
