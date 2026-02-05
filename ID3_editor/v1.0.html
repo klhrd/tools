@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MP3 標籤編輯器 Pro</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 核心函式庫 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
+    <script src="https://unpkg.com/browser-id3-writer@4.0.0/dist/browser-id3-writer.min.js"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; color: #1f2937; }
+        
+        /* 自定義樣式 */
+        .input-field {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        }
+        .input-field:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        /* 拖放區域樣式 */
+        .drop-zone {
+            transition: all 0.2s ease;
+            border: 2px dashed #d1d5db;
+        }
+        .drop-zone.drag-over {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+            transform: scale(1.01);
+        }
+
+        .cover-preview-container {
+            position: relative;
+            overflow: hidden;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            aspect-ratio: 1/1;
+            background-color: #e5e7eb;
+        }
+        
+        .cover-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s;
+            cursor: pointer;
+        }
+        .cover-preview-container:hover .cover-overlay { opacity: 1; }
+
+        /* 標籤小標題 */
+        .label-text {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #4b5563;
+            margin-bottom: 0.25rem;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+        }
+
+        /* Audio Player Customization */
+        audio {
+            width: 100%;
+            height: 40px;
+            border-radius: 20px;
+            background-color: #f1f5f9;
+        }
+    </style>
+</head>
+<body class="min-h-screen py-8 px-4 flex justify-center items-start">
+
+    <div class="w-full max-w-4xl bg-white rounded-xl shadow-lg overflow-hidden">
+        
+        <!-- 頂部標題 -->
+        <div class="bg-gray-900 text-white px-6 py-4 flex justify-between items-center">
+            <div>
+                <h1 class="text-xl font-bold flex items-center gap-2">
+                    🎵 MP3 Tag Editor <span class="text-xs bg-blue-600 px-2 py-0.5 rounded text-white font-normal">Pro</span>
+                </h1>
+            </div>
+            <div class="text-xs text-gray-400">純前端處理，檔案不離手</div>
+        </div>
+
+        <div class="p-6">
+            
+            <!-- 上傳/拖放區 -->
+            <div id="dropZone" class="drop-zone rounded-xl p-10 text-center cursor-pointer mb-6" onclick="document.getElementById('mp3Input').click()">
+                <div id="uploadContent">
+                    <div class="text-4xl mb-3">📂</div>
+                    <h3 class="text-lg font-medium text-gray-700">點擊選擇或是拖放 MP3 檔案到這裡</h3>
+                    <p class="text-sm text-gray-400 mt-1">支援讀取 ID3v2.3 / ID3v2.4</p>
+                </div>
+                <!-- 隱藏的 Input -->
+                <input type="file" id="mp3Input" accept="audio/mp3" onchange="handleFileSelect(this.files[0])" class="hidden">
+            </div>
+
+            <!-- 載入動畫 (預設隱藏) -->
+            <div id="loadingSection" class="hidden text-center py-10">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
+                <p class="mt-3 text-gray-500 text-sm">正在讀取檔案與標籤...</p>
+            </div>
+
+            <!-- 編輯器主體 (預設隱藏) -->
+            <div id="editorSection" class="hidden animate-fade-in">
+                
+                <!-- 音訊預覽播放器 -->
+                <div class="mb-6 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                    <div class="flex items-center gap-3">
+                         <div class="bg-blue-100 text-blue-600 p-2 rounded-full">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"/></svg>
+                         </div>
+                         <audio id="audioPlayer" controls class="focus:outline-none"></audio>
+                    </div>
+                </div>
+
+                <!-- 工具列 -->
+                <div class="flex flex-wrap items-center justify-between mb-6 bg-blue-50 p-3 rounded-lg border border-blue-100 gap-3">
+                    <div class="text-sm text-blue-800 font-medium truncate flex-1 min-w-[200px]" id="currentFileName">
+                        W. A. Mozart - KV 575 - String Quartet No. 21 in D major.mp3
+                    </div>
+                    <div class="flex gap-2 flex-wrap justify-end">
+                        <button onclick="googleSearch()" class="px-3 py-1.5 bg-white border border-blue-200 text-blue-600 text-xs font-semibold rounded hover:bg-blue-100 transition flex items-center gap-1" title="在 Google 搜尋此歌曲資訊">
+                             🔍 搜尋資訊
+                        </button>
+                        <button onclick="guessTagsFromFilename()" class="px-3 py-1.5 bg-white border border-blue-200 text-blue-600 text-xs font-semibold rounded hover:bg-blue-100 transition flex items-center gap-1" title="根據 '歌手 - 歌名' 格式自動填入">
+                            ✨ 從檔名猜測
+                        </button>
+                        <button onclick="swapArtistTitle()" class="px-3 py-1.5 bg-white border border-blue-200 text-blue-600 text-xs font-semibold rounded hover:bg-blue-100 transition flex items-center gap-1" title="交換歌手與標題">
+                            ⇄ 交換
+                        </button>
+                         <button onclick="fixCapitalization()" class="px-3 py-1.5 bg-white border border-blue-200 text-blue-600 text-xs font-semibold rounded hover:bg-blue-100 transition flex items-center gap-1" title="將每個單字首字母大寫">
+                            Aa 英文大寫優化
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-8">
+                    
+                    <!-- 左欄：封面與基本資訊 -->
+                    <div class="md:col-span-4 space-y-4">
+                        <!-- 封面 -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="label-text">專輯封面 (Cover Art)</span>
+                                <button onclick="downloadCover()" class="text-[10px] text-blue-600 hover:underline cursor-pointer" id="downloadCoverBtn" style="display:none;">
+                                    ⬇️ 下載封面
+                                </button>
+                            </div>
+                            <div class="cover-preview-container group" onclick="document.getElementById('coverInput').click()">
+                                <img id="coverPreview" src="" class="w-full h-full object-cover">
+                                <div class="cover-overlay">
+                                    <span class="text-white font-medium text-sm flex items-center gap-1">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                        更換圖片
+                                    </span>
+                                </div>
+                            </div>
+                            <input type="file" id="coverInput" accept="image/jpeg, image/png" onchange="handleCoverSelect(this)" class="hidden">
+                            <p class="text-xs text-center text-gray-400 mt-2">支援 JPG / PNG</p>
+                        </div>
+
+                        <!-- 簡短資訊 -->
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="label-text">年份 (Year)</label>
+                                <input type="text" id="tagYear" class="input-field" placeholder="1789">
+                            </div>
+                            <div>
+                                <label class="label-text">流派 (Genre)</label>
+                                <input type="text" id="tagGenre" class="input-field" placeholder="Classical">
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="label-text">音軌 (Track)</label>
+                                <input type="text" id="tagTrack" class="input-field" placeholder="1">
+                            </div>
+                            <div>
+                                <label class="label-text">光碟 (Disc)</label>
+                                <input type="text" id="tagDisc" class="input-field" placeholder="1">
+                            </div>
+                        </div>
+
+                         <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="label-text">速度 (BPM)</label>
+                                <input type="text" id="tagBPM" class="input-field" placeholder="Allegretto">
+                            </div>
+                             <div>
+                                <label class="label-text">初始調 (Key)</label>
+                                <input type="text" id="tagKey" class="input-field" placeholder="D Major">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 右欄：詳細文字資訊 -->
+                    <div class="md:col-span-8 space-y-4">
+                        <div>
+                            <label class="label-text text-blue-600">標題 (Title)</label>
+                            <input type="text" id="tagTitle" class="input-field text-lg font-medium" placeholder="String Quartet No. 21 in D major, K. 575">
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="label-text">演出者 (Artist)</label>
+                                <input type="text" id="tagArtist" class="input-field" placeholder="Amadeus Quartet">
+                            </div>
+                            <div>
+                                <label class="label-text">專輯演出者 (Album Artist)</label>
+                                <input type="text" id="tagAlbumArtist" class="input-field" placeholder="通常同上...">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="label-text">專輯名稱 (Album)</label>
+                            <input type="text" id="tagAlbum" class="input-field" placeholder="Mozart: The String Quartets">
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="label-text">作曲家 (Composer)</label>
+                                <input type="text" id="tagComposer" class="input-field" placeholder="Wolfgang Amadeus Mozart">
+                            </div>
+                             <div>
+                                <label class="label-text">出版商/廠牌 (Publisher)</label>
+                                <input type="text" id="tagPublisher" class="input-field" placeholder="Deutsche Grammophon">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="label-text">版權 (Copyright)</label>
+                            <input type="text" id="tagCopyright" class="input-field text-xs text-gray-500" placeholder="© Public Domain">
+                        </div>
+
+                        <div>
+                            <label class="label-text">歌詞 (Lyrics)</label>
+                            <textarea id="tagLyrics" rows="4" class="input-field" placeholder="在這裡貼上歌詞..."></textarea>
+                        </div>
+                        
+                        <div>
+                            <label class="label-text">備註 (Comment)</label>
+                            <textarea id="tagComment" rows="1" class="input-field text-gray-500" placeholder="Prussian Quartet No. 1"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 底部按鈕區 -->
+                <div class="mt-8 pt-6 border-t border-gray-100">
+                    
+                    <div class="flex items-center justify-between">
+                         <!-- 檔名選項 -->
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" id="renameFile" class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500">
+                            <label for="renameFile" class="text-sm text-gray-700 cursor-pointer select-none">
+                                下載時重命名為： <span class="font-mono text-xs bg-gray-100 px-1 py-0.5 rounded">歌手 - 標題.mp3</span>
+                            </label>
+                        </div>
+
+                        <div class="flex gap-3">
+                             <button onclick="clearFields()" class="px-5 py-2.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition font-medium text-sm">
+                                🗑️ 清空
+                            </button>
+                            <button onclick="location.reload()" class="px-5 py-2.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition font-medium text-sm">
+                                取消 / 重來
+                            </button>
+                            <button onclick="saveAndDownload()" id="saveBtn" class="px-6 py-2.5 rounded-lg bg-gray-900 text-white hover:bg-gray-800 transition shadow-lg font-medium text-sm flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                <span id="btnText">儲存並下載檔案</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="fixed bottom-4 right-4 text-xs text-gray-400 pointer-events-none">
+            Built with ID3Writer & jsmediatags
+        </div>
+    </div>
+
+    <script>
+        // 全域狀態
+        let originalMp3Buffer = null;
+        let coverImageBuffer = null; 
+        let currentFileName = "W. A. Mozart - KV 575 - String Quartet No. 21 in D major.mp3"; // 預設檔名
+        const DEFAULT_COVER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25' viewBox='0 0 200 200'%3E%3Crect width='200' height='200' fill='%23f3f4f6'/%3E%3Cpath d='M60 140 L90 100 L110 120 L130 90 L160 140 Z' fill='%23d1d5db'/%3E%3Ccircle cx='140' cy='60' r='15' fill='%23d1d5db'/%3E%3Ctext x='50%25' y='50%25' font-family='sans-serif' font-size='14' fill='%239ca3af' dominant-baseline='middle' text-anchor='middle' dy='40'%3ENo Cover%3C/text%3E%3C/svg%3E";
+
+        // 初始化
+        document.getElementById('coverPreview').src = DEFAULT_COVER;
+
+        // --- 拖放邏輯 ---
+        const dropZone = document.getElementById('dropZone');
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('drag-over'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('drag-over'), false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFileSelect(files[0]);
+        }, false);
+        // ----------------
+
+        function handleFileSelect(file) {
+            if (!file || file.type !== 'audio/mpeg') {
+                if (file) alert("請上傳 MP3 格式的檔案。");
+                return;
+            }
+            
+            currentFileName = file.name;
+            document.getElementById('currentFileName').textContent = file.name;
+            
+            // 設定音訊播放器來源
+            const audioUrl = URL.createObjectURL(file);
+            document.getElementById('audioPlayer').src = audioUrl;
+
+            // UI 切換
+            document.getElementById('dropZone').classList.add('hidden');
+            document.getElementById('loadingSection').classList.remove('hidden');
+
+            jsmediatags.read(file, {
+                onSuccess: function(tag) {
+                    const tags = tag.tags;
+                    
+                    // 填入欄位 (增加 Null Check)
+                    const setValue = (id, val) => document.getElementById(id).value = val || "";
+                    
+                    setValue('tagTitle', tags.title);
+                    setValue('tagArtist', tags.artist);
+                    setValue('tagAlbum', tags.album);
+                    setValue('tagYear', tags.year);
+                    setValue('tagTrack', tags.track);
+                    setValue('tagGenre', tags.genre);
+                    
+                    // 歌詞 (USLT)
+                    if (tags.lyrics && tags.lyrics.lyrics) {
+                         setValue('tagLyrics', tags.lyrics.lyrics);
+                    } else if (tags.USLT && tags.USLT.data && tags.USLT.data.lyrics) {
+                         setValue('tagLyrics', tags.USLT.data.lyrics);
+                    } else {
+                        setValue('tagLyrics', "");
+                    }
+
+                    // 進階欄位讀取
+                    setValue('tagComposer', tags.TCOM ? tags.TCOM.data : "");
+                    setValue('tagAlbumArtist', tags.TPE2 ? tags.TPE2.data : "");
+                    setValue('tagDisc', tags.TPOS ? tags.TPOS.data : "");
+                    setValue('tagPublisher', tags.TPUB ? tags.TPUB.data : "");
+                    setValue('tagCopyright', tags.TCOP ? tags.TCOP.data : "");
+                    setValue('tagBPM', tags.TBPM ? tags.TBPM.data : "");
+                    setValue('tagKey', tags.TKEY ? tags.TKEY.data : ""); // TKEY is Initial key
+                    
+                    if (tags.comment && tags.comment.text) {
+                        setValue('tagComment', tags.comment.text);
+                    } else {
+                        setValue('tagComment', "");
+                    }
+
+                    // 圖片處理
+                    const image = tags.picture;
+                    if (image) {
+                        try {
+                            const byteArray = new Uint8Array(image.data);
+                            const blob = new Blob([byteArray], { type: image.format });
+                            document.getElementById('coverPreview').src = URL.createObjectURL(blob);
+                            document.getElementById('downloadCoverBtn').style.display = 'block'; // 顯示下載按鈕
+                            coverImageBuffer = byteArray.buffer;
+                        } catch (e) {
+                            document.getElementById('coverPreview').src = DEFAULT_COVER;
+                            document.getElementById('downloadCoverBtn').style.display = 'none';
+                        }
+                    } else {
+                        document.getElementById('coverPreview').src = DEFAULT_COVER;
+                        coverImageBuffer = null;
+                        document.getElementById('downloadCoverBtn').style.display = 'none';
+                    }
+
+                    // 讀取檔案 Buffer
+                    const reader = new FileReader();
+                    reader.onload = function() {
+                        originalMp3Buffer = reader.result;
+                        document.getElementById('loadingSection').classList.add('hidden');
+                        document.getElementById('editorSection').classList.remove('hidden');
+                    };
+                    reader.readAsArrayBuffer(file);
+                },
+                onError: function(error) {
+                    alert("讀取標籤失敗，檔案可能損壞或格式不符。");
+                    location.reload();
+                }
+            });
+        }
+
+        function handleCoverSelect(input) {
+            const file = input.files[0];
+            if (!file) return;
+            document.getElementById('coverPreview').src = URL.createObjectURL(file);
+            document.getElementById('downloadCoverBtn').style.display = 'block';
+            const reader = new FileReader();
+            reader.onload = function() { coverImageBuffer = reader.result; };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // --- 從檔名猜測 ---
+        function guessTagsFromFilename() {
+            let name = currentFileName.replace(/\.mp3$/i, '');
+            // 處理更複雜的檔名，例如 "W. A. Mozart - KV 575 - String Quartet No. 21.mp3"
+            // 這裡我們假設第一個分隔符前是 Artist，後面全部是 Title
+            let parts = name.split(/ - | – | _ /);
+            
+            if (parts.length >= 2) {
+                const artist = parts[0].trim();
+                const title = parts.slice(1).join(' - ').trim();
+                document.getElementById('tagArtist').value = artist;
+                document.getElementById('tagTitle').value = title;
+                flashField('tagArtist');
+                flashField('tagTitle');
+            } else {
+                document.getElementById('tagTitle').value = name;
+                alert("檔名格式似乎沒有分隔符，已將檔名填入標題欄位。");
+            }
+        }
+
+        // --- 交換歌手與標題 ---
+        function swapArtistTitle() {
+            const artistEl = document.getElementById('tagArtist');
+            const titleEl = document.getElementById('tagTitle');
+            const temp = artistEl.value;
+            artistEl.value = titleEl.value;
+            titleEl.value = temp;
+            flashField('tagArtist');
+            flashField('tagTitle');
+        }
+
+        // --- 英文大寫優化 (Title Case) ---
+        function fixCapitalization() {
+            const ids = ['tagTitle', 'tagArtist', 'tagAlbum', 'tagAlbumArtist', 'tagGenre'];
+            const toTitleCase = (str) => {
+                return str.replace(/\w\S*/g, (txt) => {
+                    return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+                });
+            };
+
+            ids.forEach(id => {
+                const el = document.getElementById(id);
+                if (el.value) {
+                    el.value = toTitleCase(el.value);
+                    flashField(id);
+                }
+            });
+        }
+
+        // --- Google 搜尋 ---
+        function googleSearch() {
+            const artist = document.getElementById('tagArtist').value;
+            const title = document.getElementById('tagTitle').value;
+            let query = "";
+            
+            if (artist || title) {
+                query = `${artist} ${title}`;
+            } else {
+                // 如果欄位是空的，使用檔名搜尋
+                query = currentFileName.replace(/\.mp3$/i, '');
+            }
+            
+            if (query) {
+                const url = `https://www.google.com/search?q=${encodeURIComponent(query + " musicbrainz discogs")}`;
+                window.open(url, '_blank');
+            } else {
+                alert("請先上傳檔案或輸入歌手/歌名。");
+            }
+        }
+
+        // --- 下載封面 ---
+        function downloadCover() {
+            const src = document.getElementById('coverPreview').src;
+            if (src && src !== DEFAULT_COVER) {
+                const link = document.createElement('a');
+                link.href = src;
+                link.download = "cover.jpg"; // 預設副檔名，瀏覽器通常會處理正確的 MIME
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        }
+
+        // --- 清空欄位 ---
+        function clearFields() {
+            if(!confirm("確定要清空所有欄位嗎？(封面不會被刪除)")) return;
+            const ids = ['tagTitle', 'tagArtist', 'tagAlbum', 'tagYear', 'tagTrack', 'tagGenre', 
+                         'tagLyrics', 'tagComposer', 'tagAlbumArtist', 'tagDisc', 'tagPublisher', 
+                         'tagCopyright', 'tagBPM', 'tagKey', 'tagComment'];
+            ids.forEach(id => {
+                document.getElementById(id).value = "";
+            });
+        }
+
+        function flashField(id) {
+            const el = document.getElementById(id);
+            el.style.backgroundColor = '#ecfdf5';
+            setTimeout(() => el.style.backgroundColor = '', 500);
+        }
+
+        function saveAndDownload() {
+            if (!originalMp3Buffer) return;
+            
+            const btn = document.getElementById('saveBtn');
+            const btnText = document.getElementById('btnText');
+            const originalText = btnText.innerText;
+            
+            btnText.innerText = "寫入中...";
+            btn.disabled = true;
+            btn.classList.add('opacity-75', 'cursor-not-allowed');
+
+            setTimeout(() => {
+                try {
+                    const writer = new ID3Writer(originalMp3Buffer);
+                    
+                    const getVal = (id) => document.getElementById(id).value;
+                    const setFrame = (frame, val) => { if(val) writer.setFrame(frame, val); };
+                    const setArrFrame = (frame, val) => { if(val) writer.setFrame(frame, [val]); };
+
+                    setFrame('TIT2', getVal('tagTitle'));
+                    setArrFrame('TPE1', getVal('tagArtist'));
+                    setArrFrame('TPE2', getVal('tagAlbumArtist'));
+                    setArrFrame('TCOM', getVal('tagComposer'));
+                    setArrFrame('TCON', getVal('tagGenre'));
+                    setFrame('TALB', getVal('tagAlbum'));
+                    setFrame('TYER', getVal('tagYear'));
+                    setFrame('TRCK', getVal('tagTrack'));
+                    setFrame('TPOS', getVal('tagDisc')); // Disc Number
+                    
+                    // 新增欄位
+                    setFrame('TPUB', getVal('tagPublisher'));
+                    setFrame('TCOP', getVal('tagCopyright'));
+                    setFrame('TBPM', getVal('tagBPM'));
+                    setFrame('TKEY', getVal('tagKey'));
+
+                    // 歌詞
+                    const lyrics = getVal('tagLyrics');
+                    if (lyrics) {
+                        writer.setFrame('USLT', { description: '', lyrics: lyrics, language: 'eng' });
+                    }
+
+                    // 備註
+                    const comment = getVal('tagComment');
+                    if (comment) {
+                        writer.setFrame('COMM', { description: 'Comment', text: comment });
+                    }
+
+                    // 封面
+                    if (coverImageBuffer) {
+                        writer.setFrame('APIC', { type: 3, data: coverImageBuffer, description: 'Cover' });
+                    }
+
+                    writer.addTag();
+                    
+                    // 決定下載檔名
+                    let downloadName = `[New] ${currentFileName}`;
+                    if (document.getElementById('renameFile').checked) {
+                        const artist = getVal('tagArtist');
+                        const title = getVal('tagTitle');
+                        if (artist && title) {
+                            downloadName = `${artist} - ${title}.mp3`;
+                        }
+                    }
+
+                    const link = document.createElement('a');
+                    link.href = writer.getURL();
+                    link.download = downloadName;
+                    link.click();
+
+                    btnText.innerText = "✅ 下載成功";
+                    setTimeout(() => { 
+                        btnText.innerText = originalText; 
+                        btn.disabled = false; 
+                        btn.classList.remove('opacity-75', 'cursor-not-allowed');
+                    }, 2000);
+
+                } catch (e) {
+                    alert("錯誤: " + e.message);
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-75', 'cursor-not-allowed');
+                    btnText.innerText = originalText;
+                }
+            }, 100);
+        }
+    </script>
+</body>
+</html>

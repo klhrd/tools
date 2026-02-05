@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MP3 Tag Editor</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 核心函式庫 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
+    <script src="https://unpkg.com/browser-id3-writer@4.0.0/dist/browser-id3-writer.min.js"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <style>
+        body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
+            background-color: #ffffff; 
+            color: #1a1a1a; 
+        }
+        
+        /* 輸入框樣式 - 極簡風格 */
+        .input-field {
+            width: 100%;
+            padding: 0.5rem 0;
+            border: none;
+            border-bottom: 1px solid #e5e5e5;
+            background-color: transparent;
+            font-size: 0.95rem;
+            transition: border-color 0.2s ease;
+            border-radius: 0;
+        }
+        .input-field:focus {
+            outline: none;
+            border-bottom-color: #000;
+        }
+        .input-field::placeholder {
+            color: #d4d4d4;
+        }
+
+        /* 標籤文字 - 純大寫英文 */
+        .tag-label {
+            display: block;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #888;
+            margin-bottom: 0.25rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* 拖放區 */
+        .drop-zone {
+            border: 1px dashed #e5e5e5;
+            transition: all 0.2s ease;
+        }
+        .drop-zone:hover, .drop-zone.drag-over {
+            border-color: #666;
+            background-color: #fafafa;
+        }
+
+        /* 滾動條 */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #e5e5e5; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #ccc; }
+
+        /* 歌詞行樣式 */
+        .lyrics-line {
+            padding: 8px 0;
+            border-bottom: 1px solid #f5f5f5;
+            cursor: pointer;
+            color: #666;
+            display: flex;
+            align-items: baseline;
+        }
+        .lyrics-line:hover { color: #000; }
+        .lyrics-line.active {
+            color: #000;
+            font-weight: 600;
+        }
+        .time-badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: #999;
+            margin-right: 12px;
+            min-width: 60px;
+        }
+        .lyrics-line.active .time-badge { color: #000; }
+
+        /* 按鈕基礎樣式 */
+        .btn {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        .btn-black { background: #000; color: #fff; }
+        .btn-black:hover { background: #333; }
+        .btn-outline { border: 1px solid #e5e5e5; color: #333; }
+        .btn-outline:hover { border-color: #000; }
+        .btn-text { color: #666; padding: 0.5rem; }
+        .btn-text:hover { color: #000; }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <!-- 頂部導航與播放器 (Sticky) -->
+    <div class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100">
+        <div class="max-w-screen-xl mx-auto px-6 h-16 flex items-center justify-between">
+            <div class="font-bold text-lg tracking-tight">MP3 Tag Editor</div>
+            
+            <!-- 迷你播放器控制 -->
+            <div id="miniPlayer" class="hidden flex-1 max-w-xl mx-8 flex items-center gap-4">
+                <audio id="audioPlayer" controls class="w-full h-8"></audio>
+            </div>
+
+            <div class="text-xs text-gray-400 font-mono">v2.0</div>
+        </div>
+    </div>
+
+    <div class="max-w-screen-xl mx-auto px-6 py-12">
+        
+        <!-- 上傳區 -->
+        <div id="dropZone" class="drop-zone h-[60vh] flex flex-col items-center justify-center cursor-pointer" onclick="document.getElementById('mp3Input').click()">
+            <div class="text-center space-y-4">
+                <div class="text-4xl text-gray-200 font-light">+</div>
+                <div class="text-gray-500 font-medium">Drop MP3 file here</div>
+                <div class="text-xs text-gray-300">ID3v2.3 / ID3v2.4</div>
+            </div>
+            <input type="file" id="mp3Input" accept="audio/mp3" onchange="handleFileSelect(this.files[0])" class="hidden">
+        </div>
+
+        <!-- 載入中 -->
+        <div id="loadingSection" class="hidden h-[60vh] flex items-center justify-center">
+            <div class="animate-pulse text-gray-400 tracking-widest text-sm">LOADING...</div>
+        </div>
+
+        <!-- 編輯介面 -->
+        <div id="editorView" class="hidden animate-fade-in">
+            
+            <!-- 檔名與操作列 -->
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+                <div class="flex-1">
+                    <div class="tag-label">FILENAME</div>
+                    <div id="currentFileName" class="text-lg font-medium truncate text-gray-800">filename.mp3</div>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="guessTagsFromFilename()" class="btn btn-outline text-xs">From Filename</button>
+                    <button onclick="swapArtistTitle()" class="btn btn-outline text-xs">Swap Artist/Title</button>
+                    <button onclick="fixCapitalization()" class="btn btn-outline text-xs">Capitalize</button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-12">
+                
+                <!-- 左側：封面 (Cover) -->
+                <div class="lg:col-span-4 space-y-6">
+                    <div>
+                        <div class="flex justify-between items-baseline mb-2">
+                            <span class="tag-label">COVER ART</span>
+                            <button onclick="downloadCover()" id="downloadCoverBtn" class="text-[10px] text-gray-400 hover:text-black hidden uppercase">Download</button>
+                        </div>
+                        <div class="aspect-square bg-gray-50 cursor-pointer relative group overflow-hidden" onclick="document.getElementById('coverInput').click()">
+                            <img id="coverPreview" src="" class="w-full h-full object-cover">
+                            <div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <span class="text-white text-xs font-medium tracking-widest uppercase">Change</span>
+                            </div>
+                        </div>
+                        <input type="file" id="coverInput" accept="image/jpeg, image/png" onchange="handleCoverSelect(this)" class="hidden">
+                    </div>
+
+                    <!-- 簡要資訊 -->
+                    <div class="grid grid-cols-2 gap-6">
+                        <div>
+                            <label class="tag-label">YEAR</label>
+                            <input type="text" id="tagYear" class="input-field" placeholder="YYYY">
+                        </div>
+                        <div>
+                            <label class="tag-label">GENRE</label>
+                            <input type="text" id="tagGenre" class="input-field">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側：主要資訊 (Main Info) -->
+                <div class="lg:col-span-8 space-y-8">
+                    
+                    <div>
+                        <label class="tag-label text-black">TITLE</label>
+                        <input type="text" id="tagTitle" class="input-field text-2xl font-medium py-2 text-black placeholder:font-light" placeholder="Song Title">
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <label class="tag-label">ARTIST</label>
+                            <input type="text" id="tagArtist" class="input-field">
+                        </div>
+                        <div>
+                            <label class="tag-label">ALBUM ARTIST</label>
+                            <input type="text" id="tagAlbumArtist" class="input-field">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="tag-label">ALBUM</label>
+                        <input type="text" id="tagAlbum" class="input-field">
+                    </div>
+
+                    <!-- 技術資訊 (Grid) -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 pt-4">
+                        <div>
+                            <label class="tag-label">TRACK</label>
+                            <input type="text" id="tagTrack" class="input-field">
+                        </div>
+                        <div>
+                            <label class="tag-label">DISC</label>
+                            <input type="text" id="tagDisc" class="input-field">
+                        </div>
+                        <div>
+                            <label class="tag-label">BPM</label>
+                            <input type="text" id="tagBPM" class="input-field">
+                        </div>
+                        <div>
+                            <label class="tag-label">KEY</label>
+                            <input type="text" id="tagKey" class="input-field">
+                        </div>
+                    </div>
+
+                    <!-- 進階資訊 (More) -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-100">
+                        <div>
+                            <label class="tag-label">COMPOSER</label>
+                            <input type="text" id="tagComposer" class="input-field">
+                        </div>
+                        <div>
+                            <label class="tag-label">PUBLISHER</label>
+                            <input type="text" id="tagPublisher" class="input-field">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="tag-label">COMMENT</label>
+                        <input type="text" id="tagComment" class="input-field">
+                    </div>
+
+                    <!-- 歌詞 -->
+                    <div class="pt-4">
+                        <div class="flex justify-between items-end mb-2">
+                            <label class="tag-label">LYRICS</label>
+                            <button onclick="openLyricsEditor()" class="text-xs font-medium text-blue-600 hover:text-black transition">Open Editor</button>
+                        </div>
+                        <textarea id="tagLyrics" rows="4" class="input-field resize-none font-mono text-xs leading-relaxed bg-gray-50/50 p-3 border-none rounded-sm" placeholder="Paste lyrics here..."></textarea>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- 底部動作列 -->
+            <div class="mt-16 pt-8 border-t border-gray-100 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <input type="checkbox" id="renameFile" class="rounded border-gray-300 text-black focus:ring-black">
+                    <label for="renameFile" class="text-sm text-gray-500 select-none">Rename file to <span class="font-mono text-xs text-black">Artist - Title.mp3</span></label>
+                </div>
+                
+                <div class="flex gap-4">
+                    <button onclick="clearFields()" class="btn btn-text">Clear</button>
+                    <button onclick="location.reload()" class="btn btn-text">Reset</button>
+                    <button onclick="saveAndDownload()" id="saveBtn" class="btn btn-black px-8">Save & Download</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 歌詞編輯器 (全螢幕覆蓋) -->
+        <div id="lyricsView" class="hidden fixed inset-0 bg-white z-[60] overflow-hidden flex flex-col">
+            <div class="border-b border-gray-100 px-6 h-16 flex items-center justify-between shrink-0">
+                <div class="font-bold text-lg">LRC Editor</div>
+                <div class="flex gap-4">
+                    <button onclick="exitLyricsEditor(false)" class="btn btn-text">Cancel</button>
+                    <button onclick="exitLyricsEditor(true)" class="btn btn-black">Apply</button>
+                </div>
+            </div>
+            
+            <div class="flex-1 flex overflow-hidden">
+                <!-- 文字輸入區 -->
+                <div class="w-1/2 p-6 border-r border-gray-100 flex flex-col" id="rawLyricsContainer">
+                    <div class="tag-label mb-2">RAW TEXT</div>
+                    <textarea id="rawLyricsInput" class="flex-1 w-full resize-none outline-none font-mono text-sm leading-relaxed text-gray-600" placeholder="Paste lyrics here..."></textarea>
+                    <button onclick="startSync()" class="mt-4 btn btn-outline w-full">Start Syncing &rarr;</button>
+                </div>
+
+                <!-- 同步區 -->
+                <div class="w-1/2 p-6 flex flex-col bg-gray-50 hidden" id="syncContainer">
+                    <div class="flex justify-between items-center mb-4">
+                        <div class="tag-label">SYNC MODE</div>
+                        <button onclick="resetSync()" class="text-xs text-red-500 hover:text-red-700">Reset Timings</button>
+                    </div>
+                    
+                    <div id="lyricsList" class="flex-1 overflow-y-auto pr-2 space-y-1">
+                        <!-- 歌詞行 -->
+                    </div>
+
+                    <div class="mt-6 pt-4 border-t border-gray-200 text-center">
+                        <div class="text-xs text-gray-400 mb-2">Press SPACE or Click Button to stamp time</div>
+                        <button onclick="syncCurrentLine()" class="btn btn-black w-full py-4 text-lg">TIMESTAMP</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // 變數
+        let originalMp3Buffer = null;
+        let coverImageBuffer = null; 
+        let currentFileName = "";
+        let lyricsLines = [];
+        let currentSyncIndex = 0;
+        const DEFAULT_COVER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25'%3E%3Crect width='100%25' height='100%25' fill='%23f5f5f5'/%3E%3Ctext x='50%25' y='50%25' font-family='sans-serif' font-size='12' fill='%23d4d4d4' dominant-baseline='middle' text-anchor='middle' letter-spacing='0.1em'%3ENO COVER%3C/text%3E%3C/svg%3E";
+
+        document.getElementById('coverPreview').src = DEFAULT_COVER;
+
+        const dropZone = document.getElementById('dropZone');
+        const audioPlayer = document.getElementById('audioPlayer');
+
+        // Drag & Drop
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(e => {
+            dropZone.addEventListener(e, (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+            });
+        });
+        ['dragenter', 'dragover'].forEach(e => dropZone.classList.add('bg-gray-50'));
+        ['dragleave', 'drop'].forEach(e => dropZone.classList.remove('bg-gray-50'));
+        dropZone.addEventListener('drop', (e) => handleFileSelect(e.dataTransfer.files[0]));
+
+        function handleFileSelect(file) {
+            if (!file || file.type !== 'audio/mpeg') {
+                if(file) alert("Please upload MP3 file.");
+                return;
+            }
+            currentFileName = file.name;
+            document.getElementById('currentFileName').textContent = file.name;
+            audioPlayer.src = URL.createObjectURL(file);
+
+            document.getElementById('dropZone').classList.add('hidden');
+            document.getElementById('loadingSection').classList.remove('hidden');
+
+            jsmediatags.read(file, {
+                onSuccess: function(tag) {
+                    const tags = tag.tags;
+                    const setVal = (id, val) => document.getElementById(id).value = val || "";
+                    
+                    setVal('tagTitle', tags.title);
+                    setVal('tagArtist', tags.artist);
+                    setVal('tagAlbum', tags.album);
+                    setVal('tagYear', tags.year);
+                    setVal('tagTrack', tags.track);
+                    setVal('tagGenre', tags.genre);
+                    setVal('tagAlbumArtist', tags.TPE2?.data);
+                    setVal('tagComposer', tags.TCOM?.data);
+                    setVal('tagPublisher', tags.TPUB?.data);
+                    setVal('tagDisc', tags.TPOS?.data);
+                    setVal('tagBPM', tags.TBPM?.data);
+                    setVal('tagKey', tags.TKEY?.data);
+                    setVal('tagComment', tags.comment?.text);
+
+                    // Lyrics
+                    if (tags.lyrics?.lyrics) setVal('tagLyrics', tags.lyrics.lyrics);
+                    else if (tags.USLT?.data?.lyrics) setVal('tagLyrics', tags.USLT.data.lyrics);
+                    else setVal('tagLyrics', "");
+
+                    // Cover
+                    const image = tags.picture;
+                    if (image) {
+                        try {
+                            const bytes = new Uint8Array(image.data);
+                            const blob = new Blob([bytes], { type: image.format });
+                            document.getElementById('coverPreview').src = URL.createObjectURL(blob);
+                            document.getElementById('downloadCoverBtn').classList.remove('hidden');
+                            coverImageBuffer = bytes.buffer;
+                        } catch(e) { resetCover(); }
+                    } else { resetCover(); }
+
+                    const reader = new FileReader();
+                    reader.onload = function() {
+                        originalMp3Buffer = reader.result;
+                        document.getElementById('loadingSection').classList.add('hidden');
+                        document.getElementById('editorView').classList.remove('hidden');
+                        document.getElementById('miniPlayer').classList.remove('hidden');
+                    };
+                    reader.readAsArrayBuffer(file);
+                },
+                onError: () => { alert("Read error."); location.reload(); }
+            });
+        }
+
+        function resetCover() {
+            document.getElementById('coverPreview').src = DEFAULT_COVER;
+            document.getElementById('downloadCoverBtn').classList.add('hidden');
+            coverImageBuffer = null;
+        }
+
+        function handleCoverSelect(input) {
+            const file = input.files[0];
+            if (!file) return;
+            document.getElementById('coverPreview').src = URL.createObjectURL(file);
+            document.getElementById('downloadCoverBtn').classList.remove('hidden');
+            const reader = new FileReader();
+            reader.onload = () => coverImageBuffer = reader.result;
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Logic Helpers
+        function guessTagsFromFilename() {
+            let name = currentFileName.replace(/\.mp3$/i, '');
+            let parts = name.split(/ - | – | _ /);
+            if (parts.length >= 2) {
+                document.getElementById('tagArtist').value = parts[0].trim();
+                document.getElementById('tagTitle').value = parts.slice(1).join(' - ').trim();
+            }
+        }
+
+        function swapArtistTitle() {
+            const a = document.getElementById('tagArtist');
+            const t = document.getElementById('tagTitle');
+            [a.value, t.value] = [t.value, a.value];
+        }
+
+        function fixCapitalization() {
+            const ids = ['tagTitle', 'tagArtist', 'tagAlbum', 'tagGenre'];
+            const toTitleCase = str => str.replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+            ids.forEach(id => {
+                const el = document.getElementById(id);
+                if(el.value) el.value = toTitleCase(el.value);
+            });
+        }
+
+        function downloadCover() {
+            const src = document.getElementById('coverPreview').src;
+            if(src && src !== DEFAULT_COVER) {
+                const a = document.createElement('a');
+                a.href = src; a.download = 'cover.jpg'; a.click();
+            }
+        }
+
+        function clearFields() {
+            if(!confirm("Clear all text fields?")) return;
+            document.querySelectorAll('input[type="text"], textarea').forEach(el => el.value = "");
+        }
+
+        // Lyrics Editor
+        function openLyricsEditor() {
+            document.getElementById('lyricsView').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+            document.getElementById('rawLyricsInput').value = document.getElementById('tagLyrics').value;
+            // Reset view to raw text
+            document.getElementById('rawLyricsContainer').classList.remove('hidden');
+            document.getElementById('rawLyricsContainer').classList.add('flex');
+            document.getElementById('syncContainer').classList.add('hidden');
+            // Bind space
+            document.addEventListener('keydown', handleSpaceSync);
+        }
+
+        function exitLyricsEditor(apply) {
+            if(apply) {
+                // If in sync mode, compile lyrics
+                if(!document.getElementById('syncContainer').classList.contains('hidden')) {
+                     const lrc = lyricsLines.map(l => {
+                        const t = l.time !== null ? `[${formatTimeLRC(l.time)}]` : '';
+                        return `${t}${l.text}`;
+                    }).join('\n');
+                    document.getElementById('tagLyrics').value = lrc;
+                } else {
+                    document.getElementById('tagLyrics').value = document.getElementById('rawLyricsInput').value;
+                }
+            }
+            document.getElementById('lyricsView').classList.add('hidden');
+            document.body.style.overflow = '';
+            document.removeEventListener('keydown', handleSpaceSync);
+        }
+
+        function startSync() {
+            const raw = document.getElementById('rawLyricsInput').value;
+            lyricsLines = raw.split('\n').map(line => {
+                const match = line.match(/\[(\d{2}):(\d{2}\.\d{2,3})\]/);
+                let t = null, txt = line.replace(/\[\d{2}:\d{2}\.\d{2,3}\]/g, '').trim();
+                if(match) t = parseInt(match[1])*60 + parseFloat(match[2]);
+                return { text: txt, time: t };
+            }).filter(l => l.text);
+            
+            if(lyricsLines.length === 0) return;
+
+            document.getElementById('rawLyricsContainer').classList.add('hidden');
+            document.getElementById('rawLyricsContainer').classList.remove('flex');
+            document.getElementById('syncContainer').classList.remove('hidden');
+            
+            currentSyncIndex = lyricsLines.findIndex(l => l.time === null);
+            if(currentSyncIndex === -1) currentSyncIndex = 0;
+            
+            renderLyricsList();
+        }
+
+        function renderLyricsList() {
+            const list = document.getElementById('lyricsList');
+            list.innerHTML = '';
+            lyricsLines.forEach((l, i) => {
+                const div = document.createElement('div');
+                div.className = `lyrics-line ${i === currentSyncIndex ? 'active' : ''}`;
+                div.onclick = () => { currentSyncIndex = i; renderLyricsList(); };
+                const tStr = l.time !== null ? formatTimeLRC(l.time).substring(0,5) : '--:--';
+                div.innerHTML = `<span class="time-badge">[${tStr}]</span>${l.text}`;
+                list.appendChild(div);
+            });
+            const active = document.querySelector('.lyrics-line.active');
+            if(active) active.scrollIntoView({behavior: "smooth", block: "center"});
+        }
+
+        function syncCurrentLine() {
+            if(currentSyncIndex < lyricsLines.length) {
+                lyricsLines[currentSyncIndex].time = audioPlayer.currentTime;
+                if(currentSyncIndex < lyricsLines.length - 1) currentSyncIndex++;
+                renderLyricsList();
+            }
+        }
+        
+        function resetSync() {
+            lyricsLines.forEach(l => l.time = null);
+            currentSyncIndex = 0;
+            renderLyricsList();
+        }
+
+        function handleSpaceSync(e) {
+            if(e.code === 'Space' && !document.getElementById('syncContainer').classList.contains('hidden')) {
+                e.preventDefault();
+                syncCurrentLine();
+            }
+        }
+
+        function formatTimeLRC(s) {
+            const m = Math.floor(s/60).toString().padStart(2,'0');
+            const sec = (s%60).toFixed(2).toString().padStart(5,'0');
+            return `${m}:${sec}`;
+        }
+
+        function saveAndDownload() {
+            if(!originalMp3Buffer) return;
+            const btn = document.getElementById('saveBtn');
+            const oldText = btn.innerText;
+            btn.innerText = "Processing...";
+            btn.disabled = true;
+
+            setTimeout(() => {
+                try {
+                    const writer = new ID3Writer(originalMp3Buffer);
+                    const val = id => document.getElementById(id).value;
+                    const setF = (f, v) => { if(v) writer.setFrame(f, v); };
+                    
+                    setF('TIT2', val('tagTitle'));
+                    if(val('tagArtist')) writer.setFrame('TPE1', [val('tagArtist')]);
+                    if(val('tagAlbumArtist')) writer.setFrame('TPE2', [val('tagAlbumArtist')]);
+                    if(val('tagComposer')) writer.setFrame('TCOM', [val('tagComposer')]);
+                    if(val('tagGenre')) writer.setFrame('TCON', [val('tagGenre')]);
+                    setF('TALB', val('tagAlbum'));
+                    setF('TYER', val('tagYear'));
+                    setF('TRCK', val('tagTrack'));
+                    setF('TPOS', val('tagDisc'));
+                    setF('TPUB', val('tagPublisher'));
+                    setF('TBPM', val('tagBPM'));
+                    setF('TKEY', val('tagKey'));
+                    
+                    if(val('tagLyrics')) writer.setFrame('USLT', { description: '', lyrics: val('tagLyrics'), language: 'eng' });
+                    if(val('tagComment')) writer.setFrame('COMM', { description: '', text: val('tagComment') });
+                    if(coverImageBuffer) writer.setFrame('APIC', { type: 3, data: coverImageBuffer, description: 'Cover' });
+
+                    writer.addTag();
+                    
+                    let dlName = val('tagTitle') ? `${val('tagTitle')}.mp3` : currentFileName;
+                    if(document.getElementById('renameFile').checked) {
+                        if(val('tagArtist') && val('tagTitle')) dlName = `${val('tagArtist')} - ${val('tagTitle')}.mp3`;
+                    }
+
+                    const a = document.createElement('a');
+                    a.href = writer.getURL();
+                    a.download = dlName;
+                    a.click();
+                    
+                    btn.innerText = "Done";
+                    setTimeout(() => { btn.innerText = oldText; btn.disabled = false; }, 1500);
+                } catch(e) {
+                    alert("Error: " + e.message);
+                    btn.innerText = oldText; btn.disabled = false;
+                }
+            }, 50);
+        }
+    </script>
+</body>
+</html>
