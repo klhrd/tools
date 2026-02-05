@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MP3 Tag Editor Studio</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 核心函式庫 (更換為 cdnjs 以提高穩定性) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/browser-id3-writer/4.4.0/browser-id3-writer.min.js" onerror="alert('錯誤：ID3Writer 函式庫載入失敗，請檢查網路連線或暫時關閉擋廣告擴充功能。')"></script>
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #ffffff; color: #1a1a1a; }
+        
+        /* 極簡輸入框 */
+        .input-field {
+            width: 100%; padding: 0.5rem 0; border: none; border-bottom: 1px solid #e5e5e5;
+            background: transparent; font-size: 0.95rem; transition: border-color 0.2s; border-radius: 0;
+        }
+        .input-field:focus { outline: none; border-bottom-color: #000; }
+        
+        /* 標籤 */
+        .tag-label { font-size: 0.7rem; font-weight: 600; color: #888; margin-bottom: 0.25rem; text-transform: uppercase; letter-spacing: 0.05em; }
+
+        /* 拖放區 */
+        .drop-zone { border: 1px dashed #e5e5e5; transition: all 0.2s; }
+        .drop-zone:hover, .drop-zone.drag-over { border-color: #000; background: #fafafa; }
+
+        /* 歌詞行 - Studio 風格 */
+        .lyrics-row {
+            display: flex; align-items: center; padding: 8px 12px;
+            border-bottom: 1px solid #f9f9f9; transition: all 0.1s;
+            scroll-margin-top: 150px; /* 預留捲動空間 */
+        }
+        .lyrics-row:hover { background: #f5f5f5; }
+        
+        /* 1. 當前播放行 (正在唱) */
+        .lyrics-row.playing {
+            background-color: #eef2ff; /* 淺藍背景 */
+        }
+        .lyrics-row.playing .text-input {
+            color: #4f46e5; font-weight: 700;
+        }
+
+        /* 2. 編輯選取行 (準備打戳 - 紅色指示) */
+        .lyrics-row.selected {
+            border-left: 4px solid #ef4444; /* 紅色游標，表示「下一個要打這裡」 */
+            background-color: #fff1f2;
+        }
+        
+        /* 時間標籤按鈕 */
+        .time-btn {
+            font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;
+            color: #999; background: #f0f0f0; padding: 4px 8px; border-radius: 4px;
+            min-width: 85px; text-align: center; cursor: pointer; transition: all 0.2s;
+            border: 1px solid transparent; user-select: none;
+        }
+        .time-btn:hover { background: #e5e5e5; color: #333; }
+        .time-btn.active { background: #4f46e5; color: white; border-color: #4f46e5; }
+        .time-btn.empty { color: #ccc; background: transparent; border: 1px dashed #ddd; }
+        .time-btn.empty:hover { border-color: #999; color: #666; }
+
+        /* 歌詞文字輸入 */
+        .text-input {
+            flex: 1; border: none; background: transparent; padding: 4px 8px;
+            font-size: 1rem; color: #444; outline: none; margin-left: 8px;
+        }
+        .text-input:focus { background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.05); border-radius: 4px; }
+
+        /* 進度條 Slider */
+        input[type=range] {
+            -webkit-appearance: none; width: 100%; background: transparent; cursor: pointer;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 6px; background: #e5e5e5; border-radius: 3px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%;
+            background: #000; margin-top: -5px; transition: transform 0.1s;
+        }
+        input[type=range]:active::-webkit-slider-thumb { transform: scale(1.3); }
+
+        /* 滾動條 */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-thumb { background: #ddd; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #999; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- 頂部 Sticky -->
+    <div class="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-gray-100">
+        <div class="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+            <div class="font-bold text-lg tracking-tight flex items-center gap-2">
+                MP3 Tag Editor <span class="text-[10px] bg-black text-white px-1.5 py-0.5 rounded font-mono">STUDIO</span>
+            </div>
+            <!-- 迷你全域播放器 (編輯時隱藏，平時顯示) -->
+            <div id="globalPlayerControl" class="hidden flex items-center gap-4 text-sm font-mono text-gray-500">
+                <span id="globalTime">00:00</span>
+                <button onclick="togglePlay()" class="hover:text-black">⏯</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主內容 -->
+    <div class="flex-1 max-w-5xl mx-auto w-full px-6 py-8">
+        
+        <!-- 上傳區 -->
+        <div id="dropZone" class="drop-zone h-[50vh] flex flex-col items-center justify-center cursor-pointer rounded-xl" onclick="document.getElementById('mp3Input').click()">
+            <div class="text-center space-y-3">
+                <div class="text-3xl text-gray-300">+</div>
+                <div class="text-gray-600 font-medium">Drop MP3 file here</div>
+            </div>
+            <input type="file" id="mp3Input" accept="audio/mp3" onchange="handleFileSelect(this.files[0])" class="hidden">
+        </div>
+
+        <!-- 編輯介面 -->
+        <div id="editorView" class="hidden animate-fade-in space-y-10">
+            
+            <!-- 檔名標題 -->
+            <div class="flex items-center justify-between pb-6 border-b border-gray-100">
+                <div class="flex-1 min-w-0">
+                    <div class="tag-label">CURRENT FILE</div>
+                    <div id="currentFileName" class="text-xl font-semibold truncate text-gray-900">song.mp3</div>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="guessTags()" class="px-3 py-1.5 border rounded text-xs hover:bg-black hover:text-white transition">Auto Tag</button>
+                    <button onclick="clearAll()" class="px-3 py-1.5 border rounded text-xs text-red-500 border-red-100 hover:bg-red-50 transition">Clear</button>
+                </div>
+            </div>
+
+            <!-- 兩欄佈局 -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                
+                <!-- 左欄：封面與基本 -->
+                <div class="lg:col-span-4 space-y-6">
+                    <div>
+                        <div class="flex justify-between mb-2"><span class="tag-label">COVER ART</span></div>
+                        <div class="aspect-square bg-gray-50 border border-gray-100 relative group cursor-pointer" onclick="document.getElementById('coverInput').click()">
+                            <img id="coverPreview" class="w-full h-full object-contain p-2">
+                            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition text-white text-xs font-bold tracking-widest">CHANGE</div>
+                        </div>
+                        <input type="file" id="coverInput" accept="image/*" class="hidden" onchange="handleCover(this)">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><label class="tag-label">YEAR</label><input type="text" id="tagYear" class="input-field" placeholder="2024"></div>
+                        <div><label class="tag-label">GENRE</label><input type="text" id="tagGenre" class="input-field" placeholder="Pop"></div>
+                    </div>
+                </div>
+
+                <!-- 右欄：詳細資訊 -->
+                <div class="lg:col-span-8 space-y-6">
+                    <div><label class="tag-label">TITLE</label><input type="text" id="tagTitle" class="input-field text-2xl font-bold py-2"></div>
+                    <div class="grid grid-cols-2 gap-6">
+                        <div><label class="tag-label">ARTIST</label><input type="text" id="tagArtist" class="input-field"></div>
+                        <div><label class="tag-label">ALBUM</label><input type="text" id="tagAlbum" class="input-field"></div>
+                    </div>
+                    
+                    <!-- 歌詞入口區塊 -->
+                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-100 mt-4">
+                        <div class="flex justify-between items-center mb-3">
+                            <label class="tag-label mb-0">LYRICS</label>
+                            <button onclick="openLrcStudio()" class="bg-black text-white text-xs px-4 py-2 rounded shadow hover:bg-gray-800 transition flex items-center gap-2">
+                                <span>⚡ Open Lyrics Studio</span>
+                            </button>
+                        </div>
+                        <textarea id="tagLyrics" rows="3" class="w-full bg-white border border-gray-200 rounded p-3 text-xs font-mono resize-none text-gray-500" placeholder="Lyrics will appear here..." readonly></textarea>
+                    </div>
+
+                    <!-- 更多欄位收折 -->
+                    <details class="group">
+                        <summary class="tag-label cursor-pointer py-2 hover:text-black flex items-center gap-2">
+                            <span>▶ MORE TAGS</span>
+                        </summary>
+                        <div class="grid grid-cols-2 gap-6 pt-4 pl-2 border-l-2 border-gray-100">
+                            <div><label class="tag-label">ALBUM ARTIST</label><input type="text" id="tagAlbumArtist" class="input-field"></div>
+                            <div><label class="tag-label">COMPOSER</label><input type="text" id="tagComposer" class="input-field"></div>
+                            <div><label class="tag-label">TRACK</label><input type="text" id="tagTrack" class="input-field"></div>
+                            <div><label class="tag-label">DISC</label><input type="text" id="tagDisc" class="input-field"></div>
+                        </div>
+                    </details>
+                </div>
+            </div>
+
+            <!-- 底部儲存 -->
+            <div class="pt-8 border-t border-gray-100 flex justify-end">
+                <button onclick="saveFile()" id="saveBtn" class="bg-black text-white px-8 py-3 rounded text-sm font-bold shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition">SAVE & DOWNLOAD</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- LRC STUDIO (全螢幕編輯器) -->
+    <!-- ========================================== -->
+    <div id="lrcStudio" class="fixed inset-0 bg-white z-50 hidden flex flex-col">
+        
+        <!-- Studio Header -->
+        <div class="h-16 border-b border-gray-200 flex items-center justify-between px-6 bg-white shrink-0">
+            <div class="font-bold flex items-center gap-4">
+                <button onclick="closeLrcStudio()" class="p-2 hover:bg-gray-100 rounded-full text-gray-500">✕</button>
+                <span>Lyrics Studio</span>
+            </div>
+            <div class="flex gap-2 text-xs">
+                <button onclick="setMode('edit')" id="modeEdit" class="px-3 py-1.5 rounded transition bg-gray-100 text-gray-600">Text Mode</button>
+                <button onclick="setMode('sync')" id="modeSync" class="px-3 py-1.5 rounded transition bg-black text-white font-bold">Sync Mode</button>
+            </div>
+            <button onclick="applyLyrics()" class="text-sm font-bold text-blue-600 hover:text-blue-800 px-4">APPLY</button>
+        </div>
+
+        <!-- Studio Body -->
+        <div class="flex-1 overflow-hidden relative flex">
+            
+            <!-- 1. 純文字模式 (Raw Text) -->
+            <div id="viewRaw" class="hidden absolute inset-0 p-6 flex-col">
+                <textarea id="rawInput" class="flex-1 w-full h-full resize-none border-0 outline-none font-mono text-sm leading-7 text-gray-700 p-4 bg-gray-50 rounded-lg" placeholder="Paste your lyrics here..."></textarea>
+                <div class="mt-4 text-center">
+                    <button onclick="setMode('sync')" class="bg-black text-white px-6 py-2 rounded text-sm">Start Syncing &rarr;</button>
+                </div>
+            </div>
+
+            <!-- 2. 同步模式 (Sync List) -->
+            <div id="viewSync" class="w-full h-full flex flex-col relative">
+                <!-- 歌詞列表 (Scrollable) -->
+                <div id="lrcList" class="flex-1 overflow-y-auto pb-64 bg-white">
+                    <!-- Javascript 將在此渲染行 -->
+                    <div class="text-center text-gray-400 mt-20">No lyrics. Switch to Text Mode to paste lyrics.</div>
+                </div>
+                
+                <!-- 底部固定控制台 (Studio Console) -->
+                <div class="h-auto bg-white/95 backdrop-blur border-t border-gray-200 p-4 absolute bottom-0 left-0 right-0 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
+                    
+                    <!-- 進度與時間 -->
+                    <div class="flex items-center gap-4 mb-4">
+                        <span id="studioCurrentTime" class="font-mono text-lg font-bold w-16 text-right">00:00</span>
+                        <input type="range" id="studioSeeker" min="0" max="100" value="0" step="0.1">
+                        <span id="studioTotalTime" class="font-mono text-xs text-gray-400 w-10">00:00</span>
+                    </div>
+
+                    <!-- 控制按鈕群 -->
+                    <div class="flex items-center justify-between">
+                        
+                        <!-- 左側：速度 -->
+                        <div class="flex items-center gap-2">
+                            <span class="tag-label mb-0 mr-1">SPEED</span>
+                            <select id="playbackRate" onchange="changeSpeed()" class="text-xs bg-gray-100 border-none rounded px-2 py-1 font-mono cursor-pointer outline-none hover:bg-gray-200">
+                                <option value="0.5">0.5x</option>
+                                <option value="0.75">0.75x</option>
+                                <option value="1" selected>1.0x</option>
+                                <option value="1.25">1.25x</option>
+                                <option value="1.5">1.5x</option>
+                            </select>
+                        </div>
+
+                        <!-- 中間：播放與打戳 -->
+                        <div class="flex items-center gap-4">
+                            <!-- 後退 5s -->
+                            <button onclick="skip(-5)" class="p-2 text-gray-400 hover:text-black" title="-5s">↺</button>
+                            
+                            <!-- 播放/暫停 -->
+                            <button onclick="togglePlay()" id="studioPlayBtn" class="w-12 h-12 rounded-full border-2 border-black flex items-center justify-center text-xl hover:bg-black hover:text-white transition">
+                                ▶
+                            </button>
+
+                            <!-- 巨大的 STAMP 按鈕 -->
+                            <button onclick="stampCurrent()" id="stampBtn" class="h-12 px-8 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-full shadow-lg shadow-blue-200 active:scale-95 transition flex flex-col items-center justify-center leading-none">
+                                <span>STAMP</span>
+                                <span class="text-[9px] opacity-70 font-normal mt-0.5">SPACEBAR</span>
+                            </button>
+                        </div>
+
+                        <!-- 右側：輔助 -->
+                        <div class="flex gap-2">
+                            <button onclick="clearTimes()" class="text-[10px] text-red-400 hover:text-red-600 font-bold uppercase tracking-wider">Reset Times</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 隱藏的 Audio 元素 -->
+    <audio id="audio" preload="metadata"></audio>
+
+    <script>
+        // --- 變數與初始化 ---
+        let fileBuffer = null;
+        let coverBuffer = null;
+        let fileName = "";
+        let lrcData = []; // [{ time: float|null, text: string }]
+        let activeIndex = 0; // 當前選取的編輯行 (Selection) - 紅色
+        let playingIndex = -1; // 當前播放到的行 (Playback Highlight) - 藍色
+        
+        const audio = document.getElementById('audio');
+        const seeker = document.getElementById('studioSeeker');
+        
+        // --- 核心邏輯: 檔案處理 ---
+        
+        function handleFileSelect(file) {
+            if(!file) return;
+            fileName = file.name;
+            document.getElementById('currentFileName').innerText = fileName;
+            document.getElementById('dropZone').classList.add('hidden');
+            document.getElementById('editorView').classList.remove('hidden');
+            
+            audio.src = URL.createObjectURL(file);
+            
+            // 讀取標籤
+            jsmediatags.read(file, {
+                onSuccess: (tag) => {
+                    const t = tag.tags;
+                    const set = (id, v) => document.getElementById(id).value = v || "";
+                    set('tagTitle', t.title);
+                    set('tagArtist', t.artist);
+                    set('tagAlbum', t.album);
+                    set('tagYear', t.year);
+                    set('tagGenre', t.genre);
+                    set('tagTrack', t.track);
+                    set('tagAlbumArtist', t.TPE2?.data);
+                    set('tagComposer', t.TCOM?.data);
+                    set('tagDisc', t.TPOS?.data);
+
+                    // 歌詞
+                    let lyrics = "";
+                    if(t.lyrics) lyrics = t.lyrics.lyrics;
+                    else if(t.USLT) lyrics = t.USLT.data.lyrics;
+                    document.getElementById('tagLyrics').value = lyrics;
+
+                    // 封面
+                    if(t.picture) {
+                        try {
+                            const arr = new Uint8Array(t.picture.data);
+                            coverBuffer = arr.buffer;
+                            const blob = new Blob([arr], {type: t.picture.format});
+                            document.getElementById('coverPreview').src = URL.createObjectURL(blob);
+                        } catch(e) {}
+                    }
+                    
+                    // 讀取 Buffer 用於寫入
+                    const reader = new FileReader();
+                    reader.onload = () => fileBuffer = reader.result;
+                    reader.readAsArrayBuffer(file);
+                },
+                onError: () => alert("Error reading tags.")
+            });
+        }
+
+        function handleCover(input) {
+            const file = input.files[0];
+            if(!file) return;
+            document.getElementById('coverPreview').src = URL.createObjectURL(file);
+            const reader = new FileReader();
+            reader.onload = () => coverBuffer = reader.result;
+            reader.readAsArrayBuffer(file);
+        }
+
+        // --- 核心邏輯: 寫入檔案 ---
+
+        function saveFile() {
+            // 防呆機制：檢查庫是否載入
+            if (typeof ID3Writer === 'undefined') {
+                alert("錯誤：ID3Writer 函式庫未載入，請檢查網路連線或 AdBlock。");
+                return;
+            }
+            if (!fileBuffer) return;
+
+            try {
+                const writer = new ID3Writer(fileBuffer);
+                const val = id => document.getElementById(id).value;
+                const set = (f, v) => { if(v) writer.setFrame(f, v); };
+                const setArr = (f, v) => { if(v) writer.setFrame(f, [v]); };
+
+                set('TIT2', val('tagTitle'));
+                setArr('TPE1', val('tagArtist'));
+                setArr('TPE2', val('tagAlbumArtist'));
+                set('TALB', val('tagAlbum'));
+                set('TYER', val('tagYear'));
+                setArr('TCON', val('tagGenre'));
+                set('TRCK', val('tagTrack'));
+                set('TPOS', val('tagDisc'));
+                setArr('TCOM', val('tagComposer'));
+                
+                if(val('tagLyrics')) writer.setFrame('USLT', { description: '', lyrics: val('tagLyrics'), language: 'eng' });
+                if(coverBuffer) writer.setFrame('APIC', { type: 3, data: coverBuffer, description: 'Cover' });
+
+                writer.addTag();
+                
+                const link = document.createElement('a');
+                link.href = writer.getURL();
+                link.download = "Tagged_" + fileName;
+                link.click();
+            } catch (e) {
+                alert("Save Failed: " + e.message);
+            }
+        }
+
+        // --- Studio: 歌詞編輯器邏輯 ---
+
+        function openLrcStudio() {
+            document.getElementById('lrcStudio').classList.remove('hidden');
+            const currentLrc = document.getElementById('tagLyrics').value;
+            
+            // 如果看起來有時間軸，直接解析並進入同步模式
+            if (currentLrc.match(/\[\d{2}:\d{2}/)) {
+                parseLrcToData(currentLrc);
+                setMode('sync');
+            } else {
+                document.getElementById('rawInput').value = currentLrc;
+                setMode('edit'); // 否則進入文字模式
+            }
+            
+            document.body.style.overflow = 'hidden';
+            window.addEventListener('keydown', handleKey);
+        }
+
+        function closeLrcStudio() {
+            document.getElementById('lrcStudio').classList.add('hidden');
+            document.body.style.overflow = '';
+            audio.pause();
+            window.removeEventListener('keydown', handleKey);
+        }
+
+        function setMode(mode) {
+            const viewRaw = document.getElementById('viewRaw');
+            const viewSync = document.getElementById('viewSync');
+            const btnEdit = document.getElementById('modeEdit');
+            const btnSync = document.getElementById('modeSync');
+
+            if (mode === 'edit') {
+                document.getElementById('rawInput').value = dataToLrcStr(false); 
+                viewRaw.classList.remove('hidden');
+                viewSync.classList.add('hidden');
+                btnEdit.classList.add('bg-black', 'text-white'); btnEdit.classList.remove('bg-gray-100', 'text-gray-600');
+                btnSync.classList.remove('bg-black', 'text-white'); btnSync.classList.add('bg-gray-100', 'text-gray-600');
+            } else {
+                parseLrcToData(document.getElementById('rawInput').value);
+                renderList();
+                
+                viewRaw.classList.add('hidden');
+                viewSync.classList.remove('hidden');
+                btnSync.classList.add('bg-black', 'text-white'); btnSync.classList.remove('bg-gray-100', 'text-gray-600');
+                btnEdit.classList.remove('bg-black', 'text-white'); btnEdit.classList.add('bg-gray-100', 'text-gray-600');
+                
+                // 進入同步模式自動定位
+                activeIndex = 0;
+                // 找第一個沒時間的
+                const firstEmpty = lrcData.findIndex(d => d.time === null);
+                if(firstEmpty > -1) activeIndex = firstEmpty;
+                scrollToRow(activeIndex);
+                highlightRow();
+            }
+        }
+
+        function applyLyrics() {
+            if (!document.getElementById('viewRaw').classList.contains('hidden')) {
+                document.getElementById('tagLyrics').value = document.getElementById('rawInput').value;
+            } else {
+                document.getElementById('tagLyrics').value = dataToLrcStr(true);
+            }
+            closeLrcStudio();
+        }
+
+        // --- Studio: Data & Rendering ---
+
+        function parseLrcToData(str) {
+            lrcData = str.split('\n').map(line => {
+                const match = line.match(/\[(\d{2}):(\d{2}\.\d{2,3})\](.*)/);
+                if (match) {
+                    const min = parseInt(match[1]);
+                    const sec = parseFloat(match[2]);
+                    return { time: min * 60 + sec, text: match[3].trim() };
+                } else {
+                    const text = line.trim();
+                    if(!text) return null;
+                    return { time: null, text: text };
+                }
+            }).filter(x => x);
+        }
+
+        function dataToLrcStr(withTime) {
+            return lrcData.map(d => {
+                if(withTime && d.time !== null) {
+                    const m = Math.floor(d.time / 60).toString().padStart(2, '0');
+                    const s = (d.time % 60).toFixed(2).toString().padStart(5, '0');
+                    return `[${m}:${s}]${d.text}`;
+                }
+                return d.text;
+            }).join('\n');
+        }
+
+        function renderList() {
+            const list = document.getElementById('lrcList');
+            list.innerHTML = "";
+            
+            lrcData.forEach((item, idx) => {
+                const row = document.createElement('div');
+                row.className = `lyrics-row`;
+                row.id = `row-${idx}`;
+                row.onclick = (e) => {
+                    // 如果點擊的是時間按鈕，不切換 activeIndex (由 seekTime 處理)
+                    if(e.target.classList.contains('time-btn')) return;
+                    activeIndex = idx;
+                    highlightRow();
+                };
+
+                // 時間按鈕
+                const timeBtn = document.createElement('div');
+                timeBtn.className = `time-btn ${item.time === null ? 'empty' : 'active'}`;
+                timeBtn.innerText = item.time !== null ? fmtTime(item.time) : '--:--.--';
+                timeBtn.onclick = () => {
+                    if(item.time !== null) {
+                        audio.currentTime = item.time; // Seek
+                        
+                        // 【修復邏輯】：點擊時間按鈕跳轉時，打戳游標也跟隨到該行
+                        // 這樣使用者接著按空白鍵就會從這一行開始打，不會跳回前面
+                        activeIndex = idx;
+                        highlightRow();
+                        
+                        if(audio.paused) audio.play(); 
+                    } else {
+                        // 沒時間，點擊等於想打戳，切換 active
+                        activeIndex = idx;
+                        highlightRow();
+                    }
+                };
+
+                // 文字輸入
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'text-input';
+                input.value = item.text;
+                input.oninput = (e) => { lrcData[idx].text = e.target.value; };
+                input.onfocus = () => { activeIndex = idx; highlightRow(); };
+
+                row.appendChild(timeBtn);
+                row.appendChild(input);
+                list.appendChild(row);
+            });
+            highlightRow();
+        }
+
+        // --- Studio: Interaction & Sync ---
+
+        function highlightRow() {
+            // 處理選取游標 (紅色 Selection)
+            document.querySelectorAll('.lyrics-row').forEach((el, idx) => {
+                if (idx === activeIndex) el.classList.add('selected');
+                else el.classList.remove('selected');
+            });
+        }
+
+        function stampCurrent() {
+            if (activeIndex < lrcData.length) {
+                lrcData[activeIndex].time = audio.currentTime;
+                // 更新 UI
+                const row = document.getElementById(`row-${activeIndex}`);
+                if(row) {
+                    const btn = row.querySelector('.time-btn');
+                    btn.innerText = fmtTime(audio.currentTime);
+                    btn.classList.remove('empty');
+                    btn.classList.add('active');
+                }
+                
+                // Move Next
+                activeIndex++;
+                if(activeIndex >= lrcData.length) activeIndex = lrcData.length - 1;
+                
+                highlightRow();
+                scrollToRow(activeIndex);
+            }
+        }
+
+        function scrollToRow(idx) {
+            const el = document.getElementById(`row-${idx}`);
+            if(el) el.scrollIntoView({behavior: "smooth", block: "center"});
+        }
+
+        function clearTimes() {
+            if(confirm("Clear all timestamps?")) {
+                lrcData.forEach(d => d.time = null);
+                renderList();
+                activeIndex = 0;
+                highlightRow();
+            }
+        }
+
+        // --- Studio: Audio Controls ---
+
+        // 綁定 Audio 事件
+        audio.ontimeupdate = () => {
+            const t = audio.currentTime;
+            document.getElementById('studioCurrentTime').innerText = fmtTime(t, false);
+            seeker.value = (t / audio.duration) * 100 || 0;
+            
+            // --- 播放游標 (藍色) 與自動捲動 ---
+            let currentPlayIdx = -1;
+            for(let i=0; i<lrcData.length; i++) {
+                // 0.2秒容錯，讓高亮提前一點點，觀感較好
+                if(lrcData[i].time !== null && lrcData[i].time <= t + 0.2) { 
+                    currentPlayIdx = i;
+                }
+            }
+            
+            if (currentPlayIdx !== playingIndex) {
+                playingIndex = currentPlayIdx;
+                document.querySelectorAll('.lyrics-row').forEach(el => el.classList.remove('playing'));
+                if(playingIndex > -1) {
+                    const el = document.getElementById(`row-${playingIndex}`);
+                    if(el) {
+                        el.classList.add('playing');
+                        // 【新增功能】：自動捲動 (Auto-scroll) 到正在播放的行
+                        // 只有當使用者沒有正在編輯(focus)其他行時才自動捲動，避免干擾
+                        if(document.activeElement.tagName !== 'INPUT') {
+                            el.scrollIntoView({behavior: "smooth", block: "center"});
+                        }
+                    }
+                }
+            }
+        };
+
+        audio.onloadedmetadata = () => {
+             document.getElementById('studioTotalTime').innerText = fmtTime(audio.duration, false);
+        };
+
+        audio.onplay = () => document.getElementById('studioPlayBtn').innerText = "||";
+        audio.onpause = () => document.getElementById('studioPlayBtn').innerText = "▶";
+
+        // Seeker Logic
+        seeker.oninput = () => {
+            const t = (seeker.value / 100) * audio.duration;
+            audio.currentTime = t;
+        };
+
+        function togglePlay() { audio.paused ? audio.play() : audio.pause(); }
+        function skip(sec) { audio.currentTime += sec; }
+        function changeSpeed() { audio.playbackRate = parseFloat(document.getElementById('playbackRate').value); }
+
+        function handleKey(e) {
+            if (e.code === 'Space') {
+                if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+                e.preventDefault();
+                stampCurrent();
+            }
+        }
+
+        // --- Helpers ---
+        function fmtTime(s, highRes=true) {
+            const m = Math.floor(s/60).toString().padStart(2,'0');
+            const sec = Math.floor(s%60).toString().padStart(2,'0');
+            if(highRes) {
+                const ms = Math.floor((s % 1) * 100).toString().padStart(2,'0');
+                return `${m}:${sec}.${ms}`;
+            }
+            return `${m}:${sec}`;
+        }
+        
+        function guessTags() {
+            const parts = fileName.replace(/\.mp3$/i, '').split(/ - /);
+            if(parts.length > 1) {
+                document.getElementById('tagArtist').value = parts[0];
+                document.getElementById('tagTitle').value = parts.slice(1).join(' - ');
+            }
+        }
+        function clearAll() {
+             document.querySelectorAll('.input-field, textarea').forEach(e => e.value = "");
+        }
+    </script>
+</body>
+</html>
