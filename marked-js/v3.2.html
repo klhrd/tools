@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Markdown Pro v3.2</title>
+    
+    <!-- 1. 核心解析庫：Marked.js -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <!-- 2. 安全過濾庫：DOMPurify -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+
+    <!-- 3. 程式碼高亮：Highlight.js -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" id="hljs-light">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" id="hljs-dark" disabled>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+
+    <!-- 4. 壓縮核心：LZ-String -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+
+    <!-- 5. 預覽樣式：GitHub Markdown CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown.min.css">
+
+    <!-- 6. Google Material Symbols -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+
+    <style>
+        :root {
+            /* 淺色模式 */
+            --bg-body: #f3f4f6;
+            --bg-paper: #ffffff;
+            --text-primary: #1f2937;
+            --text-secondary: #6b7280;
+            --border-color: #e5e7eb;
+            --hover-bg: rgba(0, 0, 0, 0.05); /* 按鈕 Hover 背景 */
+            
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+        }
+
+        /* 自動深色模式偵測 */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-body: #111827;
+                --bg-paper: #1f2937;
+                --text-primary: #f3f4f6;
+                --text-secondary: #9ca3af;
+                --border-color: #374151;
+                --hover-bg: rgba(255, 255, 255, 0.1);
+            }
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            /* 使用設備原生無襯線字體 system-ui */
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            background-color: var(--bg-body);
+            color: var(--text-primary);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        /* 頂部導航 - 瘦身版 */
+        header {
+            height: 50px; /* 從 64px 縮減 */
+            background: var(--bg-paper);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            justify-content: space-between;
+            z-index: 100;
+            flex-shrink: 0;
+        }
+
+        .logo {
+            font-weight: 600;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-primary);
+            user-select: none;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 8px; /* 縮小間距 */
+        }
+
+        /* 純 Icon 按鈕樣式 (無邊框) */
+        button.icon-btn {
+            background: transparent;
+            border: none; /* 移除邊框 */
+            color: var(--text-secondary); /* 預設顏色稍淡 */
+            width: 36px;
+            height: 36px;
+            border-radius: 6px; /* 輕微圓角 */
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            padding: 0;
+        }
+
+        button.icon-btn:hover {
+            background-color: var(--hover-bg);
+            color: var(--text-primary);
+        }
+
+        button.icon-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Material Icon 調整 */
+        .material-symbols-outlined {
+            font-size: 22px; /* 適中大小 */
+        }
+
+        /* 容量計量條 */
+        .url-stats {
+            /* 使用純 Monospace 等寬字體 */
+            font-family: monospace;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 8px;
+            /* 移除背景框，讓它看起來更像資訊標籤 */
+            background: transparent; 
+            color: var(--text-secondary);
+            margin-right: 8px;
+            border-radius: 4px;
+        }
+        
+        /* 讓計量條在 hover 時才顯示背景，保持介面乾淨 */
+        .url-stats:hover {
+            background: var(--hover-bg);
+        }
+
+        .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: var(--success-color);
+        }
+
+        /* 主容器 */
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+            background: var(--bg-paper);
+        }
+
+        /* 編輯器面板 */
+        #editorPanel {
+            border-right: 1px solid var(--border-color);
+        }
+
+        #editor {
+            flex: 1;
+            padding: 24px;
+            /* 強制使用程式碼等寬字體 */
+            font-family: monospace; 
+            font-size: 15px;
+            line-height: 1.6;
+            border: none;
+            outline: none;
+            resize: none;
+            background: var(--bg-paper);
+            color: var(--text-primary);
+            width: 100%;
+        }
+
+        /* 預覽區 */
+        #preview-container {
+            flex: 1;
+            overflow-y: auto;
+            background: var(--bg-paper);
+            padding: 24px 40px;
+        }
+
+        /* Markdown 樣式覆蓋 */
+        .markdown-body {
+            background: transparent !important;
+            color: var(--text-primary) !important;
+            /* 預覽區也跟隨系統字體 */
+            font-family: system-ui, -apple-system, sans-serif !important;
+            line-height: 1.8;
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            .markdown-body {
+                color-scheme: dark;
+            }
+            .markdown-body a { color: #58a6ff; }
+            .markdown-body blockquote { border-left-color: #30363d; color: #8b949e; }
+            .markdown-body code { background: rgba(110,118,129,0.4); }
+            .markdown-body pre { background: #161b22; }
+            .markdown-body table tr { background-color: #0d1117; border-top-color: #30363d; }
+            .markdown-body table tr:nth-child(2n) { background-color: #161b22; }
+        }
+
+        /* 行動裝置邏輯 */
+        .mobile-switch-btn {
+            display: none;
+        }
+
+        /* Toast 通知 */
+        #toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(10px);
+            background: var(--text-primary);
+            color: var(--bg-paper);
+            padding: 10px 20px;
+            border-radius: 50px;
+            font-size: 13px;
+            font-weight: 500;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            /* Toast 字體也設為系統字 */
+            font-family: system-ui, sans-serif;
+        }
+        
+        #toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* 響應式設計 (Mobile) */
+        @media (max-width: 768px) {
+            header {
+                padding: 0 12px;
+                height: 48px; /* 手機版再稍微窄一點點 */
+            }
+
+            .container { display: block; }
+            .panel { display: none; width: 100%; height: 100%; }
+            #editorPanel { border-right: none; }
+            .panel.active { display: flex; }
+
+            #preview-container { padding: 20px; }
+            
+            .mobile-switch-btn { display: flex; }
+            
+            .url-stats span { display: none; }
+            .url-stats { margin-right: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo">
+        <span class="material-symbols-outlined" style="font-size: 24px;">markdown</span>
+        <span>v3.2</span>
+    </div>
+
+    <div class="controls">
+        <!-- 容量指示器 -->
+        <div class="url-stats" id="urlStats" title="URL 長度監測">
+            <div class="dot" id="sizeDot"></div>
+            <span id="sizeText">0B</span>
+        </div>
+
+        <!-- 手機版切換按鈕 (Icon Button) -->
+        <button class="icon-btn mobile-switch-btn" id="toggleViewBtn" onclick="toggleMobileView()" title="切換檢視">
+            <span class="material-symbols-outlined" id="toggleIcon">visibility</span>
+        </button>
+
+        <!-- 分享按鈕 (Icon Button, 無邊框, 無文字) -->
+        <button class="icon-btn" onclick="copyUrl()" title="複製網址">
+            <span class="material-symbols-outlined">share</span>
+        </button>
+    </div>
+</header>
+
+<div class="container" id="mainContainer">
+    <!-- 編輯區 -->
+    <section class="panel active" id="editorPanel">
+        <textarea id="editor" placeholder="# 開始輸入...&#10;&#10;無邊框、無襯線、原生字體。&#10;&#10;網址即內容，極簡體驗。" spellcheck="false"></textarea>
+    </section>
+
+    <!-- 預覽區 -->
+    <section class="panel" id="previewPanel">
+        <div id="preview-container">
+            <div id="preview" class="markdown-body"></div>
+        </div>
+    </section>
+</div>
+
+<div id="toast">
+    <span style="display: flex; align-items: center; gap: 8px;">
+        <span class="material-symbols-outlined" style="font-size: 16px;">check</span>
+        網址已複製
+    </span>
+</div>
+
+<script>
+    // DOM 元素
+    const editor = document.getElementById('editor');
+    const preview = document.getElementById('preview');
+    const editorPanel = document.getElementById('editorPanel');
+    const previewPanel = document.getElementById('previewPanel');
+    const toggleIcon = document.getElementById('toggleIcon');
+    const sizeText = document.getElementById('sizeText');
+    const sizeDot = document.getElementById('sizeDot');
+    const hljsLight = document.getElementById('hljs-light');
+    const hljsDark = document.getElementById('hljs-dark');
+    
+    let isMobilePreviewMode = false;
+    let currentCompressedHash = "";
+
+    marked.setOptions({
+        highlight: function(code, lang) {
+            const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+            return hljs.highlight(code, { language }).value;
+        },
+        breaks: true,
+        gfm: true
+    });
+
+    function handleThemeChange(e) {
+        if (e.matches) {
+            hljsLight.disabled = true;
+            hljsDark.disabled = false;
+        } else {
+            hljsLight.disabled = false;
+            hljsDark.disabled = true;
+        }
+    }
+    
+    const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    handleThemeChange(darkModeMediaQuery);
+    darkModeMediaQuery.addEventListener('change', handleThemeChange);
+
+    function updateUrlHash() {
+        const raw = editor.value;
+        if (!raw) {
+            currentCompressedHash = "";
+            try { history.replaceState(null, null, ' '); } catch (e) {}
+            updateStats(0);
+            return;
+        }
+
+        const compressed = LZString.compressToEncodedURIComponent(raw);
+        currentCompressedHash = compressed;
+        
+        try { history.replaceState(null, null, '#' + compressed); } catch (e) {}
+        
+        const estimatedUrl = window.location.href.split('#')[0] + '#' + compressed;
+        updateStats(estimatedUrl.length);
+    }
+
+    function loadFromHash() {
+        const hash = window.location.hash.substring(1); 
+        if (hash) {
+            try {
+                const decompressed = LZString.decompressFromEncodedURIComponent(hash);
+                if (decompressed) {
+                    editor.value = decompressed;
+                    return true;
+                }
+            } catch (e) {
+                console.error("解壓縮失敗", e);
+            }
+        }
+        return false;
+    }
+
+    function render() {
+        const raw = editor.value;
+        const cleanHtml = DOMPurify.sanitize(marked.parse(raw));
+        preview.innerHTML = cleanHtml;
+    }
+
+    function updateStats(byteLength) {
+        sizeText.innerText = byteLength + ' chars';
+        
+        if (byteLength < 2000) {
+            sizeDot.style.backgroundColor = 'var(--success-color)';
+        } else if (byteLength < 8000) {
+            sizeDot.style.backgroundColor = 'var(--warning-color)';
+        } else {
+            sizeDot.style.backgroundColor = 'var(--danger-color)';
+        }
+    }
+
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    function toggleMobileView() {
+        isMobilePreviewMode = !isMobilePreviewMode;
+        applyMobileView();
+    }
+
+    function applyMobileView() {
+        if (window.innerWidth > 768) {
+            editorPanel.style.display = 'flex';
+            previewPanel.style.display = 'flex';
+            editorPanel.classList.add('active');
+            previewPanel.classList.add('active');
+            return;
+        }
+
+        if (isMobilePreviewMode) {
+            editorPanel.style.display = 'none';
+            editorPanel.classList.remove('active');
+            previewPanel.style.display = 'block';
+            previewPanel.classList.add('active');
+            toggleIcon.innerText = 'edit'; 
+        } else {
+            previewPanel.style.display = 'none';
+            previewPanel.classList.remove('active');
+            editorPanel.style.display = 'block';
+            editorPanel.classList.add('active');
+            toggleIcon.innerText = 'visibility'; 
+        }
+    }
+
+    function copyUrl() {
+        updateUrlHash();
+        let url = window.location.href;
+        if (currentCompressedHash) {
+            const baseUrl = url.split('#')[0];
+            url = baseUrl + '#' + currentCompressedHash;
+        }
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(showToast).catch(err => fallbackCopy(url));
+        } else {
+            fallbackCopy(url);
+        }
+    }
+
+    function fallbackCopy(text) {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-9999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            showToast();
+        } catch (err) {
+            alert("請手動複製網址列");
+        }
+        document.body.removeChild(textArea);
+    }
+
+    function showToast() {
+        const toast = document.getElementById('toast');
+        toast.classList.add('show');
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, 2000);
+    }
+
+    const debouncedUpdate = debounce(() => {
+        render();
+        updateUrlHash();
+    }, 300);
+
+    editor.addEventListener('input', debouncedUpdate);
+    window.addEventListener('resize', applyMobileView);
+
+    const hasContent = loadFromHash();
+    render();
+
+    if (window.innerWidth <= 768) {
+        isMobilePreviewMode = hasContent; 
+        applyMobileView();
+    } else {
+        applyMobileView();
+    }
+
+    window.addEventListener('popstate', () => {
+        loadFromHash();
+        render();
+    });
+
+</script>
+
+</body>
+</html>
