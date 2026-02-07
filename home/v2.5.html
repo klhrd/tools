@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | KLHRD's Tools Library</title>
+    
+    <!-- v2.5: 路徑維持上一層 -->
+    <link rel="shortcut icon" href="../assets/favicon.ico" type="image/x-icon">
+    <link rel="icon" href="../assets/favicon.png" type="image/png">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background: #f8fafc;
+            min-height: 100vh;
+            color: #334155;
+            overflow-x: hidden;
+        }
+        .glass-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        .glass-card:hover {
+            border-color: #64748b;
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px -6px rgba(0, 0, 0, 0.08);
+            cursor: pointer;
+        }
+        
+        .detail-view {
+            display: none;
+            position: fixed;
+            top: 0; right: 0; bottom: 0; left: 0;
+            background: #ffffff;
+            z-index: 50;
+            overflow-y: auto;
+        }
+        .filter-btn.active {
+            background-color: #475569;
+            color: white;
+            border-color: #475569;
+        }
+        
+        /* 排序按鈕樣式 */
+        .sort-btn {
+            width: 36px; height: 36px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            color: #64748b;
+            transition: all 0.2s;
+        }
+        .sort-btn:hover { background: #f1f5f9; color: #334155; }
+        
+        /* 羅盤按鈕 */
+        .compass-btn {
+            background: #334155; /* Slate-700 */
+            color: white;
+            transition: all 0.3s ease;
+            position: relative;
+            z-index: 100; /* 確保在 mask 之上 */
+        }
+        .compass-btn:hover {
+            background: #1e293b;
+            box-shadow: 0 0 15px rgba(51, 65, 85, 0.5);
+        }
+
+        /* Magic Animations Keyframes */
+        @keyframes magic-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes magic-tada {
+            0% { transform: scale(1); }
+            10%, 20% { transform: scale(0.9) rotate(-3deg); }
+            30%, 50%, 70%, 90% { transform: scale(1.1) rotate(3deg); }
+            40%, 60%, 80% { transform: scale(1.1) rotate(-3deg); }
+            100% { transform: scale(1) rotate(0); }
+        }
+        @keyframes magic-rubberBand {
+            0% { transform: scale(1); }
+            30% { transform: scale(1.25, 0.75); }
+            40% { transform: scale(0.75, 1.25); }
+            50% { transform: scale(1.15, 0.85); }
+            65% { transform: scale(0.95, 1.05); }
+            75% { transform: scale(1.05, 0.95); }
+            100% { transform: scale(1); }
+        }
+        @keyframes magic-wobble {
+            0% { transform: translateX(0%); }
+            15% { transform: translateX(-25%) rotate(-5deg); }
+            30% { transform: translateX(20%) rotate(3deg); }
+            45% { transform: translateX(-15%) rotate(-3deg); }
+            60% { transform: translateX(10%) rotate(2deg); }
+            75% { transform: translateX(-5%) rotate(-1deg); }
+            100% { transform: translateX(0%); }
+        }
+
+        .anim-spin { animation: magic-spin 0.8s ease-in-out; }
+        .anim-tada { animation: magic-tada 1s; }
+        .anim-rubber { animation: magic-rubberBand 1s; }
+        .anim-wobble { animation: magic-wobble 1s; }
+
+        /* 特效蒙版與粒子 */
+        #magic-mask {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.8); /* Slate-900 with opacity */
+            z-index: 90;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            backdrop-filter: blur(2px);
+        }
+        .particle {
+            position: fixed;
+            pointer-events: none;
+            border-radius: 50%;
+            z-index: 95;
+            will-change: transform, opacity;
+        }
+
+        .nailed-icon {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: #cbd5e1;
+            transform: rotate(45deg);
+            transition: color 0.3s;
+        }
+        .glass-card:hover .nailed-icon {
+            color: #64748b;
+        }
+
+        /* Markdown 樣式 */
+        .readme-content { line-height: 1.8; }
+        .readme-content img { max-width: 100%; border-radius: 8px; margin: 1rem 0; border: 1px solid #e2e8f0; }
+        .readme-content ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 1rem; }
+        .readme-content ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 1rem; }
+        .readme-content pre { background: #1e293b; color: #e2e8f0; padding: 1rem; border-radius: 8px; overflow-x: auto; margin: 1rem 0; font-size: 0.9rem; }
+        .readme-content code { font-family: 'ui-monospace', monospace; background: #f1f5f9; padding: 0.2rem 0.4rem; border-radius: 4px; color: #be185d; font-size: 0.9em; }
+        .readme-content pre code { background: transparent; color: inherit; padding: 0; }
+        .readme-content h1 { border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem; margin-top: 2rem; margin-bottom: 1rem; font-weight: 800; color: #0f172a; font-size: 1.8rem; }
+        .readme-content h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.5rem; margin-top: 1.5rem; margin-bottom: 1rem; font-weight: 700; color: #1e293b; font-size: 1.4rem; }
+        .readme-content a { color: #2563eb; text-decoration: underline; }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f8fafc; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; border: 2px solid #f8fafc; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <!-- 特效蒙版 -->
+    <div id="magic-mask"></div>
+
+    <!-- 主視圖 -->
+    <div id="main-view" class="max-w-7xl mx-auto">
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-6">
+            <div class="flex items-center space-x-4">
+                <!-- 羅盤圖示 -->
+                <div id="compass-icon" onclick="triggerMagicCompass(event)" class="compass-btn w-12 h-12 rounded-2xl flex items-center justify-center cursor-pointer">
+                    <i class="fa-solid fa-compass text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-extrabold text-slate-900">Tools Hub</h1>
+                    <p class="text-xs font-semibold text-slate-400">klhrd's projects <span class="ml-1 text-[9px] bg-slate-200 px-1 rounded">v2.5</span></p>
+                </div>
+            </div>
+            
+            <div class="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+                <!-- 排序工具列 -->
+                <div id="sort-controls" class="flex gap-2 hidden animate-fade-in self-end md:self-auto">
+                    <div class="flex bg-white rounded-lg p-1 border border-e2e8f0 shadow-sm">
+                        <button class="sort-btn" id="sort-dir-toggle" onclick="toggleSortDirection()" title="切換名稱順序 (A-Z)">
+                            <i class="fa-solid fa-arrow-down-a-z"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="relative w-full md:w-80 group">
+                    <i class="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm group-hover:text-slate-600 transition-colors"></i>
+                    <input type="text" id="search" placeholder="搜尋專案..." 
+                        class="w-full pl-11 pr-4 py-3 text-sm rounded-2xl border border-slate-200 bg-white outline-none focus:ring-4 ring-slate-500/10 focus:border-slate-500 transition-all font-medium shadow-sm group-hover:shadow-md">
+                </div>
+            </div>
+        </header>
+
+        <!-- 標籤篩選區 -->
+        <div id="filter-container" class="flex flex-wrap gap-2 mb-8 hidden animate-fade-in">
+            <button class="filter-btn active px-4 py-1.5 rounded-full border border-slate-200 bg-white text-slate-600 text-xs font-bold transition-all hover:bg-slate-100" onclick="filterByTag('all')">
+                All
+            </button>
+            <!-- 動態標籤 -->
+        </div>
+
+        <div id="loading-state" class="flex flex-col items-center justify-center py-32 space-y-4">
+            <div class="animate-spin h-8 w-8 border-4 border-slate-600 border-t-transparent rounded-full"></div>
+            <p class="text-sm font-bold text-slate-500 animate-pulse">正在同步 GitHub 資源...</p>
+        </div>
+
+        <div id="project-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 hidden">
+            <!-- 卡片動態生成 -->
+        </div>
+    </div>
+
+    <!-- 詳情視圖 (Overlay) -->
+    <div id="detail-view" class="detail-view p-4 md:p-12">
+        <div class="max-w-6xl mx-auto">
+            <button onclick="closeDetail()" class="mb-8 flex items-center text-slate-500 hover:text-slate-800 font-bold transition-all px-4 py-2 rounded-xl hover:bg-slate-100">
+                <i class="fa-solid fa-arrow-left-long mr-2"></i> 返回清單
+            </button>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-12">
+                <!-- 左側：版本與資訊 -->
+                <div class="lg:col-span-1">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-500 text-[10px] font-bold" id="detail-title-id">ID</span>
+                        <div id="detail-tags-container" class="flex gap-1 flex-wrap"></div>
+                    </div>
+                    
+                    <h1 id="detail-title" class="text-4xl font-extrabold text-slate-900 mb-4 leading-tight">...</h1>
+                    <p id="detail-time" class="text-xs font-medium text-slate-400 mb-10 flex items-center bg-slate-50 inline-block px-3 py-1 rounded-full">
+                        <i class="fa-regular fa-clock mr-2"></i> ...
+                    </p>
+                    
+                    <div class="space-y-8">
+                        <div class="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+                            <p class="text-[11px] font-bold text-slate-400 mb-4 flex items-center">
+                                <i class="fa-solid fa-code-branch mr-2"></i> 可用版本 / 入口
+                            </p>
+                            <div id="detail-versions" class="flex flex-col gap-2">
+                                <!-- 版本連結 -->
+                            </div>
+                        </div>
+                        
+                        <div class="bg-slate-50 rounded-2xl p-6">
+                            <p class="text-[11px] font-bold text-slate-400 mb-4 flex items-center">
+                                <i class="fa-solid fa-folder-tree mr-2"></i> 專案來源
+                            </p>
+                            <div id="detail-stats" class="text-xs space-y-3 font-semibold text-slate-600">
+                                <!-- 統計與連結 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側：README 內容 -->
+                <div class="lg:col-span-2 bg-white rounded-[2rem] p-8 md:p-12 border border-slate-200 shadow-sm">
+                    <div class="flex items-center justify-between mb-8 pb-4 border-b border-slate-100">
+                        <span class="text-xs font-bold text-slate-400">Project Documentation</span>
+                        <div class="flex space-x-1.5">
+                            <span class="w-2 h-2 rounded-full bg-slate-200"></span>
+                            <span class="w-2 h-2 rounded-full bg-slate-200"></span>
+                        </div>
+                    </div>
+                    <div id="readme-box" class="readme-content text-slate-600 text-sm">
+                        <!-- 說明文件內容 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 設定
+        const CONFIG = { USER: 'klhrd', REPO: 'tools', BRANCH: 'main' };
+        const HIDDEN_FOLDERS = ['home', 'assets']; // 需要隱藏的資料夾
+
+        // 手動新增的外部專案 (External Projects) - v2.5: 清除不需要的標籤
+        const MANUAL_PROJECTS = [
+            {
+                id: 'Flashcard',
+                displayName: 'Flashcard App',
+                tags: ['PWA'], // 已移除 'Study'
+                files: [
+                    { path: 'https://klhrd.github.io/flashcard/', label: 'Main App', isExternal: true },
+                    { path: 'https://klhrd.github.io/flashcard/PWA/', label: 'PWA Version', isExternal: true }
+                ],
+                isNailed: false,
+                description: 'External Project'
+            },
+            {
+                id: 'Marquee',
+                displayName: 'Marquee Tool',
+                tags: ['PWA'], // 已移除 'Tool'
+                files: [
+                    { path: 'https://klhrd.github.io/marquee/', label: 'Latest Version', isExternal: true },
+                    { path: 'https://klhrd.github.io/marquee/PWA', label: 'PWA Version', isExternal: true },
+                    { path: 'https://klhrd.github.io/marquee/previous_version', label: 'History Versions', isExternal: true }
+                ],
+                isNailed: false
+            },
+            {
+                id: 'GeoScript',
+                displayName: 'GeoScript',
+                tags: [], // 已移除 'Geo'
+                files: [
+                    { path: 'https://klhrd.github.io/GeoScript/', label: 'Main', isExternal: true }
+                ],
+                isNailed: false
+            },
+            {
+                id: 'ToneGen',
+                displayName: 'Tone Generator',
+                tags: [], // 已移除 'Audio'
+                files: [
+                    { path: 'https://klhrd.github.io/ToneGen/', label: 'Main', isExternal: true }
+                ],
+                isNailed: false
+            }
+        ];
+
+        const TREE_API = `https://api.github.com/repos/${CONFIG.USER}/${CONFIG.REPO}/git/trees/${CONFIG.BRANCH}?recursive=1`;
+        const COMMITS_API = `https://api.github.com/repos/${CONFIG.USER}/${CONFIG.REPO}/commits?sha=${CONFIG.BRANCH}`;
+        const RAW_BASE = `https://raw.githubusercontent.com/${CONFIG.USER}/${CONFIG.REPO}/${CONFIG.BRANCH}`;
+        
+        let projectsData = []; 
+        let activeTag = 'all';
+        let sortState = { order: 'asc' };
+
+        marked.setOptions({ breaks: true, gfm: true });
+
+        // v2.5 羅盤特效邏輯
+        function triggerMagicCompass(e) {
+            const icon = document.getElementById('compass-icon');
+            const mask = document.getElementById('magic-mask');
+            
+            // 1. 隨機動畫
+            const animations = ['anim-spin', 'anim-tada', 'anim-rubber', 'anim-wobble'];
+            const randomAnim = animations[Math.floor(Math.random() * animations.length)];
+            
+            // 重置動畫
+            icon.classList.remove(...animations);
+            void icon.offsetWidth; // Trigger reflow
+            icon.classList.add(randomAnim);
+
+            // 2. 顯示蒙版 (深色蒙版做出煙火效果)
+            mask.style.opacity = '1';
+
+            // 3. 產生粒子
+            createParticles(e.clientX, e.clientY);
+
+            // 4. 定時恢復
+            setTimeout(() => {
+                mask.style.opacity = '0';
+            }, 800);
+            
+            setTimeout(() => {
+                icon.classList.remove(randomAnim);
+            }, 1000);
+        }
+
+        function createParticles(x, y) {
+            const particleCount = 20;
+            const colors = ['#f87171', '#fbbf24', '#34d399', '#60a5fa', '#a78bfa', '#f472b6'];
+            
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.classList.add('particle');
+                
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                const size = Math.random() * 6 + 4; // 4px - 10px
+                
+                particle.style.width = `${size}px`;
+                particle.style.height = `${size}px`;
+                particle.style.background = color;
+                particle.style.left = `${x}px`;
+                particle.style.top = `${y}px`;
+                
+                // 隨機方向與距離
+                const angle = Math.random() * Math.PI * 2;
+                const velocity = Math.random() * 100 + 50; // 50px - 150px distance
+                
+                const tx = Math.cos(angle) * velocity;
+                const ty = Math.sin(angle) * velocity;
+                
+                document.body.appendChild(particle);
+
+                // 使用 Web Animations API
+                const anim = particle.animate([
+                    { transform: 'translate(0, 0) scale(1)', opacity: 1 },
+                    { transform: `translate(${tx}px, ${ty}px) scale(0)`, opacity: 0 }
+                ], {
+                    duration: Math.random() * 500 + 500,
+                    easing: 'cubic-bezier(0, .9, .57, 1)',
+                });
+
+                anim.onfinish = () => particle.remove();
+            }
+        }
+
+        async function init() {
+            try {
+                const [treeRes, commitsRes] = await Promise.all([fetch(TREE_API), fetch(COMMITS_API)]);
+                const treeData = await treeRes.json();
+                const commitsData = await commitsRes.json();
+                const lastUpdated = commitsData.length > 0 ? new Date(commitsData[0].commit.committer.date).toLocaleString('zh-TW') : '未知';
+
+                const htmlFiles = treeData.tree.filter(item => item.path.endsWith('.html') && item.path !== 'index.html');
+                const readmes = treeData.tree.filter(item => item.path.toLowerCase().endsWith('readme.md'));
+
+                // 1. 處理 GitHub 內部的專案
+                let internalGroups = groupData(htmlFiles, readmes, lastUpdated);
+                
+                // 2. 抓取 Metadata (Title, Tags, Nailed)
+                await enrichWithMetadata(internalGroups);
+
+                // 3. 合併手動專案與內部專案
+                let allProjects = [...Object.values(internalGroups), ...MANUAL_PROJECTS.map(p => ({
+                    ...p,
+                    updatedAt: 'External', // 外部專案暫無時間
+                    readmePath: null, 
+                    fullReadme: `### ${p.displayName}\n此為外部連結專案，請參考上方連結。`,
+                    // 確保外部專案的 files 格式正確
+                    files: p.files.map(f => ({...f, isMain: f === p.files[0]}))
+                }))];
+
+                // 4. 排序與顯示
+                projectsData = sortProjects(allProjects);
+
+                document.getElementById('sort-controls').classList.remove('hidden');
+                renderFilters(projectsData);
+                renderGrid(projectsData);
+                handleUrlHash();
+            } catch (err) {
+                console.error(err);
+                document.getElementById('loading-state').innerHTML = '<p class="text-slate-500 font-bold">資料同步失敗，請確認網路或 GitHub API 狀態</p>';
+            }
+        }
+
+        function groupData(files, readmes, defaultTime) {
+            const groups = {};
+            files.forEach(file => {
+                const folder = file.path.split('/')[0];
+                
+                if (HIDDEN_FOLDERS.includes(folder)) return;
+
+                if (!groups[folder]) {
+                    groups[folder] = {
+                        id: folder,
+                        displayName: folder, 
+                        files: [], // 稍後會進行排序
+                        updatedAt: defaultTime,
+                        readmePath: readmes.find(r => r.path.startsWith(folder))?.path || null,
+                        fullReadme: null,
+                        tags: [],
+                        isNailed: false,
+                        isInternal: true
+                    };
+                }
+                // 暫存檔案資訊，不在此決定 isMain
+                const label = file.path.replace(folder + '/', '').replace('.html', '').replace('/index', '') || 'index';
+                groups[folder].files.push({ path: file.path, label: label, originalName: file.path });
+            });
+
+            // 關鍵：對每個群組內的檔案進行「版本號排序」並找出最佳入口
+            for (const key in groups) {
+                groups[key].files = sortFiles(groups[key].files);
+                // 排序後的第一個檔案即為 Main 入口
+                if (groups[key].files.length > 0) {
+                    groups[key].files[0].isMain = true;
+                }
+            }
+
+            return groups;
+        }
+
+        // 智慧型版本排序函式
+        function sortFiles(files) {
+            return files.sort((a, b) => {
+                const nameA = a.path.toLowerCase();
+                const nameB = b.path.toLowerCase();
+
+                // 規則 1: index.html 絕對優先
+                const isIndexA = nameA.endsWith('index.html');
+                const isIndexB = nameB.endsWith('index.html');
+                if (isIndexA && !isIndexB) return -1;
+                if (!isIndexA && isIndexB) return 1;
+
+                // 規則 2: 使用自然排序比較版本號 (遞減，新版本在前)
+                // numeric: true 可以讓 v1.10 排在 v1.2 後面
+                return b.label.localeCompare(a.label, undefined, { numeric: true, sensitivity: 'base' });
+            });
+        }
+
+        async function enrichWithMetadata(groups) {
+            const promises = Object.values(groups).map(async (group) => {
+                if (!group.readmePath) return;
+                try {
+                    const res = await fetch(`${RAW_BASE}/${group.readmePath}`);
+                    const text = await res.text();
+                    group.fullReadme = text;
+                    group.displayName = cleanTitle(text) || group.id;
+                    
+                    const jsonMatch = text.match(/<!--.*?({.*"tags".*?}).*?-->/s);
+                    if (jsonMatch) {
+                        try {
+                            const metadata = JSON.parse(jsonMatch[1]);
+                            if (metadata.tags && Array.isArray(metadata.tags)) {
+                                group.tags = metadata.tags;
+                                group.isNailed = group.tags.some(t => t.toLowerCase() === 'nailed');
+                            }
+                        } catch (e) {}
+                    }
+                } catch (e) {}
+            });
+            await Promise.all(promises);
+        }
+
+        function sortProjects(list) {
+            return list.sort((a, b) => {
+                if (a.isNailed && !b.isNailed) return -1;
+                if (!a.isNailed && b.isNailed) return 1;
+                let comparison = a.id.localeCompare(b.id);
+                return sortState.order === 'asc' ? comparison : -comparison;
+            });
+        }
+
+        function toggleSortDirection() {
+            sortState.order = sortState.order === 'asc' ? 'desc' : 'asc';
+            const icon = document.querySelector('#sort-dir-toggle i');
+            icon.className = sortState.order === 'asc' ? 'fa-solid fa-arrow-down-a-z' : 'fa-solid fa-arrow-up-a-z';
+            projectsData = sortProjects(projectsData);
+            renderGrid(projectsData);
+        }
+
+        function cleanTitle(text) {
+            if (!text) return null;
+            const mdLinkMatch = text.match(/\[(.*?)\]\(.*?\)/);
+            if (mdLinkMatch) return mdLinkMatch[1].trim();
+            const h1Match = text.match(/^#\s+(.*)/m);
+            return h1Match ? h1Match[1].trim() : text.trim();
+        }
+
+        function renderFilters(data) {
+            const allTags = new Set();
+            data.forEach(p => p.tags.forEach(t => {
+                if (t.toLowerCase() !== 'nailed') allTags.add(t); 
+            }));
+
+            const container = document.getElementById('filter-container');
+            if (allTags.size > 0) {
+                container.classList.remove('hidden');
+                allTags.forEach(tag => {
+                    const btn = document.createElement('button');
+                    btn.className = `filter-btn px-4 py-1.5 rounded-full border border-slate-200 bg-white text-slate-600 text-xs font-bold transition-all hover:bg-slate-100`;
+                    btn.textContent = tag;
+                    btn.onclick = () => filterByTag(tag, btn);
+                    container.appendChild(btn);
+                });
+            }
+        }
+
+        function filterByTag(tag, btnElement) {
+            activeTag = tag;
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            if (btnElement) {
+                btnElement.classList.add('active');
+            } else {
+                document.querySelector('.filter-btn').classList.add('active'); 
+            }
+            renderGrid(projectsData);
+        }
+
+        function renderGrid(data) {
+            const grid = document.getElementById('project-grid');
+            grid.innerHTML = '';
+            
+            const filteredData = data.filter(group => {
+                const isTagMatch = activeTag === 'all' || group.tags.includes(activeTag);
+                const searchVal = document.getElementById('search').value.toLowerCase();
+                const searchStr = (group.id + group.displayName + group.tags.join(' ')).toLowerCase();
+                const isSearchMatch = searchStr.includes(searchVal);
+                return isTagMatch && isSearchMatch;
+            });
+
+            filteredData.forEach(group => {
+                const entry = group.files[0]; // 已排序，取第一個作為主要入口
+                const card = document.createElement('div');
+                
+                card.className = 'glass-card rounded-3xl p-6 flex flex-col h-full group';
+                card.onclick = () => openDetail(group.id);
+                card.dataset.search = (group.id + group.displayName + group.tags.join(' ')).toLowerCase();
+
+                const tagsHtml = group.tags
+                    .filter(t => t.toLowerCase() !== 'nailed')
+                    .map(t => `<span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">#${t}</span>`)
+                    .join('');
+
+                const nailedHtml = group.isNailed 
+                    ? `<i class="fa-solid fa-thumbtack text-slate-400 absolute top-6 right-6 text-sm transform rotate-45 z-10"></i>` 
+                    : '';
+
+                // 判斷路徑：如果是外部專案直接用，內部專案加 ../
+                const launchPath = entry.isExternal ? entry.path : `../${entry.path}`;
+
+                card.innerHTML = `
+                    ${nailedHtml}
+                    <div class="flex flex-col h-full">
+                        <div class="mb-4">
+                            <span class="text-[10px] font-black bg-slate-700 text-white px-2 py-1 rounded-lg">${group.id}</span>
+                        </div>
+                        
+                        <h3 class="text-xl font-extrabold text-slate-800 mb-2 leading-tight group-hover:text-slate-600 transition-colors">
+                            ${group.displayName}
+                        </h3>
+                        
+                        <div class="flex flex-wrap gap-2 mb-6">
+                            ${tagsHtml}
+                        </div>
+                        
+                        <div class="mt-auto pt-5 border-t border-slate-100 flex items-center justify-between">
+                            <a href="${launchPath}" 
+                               onclick="event.stopPropagation()"
+                               class="text-xs font-bold text-white bg-slate-700 px-4 py-2 rounded-xl hover:bg-slate-800 transition-colors shadow-sm hover:shadow-slate-300">
+                                <i class="fa-solid fa-play mr-1"></i> 啟動
+                            </a>
+                            <span class="text-[10px] text-slate-400 font-bold">${group.files.length} 個版本</span>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+            
+            document.getElementById('loading-state').classList.add('hidden');
+            grid.classList.remove('hidden');
+        }
+
+        function openDetail(id, updateHash = true) {
+            const group = projectsData.find(p => p.id === id);
+            if (!group) return;
+
+            const view = document.getElementById('detail-view');
+            document.getElementById('detail-title-id').textContent = group.id;
+            document.getElementById('detail-title').textContent = group.displayName;
+            document.getElementById('detail-time').innerHTML = `<i class="fa-regular fa-clock mr-1.5"></i> 更新：${group.updatedAt}`;
+            
+            const tagsContainer = document.getElementById('detail-tags-container');
+            tagsContainer.innerHTML = group.tags.map(t => 
+                `<span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold border border-slate-200">${t}</span>`
+            ).join('');
+
+            const vBox = document.getElementById('detail-versions');
+            vBox.innerHTML = group.files.map(f => {
+                const link = f.isExternal ? f.path : `../${f.path}`;
+                return `
+                <a href="${link}" class="flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition-all group bg-white">
+                    <span class="text-sm font-bold text-slate-700 group-hover:text-slate-900">${f.label}</span>
+                    <i class="fa-solid fa-arrow-up-right-from-square text-[11px] text-slate-300 group-hover:text-slate-500"></i>
+                </a>
+            `}).join('');
+
+            // 統計區塊：如果是內部專案，顯示 Source Code 連結；外部則顯示 External
+            let sourceLinkHtml = '';
+            if (group.isInternal) {
+                const repoLink = `https://github.com/${CONFIG.USER}/${CONFIG.REPO}/tree/${CONFIG.BRANCH}/${group.id}`;
+                sourceLinkHtml = `<a href="${repoLink}" target="_blank" class="text-blue-600 truncate max-w-[200px] underline hover:text-blue-800">${group.id} (GitHub)</a>`;
+            } else {
+                sourceLinkHtml = `<span class="text-slate-500 italic">External Project</span>`;
+            }
+
+            document.getElementById('detail-stats').innerHTML = `
+                <div class="flex justify-between">
+                    <span class="text-slate-400">版本數量</span>
+                    <span class="text-slate-900">${group.files.length}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-400">原始碼 / 路徑</span>
+                    ${sourceLinkHtml}
+                </div>
+            `;
+
+            const readmeBox = document.getElementById('readme-box');
+            if (group.fullReadme) {
+                readmeBox.innerHTML = marked.parse(group.fullReadme);
+            } else {
+                readmeBox.innerHTML = '<p class="text-slate-400 italic py-10 text-center">此專案暫無說明文件。</p>';
+            }
+
+            if (updateHash) location.hash = id;
+            view.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeDetail(updateHash = true) {
+            document.getElementById('detail-view').style.display = 'none';
+            document.body.style.overflow = 'auto';
+            if (updateHash) location.hash = '';
+        }
+
+        window.addEventListener('hashchange', handleUrlHash);
+        function handleUrlHash() {
+            const hashId = window.location.hash.replace('#', '');
+            if (hashId) {
+                openDetail(hashId, false);
+            } else {
+                closeDetail(false);
+            }
+        }
+
+        document.getElementById('search').addEventListener('input', (e) => {
+            renderGrid(projectsData);
+        });
+
+        init();
+    </script>
+</body>
+</html>
