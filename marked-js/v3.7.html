@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Markdown Pro v3.7</title>
+    <title>Markdown Pro v4.2</title>
     
     <!-- 1. 核心解析庫：Marked.js -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -346,7 +346,7 @@
 <header>
     <div class="logo">
         <span class="material-symbols-outlined" style="font-size: 24px;">markdown</span>
-        <span>v3.7</span>
+        <span>v4.2</span>
     </div>
 
     <div class="controls">
@@ -608,15 +608,21 @@
         
         const longUrl = getFullUrl();
 
-        // 檢查是否為有效協議 (避免 blob: 或 file: 導致 API 報錯)
+        // 0. 基礎檢查
         if (!longUrl.startsWith('http')) {
-            showToast("⚠️ 無法縮短非公開網址 (Blob/File)");
+            showToast("⚠️ 無法縮短非公開網址");
             return;
+        }
+
+        // 1. 長度預警 (許多縮網址 API GET 請求上限約 2000 chars)
+        if (longUrl.length > 2500) {
+             const proceed = confirm(`注意：您的網址長度 (${longUrl.length} 字元) 可能過長，縮網址服務可能會失敗。是否仍要嘗試？`);
+             if (!proceed) return;
         }
 
         showToast("⏳ 縮網址產生中...");
         
-        // 關鍵：對整個包含 hash 的長網址進行編碼
+        // 2. 關鍵：對整個包含 hash 的長網址進行編碼
         const encodedUrl = encodeURIComponent(longUrl);
         
         let apiUrl = '';
@@ -626,31 +632,35 @@
             apiUrl = `https://tinyurl.com/api-create.php?url=${encodedUrl}`;
         }
 
-        const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(apiUrl);
+        // 3. 使用更穩定的代理：allorigins.win (Raw Mode)
+        // 舊的 corsproxy.io 有時會擋 Github Pages
+        const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(apiUrl);
 
         try {
+            console.log(`正在請求縮網址: ${service}`);
+            console.log(`原始網址長度: ${longUrl.length}`);
+
             const response = await fetch(proxyUrl);
-            
-            // TinyURL 有時回傳 200 但內容是 Error，所以不能只靠 response.ok
-            // Is.gd 回傳 400 時 response.ok 為 false
             
             let shortUrl = '';
             
             if (service === 'isgd') {
                 if (!response.ok) {
-                     // 嘗試讀取錯誤訊息
+                    // Is.gd 回傳 400 等錯誤時，嘗試讀取 JSON 錯誤訊息
                     const errData = await response.json().catch(() => ({}));
-                    throw new Error(errData.errormessage || 'Is.gd error');
+                    throw new Error(errData.errormessage || `HTTP Error ${response.status}`);
                 }
                 const data = await response.json();
                 if (data.shorturl) shortUrl = data.shorturl;
-                else throw new Error(data.errormessage || 'Unknown error');
+                else throw new Error(data.errormessage || 'Unknown error from Is.gd');
+
             } else if (service === 'tinyurl') {
                 const text = await response.text();
+                // TinyURL 成功時回傳 http...，失敗時回傳 "Error" 字串
                 if (text.startsWith('http')) {
                     shortUrl = text;
                 } else {
-                    throw new Error(text || 'TinyURL error');
+                    throw new Error(text || 'TinyURL returned invalid data');
                 }
             }
 
@@ -661,7 +671,8 @@
 
         } catch (error) {
             console.error('Shorten URL failed:', error);
-            showToast(`❌ 失敗: ${error.message || '未知錯誤'}`);
+            // 顯示更具體錯誤給使用者
+            showToast(`❌ 失敗: ${error.message || '網路連線錯誤'}`);
         }
     }
 
@@ -704,7 +715,7 @@
         toast.classList.add('show');
         setTimeout(() => {
             toast.classList.remove('show');
-        }, 3000); // 延長顯示時間讓使用者看清楚
+        }, 4000); // 延長顯示時間讓使用者看清楚錯誤訊息
     }
 
     // 6. 視圖切換與初始化
