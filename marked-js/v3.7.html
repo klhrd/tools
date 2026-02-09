@@ -605,10 +605,18 @@
 
     async function shortenUrl(service) {
         shareMenu.classList.remove('show');
-        showToast("⏳ 縮網址產生中...");
         
         const longUrl = getFullUrl();
-        // 關鍵：對整個包含 hash 的長網址進行編碼，確保 API 伺服器能完整接收
+
+        // 檢查是否為有效協議 (避免 blob: 或 file: 導致 API 報錯)
+        if (!longUrl.startsWith('http')) {
+            showToast("⚠️ 無法縮短非公開網址 (Blob/File)");
+            return;
+        }
+
+        showToast("⏳ 縮網址產生中...");
+        
+        // 關鍵：對整個包含 hash 的長網址進行編碼
         const encodedUrl = encodeURIComponent(longUrl);
         
         let apiUrl = '';
@@ -618,33 +626,42 @@
             apiUrl = `https://tinyurl.com/api-create.php?url=${encodedUrl}`;
         }
 
-        // 使用 CORS Proxy 繞過跨域限制
         const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(apiUrl);
 
         try {
             const response = await fetch(proxyUrl);
-            if (!response.ok) throw new Error('Network error');
-
+            
+            // TinyURL 有時回傳 200 但內容是 Error，所以不能只靠 response.ok
+            // Is.gd 回傳 400 時 response.ok 為 false
+            
             let shortUrl = '';
             
             if (service === 'isgd') {
+                if (!response.ok) {
+                     // 嘗試讀取錯誤訊息
+                    const errData = await response.json().catch(() => ({}));
+                    throw new Error(errData.errormessage || 'Is.gd error');
+                }
                 const data = await response.json();
                 if (data.shorturl) shortUrl = data.shorturl;
-                else throw new Error(data.error || 'Unknown error');
+                else throw new Error(data.errormessage || 'Unknown error');
             } else if (service === 'tinyurl') {
-                shortUrl = await response.text();
+                const text = await response.text();
+                if (text.startsWith('http')) {
+                    shortUrl = text;
+                } else {
+                    throw new Error(text || 'TinyURL error');
+                }
             }
 
             if (shortUrl) {
                 copyToClipboard(shortUrl);
                 showToast("✅ 短網址已複製！");
-            } else {
-                throw new Error('Empty response');
             }
 
         } catch (error) {
             console.error('Shorten URL failed:', error);
-            showToast("❌ 縮網址失敗 (可能太長)");
+            showToast(`❌ 失敗: ${error.message || '未知錯誤'}`);
         }
     }
 
