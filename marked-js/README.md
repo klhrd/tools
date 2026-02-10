@@ -1,40 +1,35 @@
-# **Markdown Pro Editor 專案說明書**
+# Markdown Pro Editor v4.3
 
-這是一個基於瀏覽器環境開發的高性能、安全且具備現代 UI 的 **Markdown 即時編輯器**。本專案旨在展示如何整合多個開放原始碼庫，構建一個流暢的使用者創作環境。
+**Markdown Pro** 是一款輕量、高效且極具隱私保護的 Markdown 線上編輯器。它最大的特色是 **「網址即檔案」**：所有的編輯內容都會經過壓縮並存儲在瀏覽器的 URL Hash 中，無需資料庫，只要分享網址，對方就能看到完全相同的內容。
 
-## **🚀 核心功能**
+## ✨ 核心特色
 
-1. **即時預覽 (Real-time Preview)**：採用高性能解析引擎，輸入後即時呈現 HTML 結果。  
-2. **語法高亮 (Syntax Highlighting)**：整合 Highlight.js，自動辨識並著色多種程式語言。  
-3. **安全防護 (XSS Protection)**：內建 DOMPurify 過濾器，確保輸出的 HTML 不包含惡意腳本。  
-4. **防抖渲染 (Debounce)**：智慧延遲渲染機制，在處理大型文件時依然保持流暢不卡頓。  
-5. **同步捲動 (Sync Scroll)**：編輯區與預覽區比例同步，方便快速校對。  
-6. **自動儲存 (Persistence)**：使用 localStorage 技術，即使重新整理頁面，您的內容也不會遺失。
+- **無伺服器存儲**：採用 `LZ-String` 壓縮演算法，將內容編碼於 URL 中。
+- **即時預覽**：基於 `Marked.js` 提供毫秒級的渲染速度。
+- **數學公式支援**：完全整合 `KaTeX`，支援高品質的 $LaTeX$ 數學表達式。
+- **代碼高亮**：內建 `Highlight.js`，自動識別並美化程式碼區塊。
+- **縮網址整合**：整合 `is.gd` 與 `TinyURL` API（透過 AllOrigins 代理），解決長網址分享問題。
+- **跨平台適應**：支援行動端切換模式（編輯/預覽）以及系統層級的深色模式自動切換。
+- **檔案操作**：支援 `.md` 或 `.txt` 檔案的匯入與匯出。
 
-## **🛠 技術棧**
+## 🚀 快速開始
 
-* **核心解析**：[Marked.js](https://marked.js.org/)  
-* **安全性**：[DOMPurify](https://github.com/cure53/dompurify)  
-* **程式碼美化**：[Highlight.js](https://highlightjs.org/)  
-* **樣式體系**：[GitHub Markdown CSS](https://github.com/sindresorhus/github-markdown-css)  
-* **前端架構**：原生 JavaScript (Vanilla JS) + CSS3 Flexbox 佈局
+1.  **直接編輯**：在左側（或移動端的編輯模式）輸入 Markdown 內容。
+2.  **即時分享**：點擊右上角的 **分享 (Share)** 圖示，複製長連結或產生縮網址。
+3.  **離線使用**：這是一個純 HTML 檔案，您可以將其下載到本地，隨時隨地開啟瀏覽器即可編輯。
 
-## **📖 如何使用**
+## 🛠 使用技術
 
-1. **開始編寫**：在左側的 MARKDOWN EDITOR 區塊直接輸入 Markdown 語法。  
-2. **查看結果**：右側會根據您的輸入自動更新對應的 HTML 樣式。  
-3. **插入程式碼**：  
-   使用標準的 Markdown 程式碼塊語法：  
-   ```javascript  
-   console.log("Hello World");  
-   ```  
-4. **狀態檢查**：上方標題欄會顯示「已存檔」時間，標籤區會即時統計字數與渲染耗時。
+- **解析器**: [Marked.js](https://marked.js.org/)
+- **安全性**: [DOMPurify](https://github.com/cure53/dompurify) (防止 XSS 攻擊)
+- **壓縮**: [LZ-String](https://pieroxy.net/blog/pages/lz-string/index.html)
+- **樣式**: [GitHub Markdown CSS](https://github.com/sindresorhus/github-markdown-css)
+- **字體**: Google Material Symbols
 
-## **⚠️ 注意事項**
+## 📋 版本更新 (v4.3)
 
-* 本編輯器目前專為桌面端優化，但在行動裝置上也會切換為上下堆疊模式。  
-* 為了保護隱私，所有資料僅存儲於您的瀏覽器本地（localStorage），不會上傳至任何伺服器。
+- **穩定性優化**：優化了在 GitHub Pages 等環境下縮網址功能的穩定性。
+- **跨網域支援**：採用 AllOrigins 代理機制，解決了縮網址服務常見的 CORS 跨網域限制。
+- **容量監控**：新增網址字元數計算器與狀態燈（綠/黃/紅），提醒使用者當前 URL 的長度健康狀態。
 
-*本專案為教學與實作參考用途，適合用於部落格後台或筆記應用的基礎開發。*
-
-<!-- {"tags":["code","tools"]} -->
+<!-- {"tags":["code","nailed",".md"]} -->
