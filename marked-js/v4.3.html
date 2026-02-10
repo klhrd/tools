@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Markdown Pro v4.3</title>
+    
+    <!-- 1. 核心解析庫：Marked.js -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <!-- 2. 安全過濾庫：DOMPurify -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+
+    <!-- 3. 程式碼高亮：Highlight.js -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" id="hljs-light">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" id="hljs-dark" disabled>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+
+    <!-- 4. 壓縮核心：LZ-String -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+
+    <!-- 5. LaTeX 數學支援：KaTeX -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked-katex-extension/lib/index.umd.js"></script>
+
+    <!-- 6. 預覽樣式：GitHub Markdown CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown.min.css">
+
+    <!-- 7. Google Material Symbols -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+
+    <style>
+        :root {
+            /* 淺色模式 */
+            --bg-body: #f3f4f6;
+            --bg-paper: #ffffff;
+            --text-primary: #1f2937;
+            --text-secondary: #6b7280;
+            --border-color: #e5e7eb;
+            --hover-bg: rgba(0, 0, 0, 0.05);
+            
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --dropdown-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        /* 自動深色模式偵測 */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-body: #121212;       
+                --bg-paper: #1e1e1e;      
+                --text-primary: #e5e5e5;  
+                --text-secondary: #a3a3a3;
+                --border-color: #333333;
+                --hover-bg: rgba(255, 255, 255, 0.08);
+                --dropdown-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            }
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            background-color: var(--bg-body);
+            color: var(--text-primary);
+            display: flex;
+            flex-direction: column;
+            height: 100dvh; 
+            overflow: hidden;
+            transition: background-color 0.3s, color 0.3s;
+            overscroll-behavior: none;
+        }
+
+        /* 頂部導航 */
+        header {
+            height: 50px;
+            background: var(--bg-paper);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            justify-content: space-between;
+            z-index: 100;
+            flex-shrink: 0;
+            padding-left: max(16px, env(safe-area-inset-left));
+            padding-right: max(16px, env(safe-area-inset-right));
+        }
+
+        .logo {
+            font-weight: 600;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-primary);
+            user-select: none;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button.icon-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            padding: 0;
+        }
+
+        button.icon-btn:hover {
+            background-color: var(--hover-bg);
+            color: var(--text-primary);
+        }
+
+        button.icon-btn:active {
+            transform: scale(0.95);
+        }
+
+        .material-symbols-outlined {
+            font-size: 22px;
+        }
+
+        /* -----------------------------------
+           下拉選單 (Dropdown) 共用樣式
+           ----------------------------------- */
+        .dropdown {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 8px;
+            background-color: var(--bg-paper);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: var(--dropdown-shadow);
+            min-width: 180px;
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+            padding: 6px;
+            transform-origin: top right;
+            animation: dropdownFade 0.2s ease-out;
+        }
+
+        @keyframes dropdownFade {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .dropdown-menu.show {
+            display: flex;
+        }
+
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            border: none;
+            background: transparent;
+            color: var(--text-primary);
+            cursor: pointer;
+            text-align: left;
+            font-size: 14px;
+            border-radius: 6px;
+            width: 100%;
+            font-family: system-ui, -apple-system, sans-serif;
+            white-space: nowrap;
+        }
+
+        .dropdown-item:hover {
+            background-color: var(--hover-bg);
+        }
+
+        .dropdown-item .material-symbols-outlined {
+            font-size: 20px;
+            color: var(--text-secondary);
+        }
+        
+        .dropdown-item:hover .material-symbols-outlined {
+            color: var(--text-primary);
+        }
+
+        /* 容量計量條 */
+        .url-stats {
+            font-family: monospace;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 8px;
+            background: transparent; 
+            color: var(--text-secondary);
+            margin-right: 4px;
+            border-radius: 4px;
+        }
+        
+        .url-stats:hover {
+            background: var(--hover-bg);
+        }
+
+        .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: var(--success-color);
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+            background: var(--bg-paper);
+        }
+
+        #editorPanel {
+            border-right: 1px solid var(--border-color);
+        }
+
+        #editor {
+            flex: 1;
+            padding: 24px;
+            font-family: monospace; 
+            font-size: 15px;
+            line-height: 1.6;
+            border: none;
+            outline: none;
+            resize: none;
+            background: var(--bg-paper);
+            color: var(--text-primary);
+            width: 100%;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 80px; 
+            padding-bottom: calc(80px + env(safe-area-inset-bottom));
+        }
+
+        #preview-container {
+            flex: 1;
+            overflow-y: auto;
+            background: var(--bg-paper);
+            padding: 24px 40px;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 80px;
+            padding-bottom: calc(80px + env(safe-area-inset-bottom));
+        }
+
+        .markdown-body {
+            background: transparent !important;
+            color: var(--text-primary) !important;
+            font-family: system-ui, -apple-system, sans-serif !important;
+            line-height: 1.8;
+        }
+
+        .katex {
+            font-size: 1.1em;
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            .markdown-body {
+                color-scheme: dark;
+            }
+            .markdown-body a { color: #58a6ff; }
+            .markdown-body blockquote { border-left-color: #333; color: #a3a3a3; }
+            .markdown-body code { background: rgba(255,255,255,0.1); }
+            .markdown-body pre { background: #161616; }
+            .markdown-body table tr { background-color: #1e1e1e; border-top-color: #333; }
+            .markdown-body table tr:nth-child(2n) { background-color: #252525; }
+        }
+
+        .mobile-switch-btn {
+            display: none;
+        }
+
+        #toast {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: var(--text-primary);
+            color: var(--bg-paper);
+            padding: 10px 20px;
+            border-radius: 50px;
+            font-size: 13px;
+            font-weight: 500;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            font-family: system-ui, sans-serif;
+            white-space: nowrap;
+        }
+        
+        #toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        @media (max-width: 768px) {
+            header { padding: 0 12px; height: 48px; }
+            .container { display: block; }
+            .panel { display: none; width: 100%; height: 100%; }
+            #editorPanel { border-right: none; }
+            .panel.active { display: flex; }
+            #preview-container { padding: 20px; }
+            .mobile-switch-btn { display: flex; }
+            .url-stats span { display: none; }
+            .url-stats { margin-right: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- 隱藏的檔案上傳 Input -->
+<input type="file" id="fileInput" style="display: none" accept=".md,.txt,.markdown">
+
+<header>
+    <div class="logo">
+        <span class="material-symbols-outlined" style="font-size: 24px;">markdown</span>
+        <span>v4.3</span>
+    </div>
+
+    <div class="controls">
+        <div class="url-stats" id="urlStats" title="URL 字元數 (Chars)">
+            <div class="dot" id="sizeDot"></div>
+            <span id="sizeText">0 chars</span>
+        </div>
+
+        <button class="icon-btn mobile-switch-btn" id="toggleViewBtn" onclick="toggleMobileView()" title="切換檢視">
+            <span class="material-symbols-outlined" id="toggleIcon">visibility</span>
+        </button>
+
+        <!-- 檔案選單 -->
+        <div class="dropdown" id="fileDropdown">
+            <button class="icon-btn" onclick="toggleFileMenu(event)" title="檔案操作">
+                <span class="material-symbols-outlined">save</span>
+            </button>
+            <div class="dropdown-menu" id="fileMenu">
+                <button class="dropdown-item" onclick="triggerUpload()">
+                    <span class="material-symbols-outlined">upload_file</span>
+                    <span>Import</span>
+                </button>
+                <button class="dropdown-item" onclick="downloadFile()">
+                    <span class="material-symbols-outlined">save_alt</span>
+                    <span>Export</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 分享選單 -->
+        <div class="dropdown" id="shareDropdown">
+            <button class="icon-btn" onclick="toggleShareMenu(event)" title="分享連結">
+                <span class="material-symbols-outlined">share</span>
+            </button>
+            <div class="dropdown-menu" id="shareMenu">
+                <button class="dropdown-item" onclick="copyOriginalUrl()">
+                    <span class="material-symbols-outlined">link</span>
+                    <span>原始長連結</span>
+                </button>
+                <button class="dropdown-item" onclick="shortenUrl('isgd')">
+                    <span class="material-symbols-outlined">bolt</span>
+                    <span>Is.gd 縮網址</span>
+                </button>
+                <button class="dropdown-item" onclick="shortenUrl('tinyurl')">
+                    <span class="material-symbols-outlined">compress</span>
+                    <span>TinyURL 縮網址</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</header>
+
+<div class="container" id="mainContainer">
+    <section class="panel active" id="editorPanel">
+        <textarea id="editor" placeholder="# 開始輸入...&#10;&#10;更新 v4.3：&#10;優化了在 GitHub Pages 上縮網址的穩定性，&#10;解決了跨網域與安全連線問題。" spellcheck="false"></textarea>
+    </section>
+
+    <section class="panel" id="previewPanel">
+        <div id="preview-container">
+            <div id="preview" class="markdown-body"></div>
+        </div>
+    </section>
+</div>
+
+<div id="toast">
+    <span style="display: flex; align-items: center; gap: 8px;">
+        <span class="material-symbols-outlined" style="font-size: 16px;">check</span>
+        <span id="toastMsg">網址已複製</span>
+    </span>
+</div>
+
+<script>
+    const editor = document.getElementById('editor');
+    const preview = document.getElementById('preview');
+    const editorPanel = document.getElementById('editorPanel');
+    const previewPanel = document.getElementById('previewPanel');
+    const toggleIcon = document.getElementById('toggleIcon');
+    const sizeText = document.getElementById('sizeText');
+    const sizeDot = document.getElementById('sizeDot');
+    const hljsLight = document.getElementById('hljs-light');
+    const hljsDark = document.getElementById('hljs-dark');
+    
+    // 檔案操作相關元素
+    const fileInput = document.getElementById('fileInput');
+    const fileMenu = document.getElementById('fileMenu');
+    const shareMenu = document.getElementById('shareMenu');
+    const toastMsg = document.getElementById('toastMsg');
+    
+    let isMobilePreviewMode = false;
+    let currentCompressedHash = "";
+
+    // 1. 初始化
+    marked.use(window.markedKatex({ throwOnError: false }));
+    marked.setOptions({
+        highlight: function(code, lang) {
+            const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+            return hljs.highlight(code, { language }).value;
+        },
+        breaks: true,
+        gfm: true
+    });
+
+    // 2. 深色模式
+    function handleThemeChange(e) {
+        if (e.matches) {
+            hljsLight.disabled = true;
+            hljsDark.disabled = false;
+        } else {
+            hljsLight.disabled = false;
+            hljsDark.disabled = true;
+        }
+    }
+    const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    handleThemeChange(darkModeMediaQuery);
+    darkModeMediaQuery.addEventListener('change', handleThemeChange);
+
+    // 3. 核心邏輯
+    function updateUrlHash() {
+        const raw = editor.value;
+        if (!raw) {
+            currentCompressedHash = "";
+            try { history.replaceState(null, null, ' '); } catch (e) {}
+            updateStats(window.location.href.length);
+            return;
+        }
+
+        const compressed = LZString.compressToEncodedURIComponent(raw);
+        currentCompressedHash = compressed;
+        
+        try { history.replaceState(null, null, '#' + compressed); } catch (e) {}
+        
+        const estimatedUrl = window.location.href.split('#')[0] + '#' + compressed;
+        updateStats(estimatedUrl.length);
+    }
+
+    function loadFromHash() {
+        const hash = window.location.hash.substring(1); 
+        if (hash) {
+            try {
+                const decompressed = LZString.decompressFromEncodedURIComponent(hash);
+                if (decompressed) {
+                    editor.value = decompressed;
+                    currentCompressedHash = hash;
+                    return true;
+                }
+            } catch (e) {
+                console.error("解壓縮失敗", e);
+            }
+        }
+        return false;
+    }
+
+    function render() {
+        const raw = editor.value;
+        const cleanHtml = DOMPurify.sanitize(marked.parse(raw));
+        preview.innerHTML = cleanHtml;
+    }
+
+    function updateStats(byteLength) {
+        sizeText.innerText = byteLength + ' chars';
+        if (byteLength < 2000) {
+            sizeDot.style.backgroundColor = 'var(--success-color)';
+        } else if (byteLength < 8000) {
+            sizeDot.style.backgroundColor = 'var(--warning-color)';
+        } else {
+            sizeDot.style.backgroundColor = 'var(--danger-color)';
+        }
+    }
+
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    // 4. 下拉選單邏輯 (檔案與分享)
+    function toggleFileMenu(event) {
+        event.stopPropagation();
+        shareMenu.classList.remove('show');
+        fileMenu.classList.toggle('show');
+    }
+
+    function toggleShareMenu(event) {
+        event.stopPropagation();
+        fileMenu.classList.remove('show');
+        shareMenu.classList.toggle('show');
+    }
+
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.dropdown')) {
+            fileMenu.classList.remove('show');
+            shareMenu.classList.remove('show');
+        }
+    });
+
+    // 檔案功能
+    function triggerUpload() {
+        fileInput.click();
+        fileMenu.classList.remove('show');
+    }
+
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            editor.value = e.target.result;
+            render(); 
+            updateUrlHash();
+            showToast("檔案已載入");
+            fileInput.value = ''; 
+        };
+        reader.readAsText(file);
+    });
+
+    function downloadFile() {
+        const content = editor.value;
+        const blob = new Blob([content], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'document.md';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        fileMenu.classList.remove('show');
+        showToast("已下載檔案");
+    }
+
+    // 5. 分享與縮網址功能
+    function getFullUrl() {
+        updateUrlHash();
+        let url = window.location.href;
+        if (currentCompressedHash) {
+            const baseUrl = url.split('#')[0];
+            url = baseUrl + '#' + currentCompressedHash;
+        }
+        return url;
+    }
+
+    function copyOriginalUrl() {
+        const url = getFullUrl();
+        copyToClipboard(url);
+        shareMenu.classList.remove('show');
+    }
+
+    // 使用 AllOrigins 的 /get 模式來繞過 CORS 並取得 JSON 包裝的回應
+    const PROXY_BASE = "https://api.allorigins.win/get?url=";
+
+    async function shortenUrl(service) {
+        shareMenu.classList.remove('show');
+        
+        const longUrl = getFullUrl();
+
+        if (!longUrl.startsWith('http')) {
+            showToast("⚠️ 無法縮短非公開網址");
+            return;
+        }
+
+        // 許多縮網址 API GET 請求上限約 2000 chars，太長容易失敗
+        if (longUrl.length > 2000) {
+             const proceed = confirm(`注意：您的網址長度 (${longUrl.length} 字元) 可能過長，縮網址服務可能會失敗。是否仍要嘗試？`);
+             if (!proceed) return;
+        }
+
+        showToast("⏳ 縮網址產生中...");
+        
+        const encodedUrl = encodeURIComponent(longUrl);
+        let apiUrl = '';
+        
+        if (service === 'isgd') {
+            apiUrl = `https://is.gd/create.php?format=json&url=${encodedUrl}`;
+        } else if (service === 'tinyurl') {
+            apiUrl = `https://tinyurl.com/api-create.php?url=${encodedUrl}`;
+        }
+
+        // 使用 /get 模式，將目標 API 的回應包裝在 contents 欄位中
+        const proxyUrl = `${PROXY_BASE}${encodeURIComponent(apiUrl)}`;
+
+        try {
+            const response = await fetch(proxyUrl);
+            
+            if (!response.ok) {
+                throw new Error(`Proxy Network Error: ${response.status}`);
+            }
+
+            // AllOrigins 回傳的是 JSON: { contents: "目標API的原始回應", status: ... }
+            const proxyData = await response.json();
+            const contents = proxyData.contents;
+
+            if (!contents) {
+                throw new Error('Proxy returned empty content');
+            }
+
+            let shortUrl = '';
+
+            if (service === 'isgd') {
+                // Is.gd 回傳的是 JSON 字串，需要再 parse 一次
+                try {
+                    const data = JSON.parse(contents);
+                    if (data.shorturl) {
+                        shortUrl = data.shorturl;
+                    } else {
+                        throw new Error(data.errormessage || 'Unknown error from Is.gd');
+                    }
+                } catch (e) {
+                    throw new Error('Invalid JSON response from Is.gd: ' + contents);
+                }
+
+            } else if (service === 'tinyurl') {
+                // TinyURL 回傳的是純文字
+                if (contents.startsWith('http')) {
+                    shortUrl = contents;
+                } else {
+                    throw new Error(contents || 'TinyURL error');
+                }
+            }
+
+            if (shortUrl) {
+                copyToClipboard(shortUrl);
+                showToast("✅ 短網址已複製！");
+            }
+
+        } catch (error) {
+            console.error('Shorten URL failed:', error);
+            showToast(`❌ 失敗: ${error.message}`);
+        }
+    }
+
+    function copyToClipboard(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+                if (!text.includes('is.gd') && !text.includes('tinyurl.com')) {
+                    showToast("網址已複製");
+                }
+            }).catch(err => fallbackCopy(text));
+        } else {
+            fallbackCopy(text);
+        }
+    }
+
+    function fallbackCopy(text) {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-9999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            if (!text.includes('is.gd') && !text.includes('tinyurl.com')) {
+                showToast("網址已複製");
+            }
+        } catch (err) {
+            alert("請手動複製網址列");
+        }
+        document.body.removeChild(textArea);
+    }
+
+    function showToast(msg) {
+        toastMsg.innerText = msg;
+        const toast = document.getElementById('toast');
+        toast.classList.add('show');
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, 4000);
+    }
+
+    function toggleMobileView() {
+        isMobilePreviewMode = !isMobilePreviewMode;
+        applyMobileView();
+    }
+
+    function applyMobileView() {
+        if (window.innerWidth > 768) {
+            editorPanel.style.display = 'flex';
+            previewPanel.style.display = 'flex';
+            editorPanel.classList.add('active');
+            previewPanel.classList.add('active');
+            return;
+        }
+        if (isMobilePreviewMode) {
+            editorPanel.style.display = 'none';
+            editorPanel.classList.remove('active');
+            previewPanel.style.display = 'flex'; 
+            previewPanel.classList.add('active');
+            toggleIcon.innerText = 'edit'; 
+        } else {
+            previewPanel.style.display = 'none';
+            previewPanel.classList.remove('active');
+            editorPanel.style.display = 'flex'; 
+            editorPanel.classList.add('active');
+            toggleIcon.innerText = 'visibility'; 
+        }
+    }
+
+    const debouncedUpdate = debounce(() => {
+        render();
+        updateUrlHash();
+    }, 300);
+
+    editor.addEventListener('input', debouncedUpdate);
+    window.addEventListener('resize', applyMobileView);
+
+    const hasContent = loadFromHash();
+    render();
+
+    if (hasContent) {
+        updateStats(window.location.href.length);
+    } else {
+        updateStats(window.location.href.length);
+    }
+
+    if (window.innerWidth <= 768) {
+        isMobilePreviewMode = hasContent; 
+        applyMobileView();
+    } else {
+        applyMobileView();
+    }
+
+    window.addEventListener('popstate', () => {
+        loadFromHash();
+        render();
+        updateStats(window.location.href.length);
+    });
+
+</script>
+
+</body>
+</html>
