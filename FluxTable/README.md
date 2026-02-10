@@ -1,4 +1,4 @@
-# FluxTable v0.8.0
+# FluxTable
 
 **FluxTable** 是一款專為開發者與數據工作者設計的「工業級」Markdown 表格編輯器。它結合了試算表的直觀操作與 Markdown 的純文字優勢，支援矩陣旋轉、轉置等進階功能，讓表格編輯不再痛苦。
 
