@@ -20,7 +20,7 @@
         <!-- Header -->
         <header class="text-center mb-10">
             <h1 class="text-3xl font-bold text-gray-800 mb-2">縮網址 API 整合測試器</h1>
-            <p class="text-gray-600 font-medium">解決 URL 錨點 (#) 與特殊字元傳輸問題</p>
+            <p class="text-gray-600 font-medium text-sm md:text-base">解決 GitHub Pages 安全連線與 URL 錨點 (#) 問題</p>
         </header>
 
         <!-- Input Section -->
@@ -60,19 +60,18 @@
 
         <!-- Knowledge Section -->
         <div class="bg-blue-50 rounded-xl p-6 border border-blue-100 mb-8">
-            <h2 class="text-lg font-bold text-blue-800 mb-3">為什麼會 Failed to fetch？</h2>
-            <p class="text-blue-700 text-sm leading-relaxed mb-2">
-                1. <strong>Proxy 限制：</strong> 當網址過長（超過 2000 字元）時，許多免費的 Proxy 服務會拒絕連線，導致程式報錯。
-            </p>
-            <p class="text-blue-700 text-sm leading-relaxed">
-                2. <strong>編碼問題：</strong> 如果長網址內的 <code>#</code> 沒編碼好，請求會被截斷；如果編碼太多次，網址會變太長導致伺服器無法處理。
-            </p>
+            <h2 class="text-lg font-bold text-blue-800 mb-3">為何 GitHub Pages 容易失敗？</h2>
+            <ul class="text-blue-700 text-sm list-disc ml-5 space-y-2">
+                <li><strong>HTTPS 限制：</strong>GitHub Pages 必須使用 HTTPS，如果代理伺服器（Proxy）或 API 的憑證不全，瀏覽器會直接攔截請求。</li>
+                <li><strong>網址長度上限：</strong>如果你傳輸的加密網址（# 之後的內容）太長，超出了 Proxy 或 GitHub 的傳輸限制（約 2000-4000 字元），請求會被切斷。</li>
+                <li><strong>雙重編碼：</strong>在代理模式下，網址需要經過兩次編碼，否則特殊符號會導致代理解析失敗。</li>
+            </ul>
         </div>
     </div>
 
     <script>
-        // 改用更穩定的代理方案，並加入錯誤重試機制
-        const PROXY = "https://corsproxy.io/?";
+        // 在 GitHub Pages 上，AllOrigins 較為穩定，我們使用他的 /get 介面來處理
+        const PROXY_BASE = "https://api.allorigins.win/get?url=";
 
         async function testAllApis() {
             const longUrl = document.getElementById('urlInput').value.trim();
@@ -81,7 +80,6 @@
                 return;
             }
 
-            // 對長網址進行標準 URL 編碼
             const encodedUrl = encodeURIComponent(longUrl);
 
             // 1. 測試 Is.gd
@@ -93,26 +91,26 @@
             
             const isgdApi = `https://is.gd/create.php?format=json&url=${encodedUrl}`;
             
-            // 修正：不要對整個 Proxy URL 做二次 encodeURIComponent，除非必要
-            // 這裡使用最直接的拼接方式
-            fetch(`${PROXY}${encodeURIComponent(isgdApi)}`)
+            fetch(`${PROXY_BASE}${encodeURIComponent(isgdApi)}`)
                 .then(r => {
                     if(!r.ok) throw new Error(`HTTP ${r.status}`);
                     return r.json();
                 })
-                .then(data => {
+                .then(proxyData => {
+                    // AllOrigins 的內容在 contents 欄位，且是字串格式
+                    const data = JSON.parse(proxyData.contents);
                     if(data.shorturl) {
                         statusIsgd.innerText = "成功";
                         statusIsgd.className = "text-xs text-green-600 font-bold";
                         linkIsgd.innerHTML = `<a href="${data.shorturl}" target="_blank" class="underline hover:text-blue-800">${data.shorturl}</a>`;
                     } else {
-                        throw new Error(data.errormessage || "未知錯誤");
+                        throw new Error(data.errormessage || "API 錯誤");
                     }
                 })
                 .catch(e => {
                     statusIsgd.innerText = "失敗";
                     statusIsgd.className = "text-xs text-red-500 font-bold";
-                    linkIsgd.innerText = "原因: " + e.message;
+                    linkIsgd.innerText = "錯誤原因: " + e.message;
                 });
 
             // 2. 測試 TinyURL
@@ -123,24 +121,25 @@
             linkTiny.innerText = "";
 
             const tinyApi = `https://tinyurl.com/api-create.php?url=${encodedUrl}`;
-            fetch(`${PROXY}${encodeURIComponent(tinyApi)}`)
+            fetch(`${PROXY_BASE}${encodeURIComponent(tinyApi)}`)
                 .then(r => {
                     if(!r.ok) throw new Error(`HTTP ${r.status}`);
-                    return r.text();
+                    return r.json();
                 })
-                .then(text => {
+                .then(proxyData => {
+                    const text = proxyData.contents;
                     if(text.startsWith('http')) {
                         statusTiny.innerText = "成功";
                         statusTiny.className = "text-xs text-green-600 font-bold";
                         linkTiny.innerHTML = `<a href="${text}" target="_blank" class="underline hover:text-blue-800">${text}</a>`;
                     } else {
-                        throw new Error("API 回傳無效數據");
+                        throw new Error("API 傳回無效數據");
                     }
                 })
                 .catch(e => {
                     statusTiny.innerText = "失敗";
                     statusTiny.className = "text-xs text-red-500 font-bold";
-                    linkTiny.innerText = "原因: " + e.message;
+                    linkTiny.innerText = "連線失敗，請檢查網路";
                 });
         }
     </script>
