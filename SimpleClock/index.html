@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>典雅適應時鐘</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --bg-color: #0a0a0a;
+            --text-color: #f5f5f5;
+            --muted-color: #737373;
+            --accent-color: #404040;
+            --card-bg: rgba(255, 255, 255, 0.02);
+            --border-color: rgba(255, 255, 255, 0.05);
+        }
+
+        body.light-mode {
+            --bg-color: #f9f9f9;
+            --text-color: #171717;
+            --muted-color: #a3a3a3;
+            --accent-color: #d4d4d4;
+            --card-bg: rgba(0, 0, 0, 0.02);
+            --border-color: rgba(0, 0, 0, 0.05);
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.7s, color 0.7s;
+            overflow: hidden;
+            font-family: ui-sans-serif, system-ui, sans-serif;
+        }
+
+        /* 核心自適應設計：使用 clamp 確保字體在小螢幕不至於太小，大螢幕不至於爆開 */
+        .clock-container {
+            padding: 5vw;
+            border-radius: 5vw;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            backdrop-filter: blur(20px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4vw;
+            max-width: 90vw;
+        }
+
+        .date-display {
+            font-size: clamp(0.8rem, 1.5vw, 1.5rem);
+            letter-spacing: 0.4em;
+            color: var(--muted-color);
+            text-transform: uppercase;
+        }
+
+        .time-display {
+            display: flex;
+            align-items: center;
+            /* 數字大小隨視窗寬度流動 */
+            font-size: clamp(3rem, 15vw, 12rem);
+            line-height: 1;
+            font-weight: 200;
+        }
+
+        .digit-group {
+            display: flex;
+        }
+
+        .digit {
+            display: inline-block;
+            width: 0.6em;
+            text-align: center;
+        }
+
+        .colon {
+            margin: 0 0.2em;
+            color: var(--accent-color);
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            position: relative;
+            top: -0.05em;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .period-display {
+            font-size: clamp(0.8rem, 2vw, 1.8rem);
+            letter-spacing: 0.5em;
+            color: var(--muted-color);
+            margin-top: 2vw;
+        }
+
+        /* 典雅捲動條 */
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { 
+            background: rgba(128, 128, 128, 0.2); 
+            border-radius: 10px; 
+        }
+
+        .menu-sidebar {
+            transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen">
+
+    <!-- 漢堡選單按鈕 -->
+    <button id="menuBtn" class="absolute top-8 right-8 p-3 rounded-full hover:bg-white/5 transition-all z-10">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <line x1="4" x2="20" y1="12" y2="12"></line>
+            <line x1="4" x2="20" y1="6" y2="6"></line>
+            <line x1="4" x2="20" y1="18" y2="18"></line>
+        </svg>
+    </button>
+
+    <!-- 設定面板 -->
+    <div id="sidebar" class="menu-sidebar fixed top-0 right-0 h-full w-72 backdrop-blur-3xl z-50 p-8 border-l border-white/5 translate-x-full flex flex-col" style="background: rgba(20,20,20,0.85);">
+        <div class="flex justify-between items-center mb-10">
+            <h2 class="text-xs font-medium tracking-widest opacity-50 uppercase text-white">Settings</h2>
+            <button id="closeBtn" class="text-white opacity-50 hover:opacity-100">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M18 6 6 18M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-8 text-white">
+            <div>
+                <h3 class="text-[10px] font-bold tracking-widest uppercase mb-3 opacity-30">Theme</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="setTheme('dark')" class="theme-opt px-4 py-2 text-xs rounded-xl border border-white/10 bg-white/5" data-val="dark">Dark</button>
+                    <button onclick="setTheme('light')" class="theme-opt px-4 py-2 text-xs rounded-xl border border-white/10 bg-white/5" data-val="light">Light</button>
+                </div>
+            </div>
+
+            <div>
+                <h3 class="text-[10px] font-bold tracking-widest uppercase mb-3 opacity-30">Time Format</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="set12H(false)" class="h12-opt px-4 py-2 text-xs rounded-xl border border-white/10 bg-white/5" data-val="false">24H</button>
+                    <button onclick="set12H(true)" class="h12-opt px-4 py-2 text-xs rounded-xl border border-white/10 bg-white/5" data-val="true">12H</button>
+                </div>
+            </div>
+
+            <div>
+                <h3 class="text-[10px] font-bold tracking-widest uppercase mb-3 opacity-30">Date Format</h3>
+                <div class="space-y-2">
+                    <button onclick="setDateFormat('zh')" class="date-opt w-full text-left px-4 py-2 text-xs rounded-xl border border-white/10 bg-white/5" data-val="zh">中文日期</button>
+                    <button onclick="setDateFormat('en')" class="date-opt w-full text-left px-4 py-2 text-xs rounded-xl border border-white/10 bg-white/5" data-val="en">English</button>
+                </div>
+            </div>
+
+            <div>
+                <h3 class="text-[10px] font-bold tracking-widest uppercase mb-3 opacity-30">Typography</h3>
+                <div class="space-y-2">
+                    <button onclick="setFont('sans')" class="font-opt w-full text-left px-4 py-2 text-xs rounded-xl border border-white/10 bg-white/5 font-sans" data-val="sans">Modern Sans</button>
+                    <button onclick="setFont('serif')" class="font-opt w-full text-left px-4 py-2 text-xs rounded-xl border border-white/10 bg-white/5 font-serif" data-val="serif">Classic Serif</button>
+                    <button onclick="setFont('mono')" class="font-opt w-full text-left px-4 py-2 text-xs rounded-xl border border-white/10 bg-white/5 font-mono" data-val="mono">Tech Mono</button>
+                </div>
+            </div>
+
+            <button onclick="toggleFS()" class="w-full py-3 rounded-xl border border-white/20 text-xs hover:bg-white/10 transition-all">全螢幕切換</button>
+        </div>
+    </div>
+
+    <!-- 主體內容 -->
+    <div class="clock-container shadow-2xl">
+        <div id="dateEl" class="date-display">載入中...</div>
+        
+        <div class="flex flex-col items-center">
+            <div class="time-display" id="timeEl">
+                <div class="digit-group" id="hourGroup">
+                    <span class="digit">0</span><span class="digit">0</span>
+                </div>
+                <div class="colon">:</div>
+                <div class="digit-group" id="minGroup">
+                    <span class="digit">0</span><span class="digit">0</span>
+                </div>
+                <div class="colon">:</div>
+                <div class="digit-group" id="secGroup">
+                    <span class="digit">0</span><span class="digit">0</span>
+                </div>
+            </div>
+            <div id="periodEl" class="period-display hidden">ANTE MERIDIEM</div>
+        </div>
+    </div>
+
+    <script>
+        // --- 狀態管理 ---
+        let state = {
+            theme: 'dark',
+            date: 'zh',
+            h12: false,
+            font: 'sans'
+        };
+
+        // --- 初始化 Hash ---
+        function initFromHash() {
+            const hash = window.location.hash.replace('#', '');
+            const params = new URLSearchParams(hash);
+            if (params.has('theme')) state.theme = params.get('theme');
+            if (params.has('date')) state.date = params.get('date');
+            if (params.has('h12')) state.h12 = params.get('h12') === 'true';
+            if (params.has('font')) state.font = params.get('font');
+            applyState();
+        }
+
+        function syncHash() {
+            const params = new URLSearchParams();
+            params.set('theme', state.theme);
+            params.set('date', state.date);
+            params.set('h12', state.h12);
+            params.set('font', state.font);
+            window.history.replaceState(null, '', '#' + params.toString());
+        }
+
+        // --- UI 更新 ---
+        function applyState() {
+            // 主題
+            if (state.theme === 'light') {
+                document.body.classList.add('light-mode');
+                document.getElementById('sidebar').style.background = 'rgba(240,240,240,0.85)';
+                document.getElementById('sidebar').style.color = '#171717';
+            } else {
+                document.body.classList.remove('light-mode');
+                document.getElementById('sidebar').style.background = 'rgba(20,20,20,0.85)';
+                document.getElementById('sidebar').style.color = '#fff';
+            }
+
+            // 字體
+            const fonts = {
+                sans: 'ui-sans-serif, system-ui, sans-serif',
+                serif: 'ui-serif, Georgia, serif',
+                mono: 'ui-monospace, monospace'
+            };
+            document.body.style.fontFamily = fonts[state.font];
+
+            // 按鈕樣式更新 (Highlight active)
+            updateButtonStyles();
+            syncHash();
+        }
+
+        function updateButtonStyles() {
+            const updateGroup = (selector, val) => {
+                document.querySelectorAll(selector).forEach(btn => {
+                    const isActive = btn.getAttribute('data-val') === String(val);
+                    if (state.theme === 'dark') {
+                        btn.className = btn.className.replace(/bg-white text-black|bg-white\/5 text-neutral-400/, isActive ? 'bg-white text-black' : 'bg-white/5 text-neutral-400');
+                    } else {
+                        btn.className = btn.className.replace(/bg-black text-white|bg-black\/5 text-neutral-500/, isActive ? 'bg-black text-white' : 'bg-black/5 text-neutral-500');
+                    }
+                });
+            };
+            updateGroup('.theme-opt', state.theme);
+            updateGroup('.h12-opt', state.h12);
+            updateGroup('.date-opt', state.date);
+            updateGroup('.font-opt', state.font);
+        }
+
+        // --- 功能控制 ---
+        window.setTheme = (t) => { state.theme = t; applyState(); };
+        window.set12H = (v) => { state.h12 = v; applyState(); };
+        window.setDateFormat = (d) => { state.date = d; applyState(); };
+        window.setFont = (f) => { state.font = f; applyState(); };
+        window.toggleFS = () => {
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+            else document.exitFullscreen();
+        };
+
+        // --- 時鐘核心邏輯 ---
+        function updateClock() {
+            const now = new Date();
+            
+            // 日期
+            const dateEl = document.getElementById('dateEl');
+            if (state.date === 'en') {
+                dateEl.innerText = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+            } else {
+                dateEl.innerText = now.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+            }
+
+            // 時間計算
+            let h = now.getHours();
+            const isPM = h >= 12;
+            if (state.h12) {
+                h = h % 12 || 12;
+                document.getElementById('periodEl').classList.remove('hidden');
+                document.getElementById('periodEl').innerText = isPM ? 'Post Meridiem' : 'Ante Meridiem';
+            } else {
+                document.getElementById('periodEl').classList.add('hidden');
+            }
+
+            const hStr = h.toString().padStart(2, '0');
+            const mStr = now.getMinutes().toString().padStart(2, '0');
+            const sStr = now.getSeconds().toString().padStart(2, '0');
+
+            // 更新數字 (保持寬度，12H首位半透明防止跳動)
+            updateDigitGroup('hourGroup', hStr, state.h12 && hStr[0] === '0');
+            updateDigitGroup('minGroup', mStr, false);
+            updateDigitGroup('secGroup', sStr, false);
+        }
+
+        function updateDigitGroup(id, str, fadeFirst) {
+            const container = document.getElementById(id);
+            const digits = container.querySelectorAll('.digit');
+            digits[0].innerText = str[0];
+            digits[0].style.opacity = fadeFirst ? '0.1' : '1';
+            digits[1].innerText = str[1];
+        }
+
+        // --- 事件監聽 ---
+        document.getElementById('menuBtn').onclick = () => {
+            document.getElementById('sidebar').classList.remove('translate-x-full');
+        };
+        document.getElementById('closeBtn').onclick = () => {
+            document.getElementById('sidebar').classList.add('translate-x-full');
+        };
+
+        // 初始化
+        initFromHash();
+        setInterval(updateClock, 100);
+        updateClock();
+    </script>
+</body>
+</html>
