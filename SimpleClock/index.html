@@ -13,6 +13,11 @@
             --accent-color: #404040;
             --card-bg: rgba(255, 255, 255, 0.02);
             --border-color: rgba(255, 255, 255, 0.05);
+            --menu-bg: rgba(20, 20, 20, 0.85);
+            --menu-text: #ffffff;
+            /* 中性灰定義 - 暗色 */
+            --neutral-selected-bg: #262626;
+            --neutral-selected-text: #ffffff;
         }
 
         body.light-mode {
@@ -22,6 +27,11 @@
             --accent-color: #d4d4d4;
             --card-bg: rgba(0, 0, 0, 0.02);
             --border-color: rgba(0, 0, 0, 0.05);
+            --menu-bg: rgba(250, 250, 250, 0.9);
+            --menu-text: #171717;
+            /* 中性灰定義 - 淺色 */
+            --neutral-selected-bg: #e5e5e5;
+            --neutral-selected-text: #171717;
         }
 
         body {
@@ -32,34 +42,33 @@
             font-family: ui-sans-serif, system-ui, sans-serif;
         }
 
-        /* 核心自適應設計：使用 clamp 確保字體在小螢幕不至於太小，大螢幕不至於爆開 */
         .clock-container {
-            padding: 5vw;
-            border-radius: 5vw;
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            backdrop-filter: blur(20px);
+            width: 100vw;
+            height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 4vw;
-            max-width: 90vw;
+            justify-content: center;
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            gap: 2vh;
         }
 
         .date-display {
-            font-size: clamp(0.8rem, 1.5vw, 1.5rem);
-            letter-spacing: 0.4em;
+            font-size: clamp(0.7rem, 1.2vw, 1.2rem);
+            letter-spacing: 0.5em;
             color: var(--muted-color);
             text-transform: uppercase;
+            margin-bottom: 1vh;
         }
 
         .time-display {
             display: flex;
             align-items: center;
-            /* 數字大小隨視窗寬度流動 */
-            font-size: clamp(3rem, 15vw, 12rem);
-            line-height: 1;
+            font-size: clamp(4rem, 22vw, 18rem);
+            line-height: 0.85;
             font-weight: 200;
+            letter-spacing: -0.05em; 
         }
 
         .digit-group {
@@ -68,12 +77,12 @@
 
         .digit {
             display: inline-block;
-            width: 0.6em;
+            width: 0.55em; 
             text-align: center;
         }
 
         .colon {
-            margin: 0 0.2em;
+            margin: 0 0.05em; 
             color: var(--accent-color);
             animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
             position: relative;
@@ -86,29 +95,43 @@
         }
 
         .period-display {
-            font-size: clamp(0.8rem, 2vw, 1.8rem);
-            letter-spacing: 0.5em;
+            font-size: clamp(0.7rem, 1.5vw, 1.5rem);
+            letter-spacing: 0.6em;
             color: var(--muted-color);
-            margin-top: 2vw;
+            margin-top: 3vh;
         }
 
-        /* 典雅捲動條 */
+        /* 典雅捲動條樣式 */
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { 
             background: rgba(128, 128, 128, 0.2); 
             border-radius: 10px; 
         }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { 
+            background: rgba(128, 128, 128, 0.4); 
+        }
 
         .menu-sidebar {
-            transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            background-color: var(--menu-bg);
+            color: var(--menu-text);
+            transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.5s;
+        }
+
+        .sidebar-header h2 {
+            color: var(--menu-text);
+        }
+
+        .sidebar-section-label {
+            color: var(--menu-text);
+            opacity: 0.4;
         }
     </style>
 </head>
 <body class="flex items-center justify-center min-h-screen">
 
     <!-- 漢堡選單按鈕 -->
-    <button id="menuBtn" class="absolute top-8 right-8 p-3 rounded-full hover:bg-white/5 transition-all z-10">
+    <button id="menuBtn" class="absolute top-8 right-8 p-3 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-all z-10">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
             <line x1="4" x2="20" y1="12" y2="12"></line>
             <line x1="4" x2="20" y1="6" y2="6"></line>
@@ -117,57 +140,68 @@
     </button>
 
     <!-- 設定面板 -->
-    <div id="sidebar" class="menu-sidebar fixed top-0 right-0 h-full w-72 backdrop-blur-3xl z-50 p-8 border-l border-white/5 translate-x-full flex flex-col" style="background: rgba(20,20,20,0.85);">
-        <div class="flex justify-between items-center mb-10">
-            <h2 class="text-xs font-medium tracking-widest opacity-50 uppercase text-white">Settings</h2>
-            <button id="closeBtn" class="text-white opacity-50 hover:opacity-100">
+    <div id="sidebar" class="menu-sidebar fixed top-0 right-0 h-full w-80 backdrop-blur-3xl z-50 translate-x-full border-l border-black/5 dark:border-white/5 flex flex-col shadow-2xl">
+        <!-- 固定頂部 -->
+        <div class="sidebar-header flex justify-between items-center p-8 pb-4">
+            <h2 class="text-xs font-semibold tracking-widest uppercase">Settings</h2>
+            <button id="closeBtn" class="opacity-50 hover:opacity-100 transition-opacity p-1">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                     <path d="M18 6 6 18M6 6l12 12"></path>
                 </svg>
             </button>
         </div>
 
-        <div class="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-8 text-white">
+        <!-- 捲動內容區 -->
+        <div class="flex-1 overflow-y-auto px-8 custom-scrollbar space-y-10 pb-12">
             <div>
-                <h3 class="text-[10px] font-bold tracking-widest uppercase mb-3 opacity-30">Theme</h3>
+                <h3 class="sidebar-section-label text-[10px] font-bold tracking-widest uppercase mb-4">Theme</h3>
                 <div class="grid grid-cols-2 gap-2">
-                    <button onclick="setTheme('dark')" class="theme-opt px-4 py-2 text-xs rounded-xl border border-white/10 bg-white/5" data-val="dark">Dark</button>
-                    <button onclick="setTheme('light')" class="theme-opt px-4 py-2 text-xs rounded-xl border border-white/10 bg-white/5" data-val="light">Light</button>
+                    <button onclick="setTheme('dark')" class="theme-opt px-4 py-3 text-xs rounded-xl border border-current transition-all" data-val="dark">Dark</button>
+                    <button onclick="setTheme('light')" class="theme-opt px-4 py-3 text-xs rounded-xl border border-current transition-all" data-val="light">Light</button>
                 </div>
             </div>
 
             <div>
-                <h3 class="text-[10px] font-bold tracking-widest uppercase mb-3 opacity-30">Time Format</h3>
+                <h3 class="sidebar-section-label text-[10px] font-bold tracking-widest uppercase mb-4">Time Format</h3>
                 <div class="grid grid-cols-2 gap-2">
-                    <button onclick="set12H(false)" class="h12-opt px-4 py-2 text-xs rounded-xl border border-white/10 bg-white/5" data-val="false">24H</button>
-                    <button onclick="set12H(true)" class="h12-opt px-4 py-2 text-xs rounded-xl border border-white/10 bg-white/5" data-val="true">12H</button>
+                    <button onclick="set12H(false)" class="h12-opt px-4 py-3 text-xs rounded-xl border border-current transition-all" data-val="false">24H</button>
+                    <button onclick="set12H(true)" class="h12-opt px-4 py-3 text-xs rounded-xl border border-current transition-all" data-val="true">12H</button>
                 </div>
             </div>
 
             <div>
-                <h3 class="text-[10px] font-bold tracking-widest uppercase mb-3 opacity-30">Date Format</h3>
+                <h3 class="sidebar-section-label text-[10px] font-bold tracking-widest uppercase mb-4">Date Format</h3>
                 <div class="space-y-2">
-                    <button onclick="setDateFormat('zh')" class="date-opt w-full text-left px-4 py-2 text-xs rounded-xl border border-white/10 bg-white/5" data-val="zh">中文日期</button>
-                    <button onclick="setDateFormat('en')" class="date-opt w-full text-left px-4 py-2 text-xs rounded-xl border border-white/10 bg-white/5" data-val="en">English</button>
+                    <button onclick="setDateFormat('zh')" class="date-opt w-full text-left px-4 py-3 text-xs rounded-xl border border-current transition-all" data-val="zh">中文日期</button>
+                    <button onclick="setDateFormat('en')" class="date-opt w-full text-left px-4 py-3 text-xs rounded-xl border border-current transition-all" data-val="en">English Date</button>
                 </div>
             </div>
 
             <div>
-                <h3 class="text-[10px] font-bold tracking-widest uppercase mb-3 opacity-30">Typography</h3>
+                <h3 class="sidebar-section-label text-[10px] font-bold tracking-widest uppercase mb-4">Typography</h3>
                 <div class="space-y-2">
-                    <button onclick="setFont('sans')" class="font-opt w-full text-left px-4 py-2 text-xs rounded-xl border border-white/10 bg-white/5 font-sans" data-val="sans">Modern Sans</button>
-                    <button onclick="setFont('serif')" class="font-opt w-full text-left px-4 py-2 text-xs rounded-xl border border-white/10 bg-white/5 font-serif" data-val="serif">Classic Serif</button>
-                    <button onclick="setFont('mono')" class="font-opt w-full text-left px-4 py-2 text-xs rounded-xl border border-white/10 bg-white/5 font-mono" data-val="mono">Tech Mono</button>
+                    <button onclick="setFont('sans')" class="font-opt w-full text-left px-4 py-3 text-xs rounded-xl border border-current transition-all font-sans" data-val="sans">Modern Sans</button>
+                    <button onclick="setFont('serif')" class="font-opt w-full text-left px-4 py-3 text-xs rounded-xl border border-current transition-all font-serif" data-val="serif">Classic Serif</button>
+                    <button onclick="setFont('mono')" class="font-opt w-full text-left px-4 py-3 text-xs rounded-xl border border-current transition-all font-mono" data-val="mono">Tech Mono</button>
                 </div>
             </div>
 
-            <button onclick="toggleFS()" class="w-full py-3 rounded-xl border border-white/20 text-xs hover:bg-white/10 transition-all">全螢幕切換</button>
+            <div>
+                <h3 class="sidebar-section-label text-[10px] font-bold tracking-widest uppercase mb-4">Display</h3>
+                <button onclick="toggleFS()" class="w-full py-4 rounded-xl border border-current opacity-40 hover:opacity-100 text-xs transition-all flex items-center justify-center gap-2">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+                    全螢幕切換
+                </button>
+            </div>
         </div>
     </div>
 
+    <!-- 背景遮罩 (點擊關閉選單) -->
+    <div id="overlay" class="fixed inset-0 bg-black/20 z-40 hidden backdrop-blur-[2px]"></div>
+
     <!-- 主體內容 -->
-    <div class="clock-container shadow-2xl">
-        <div id="dateEl" class="date-display">載入中...</div>
+    <div class="clock-container">
+        <div id="dateEl" class="date-display">Loading...</div>
         
         <div class="flex flex-col items-center">
             <div class="time-display" id="timeEl">
@@ -218,18 +252,14 @@
 
         // --- UI 更新 ---
         function applyState() {
-            // 主題
+            // 主題切換
             if (state.theme === 'light') {
                 document.body.classList.add('light-mode');
-                document.getElementById('sidebar').style.background = 'rgba(240,240,240,0.85)';
-                document.getElementById('sidebar').style.color = '#171717';
             } else {
                 document.body.classList.remove('light-mode');
-                document.getElementById('sidebar').style.background = 'rgba(20,20,20,0.85)';
-                document.getElementById('sidebar').style.color = '#fff';
             }
 
-            // 字體
+            // 字體切換
             const fonts = {
                 sans: 'ui-sans-serif, system-ui, sans-serif',
                 serif: 'ui-serif, Georgia, serif',
@@ -237,7 +267,6 @@
             };
             document.body.style.fontFamily = fonts[state.font];
 
-            // 按鈕樣式更新 (Highlight active)
             updateButtonStyles();
             syncHash();
         }
@@ -246,10 +275,19 @@
             const updateGroup = (selector, val) => {
                 document.querySelectorAll(selector).forEach(btn => {
                     const isActive = btn.getAttribute('data-val') === String(val);
-                    if (state.theme === 'dark') {
-                        btn.className = btn.className.replace(/bg-white text-black|bg-white\/5 text-neutral-400/, isActive ? 'bg-white text-black' : 'bg-white/5 text-neutral-400');
+                    if (isActive) {
+                        btn.style.opacity = '1';
+                        btn.style.borderWidth = '1px';
+                        // 使用中性灰變數
+                        btn.style.backgroundColor = 'var(--neutral-selected-bg)';
+                        btn.style.color = 'var(--neutral-selected-text)';
+                        btn.style.borderColor = 'transparent';
                     } else {
-                        btn.className = btn.className.replace(/bg-black text-white|bg-black\/5 text-neutral-500/, isActive ? 'bg-black text-white' : 'bg-black/5 text-neutral-500');
+                        btn.style.opacity = '0.4';
+                        btn.style.backgroundColor = 'transparent';
+                        btn.style.color = 'inherit';
+                        btn.style.borderColor = 'currentColor';
+                        btn.style.borderWidth = '1px';
                     }
                 });
             };
@@ -273,7 +311,6 @@
         function updateClock() {
             const now = new Date();
             
-            // 日期
             const dateEl = document.getElementById('dateEl');
             if (state.date === 'en') {
                 dateEl.innerText = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
@@ -281,7 +318,6 @@
                 dateEl.innerText = now.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
             }
 
-            // 時間計算
             let h = now.getHours();
             const isPM = h >= 12;
             if (state.h12) {
@@ -296,7 +332,6 @@
             const mStr = now.getMinutes().toString().padStart(2, '0');
             const sStr = now.getSeconds().toString().padStart(2, '0');
 
-            // 更新數字 (保持寬度，12H首位半透明防止跳動)
             updateDigitGroup('hourGroup', hStr, state.h12 && hStr[0] === '0');
             updateDigitGroup('minGroup', mStr, false);
             updateDigitGroup('secGroup', sStr, false);
@@ -310,13 +345,22 @@
             digits[1].innerText = str[1];
         }
 
-        // --- 事件監聽 ---
+        // --- 選單控制 ---
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('overlay');
+
         document.getElementById('menuBtn').onclick = () => {
-            document.getElementById('sidebar').classList.remove('translate-x-full');
+            sidebar.classList.remove('translate-x-full');
+            overlay.classList.remove('hidden');
         };
-        document.getElementById('closeBtn').onclick = () => {
-            document.getElementById('sidebar').classList.add('translate-x-full');
+        
+        const closeMenu = () => {
+            sidebar.classList.add('translate-x-full');
+            overlay.classList.add('hidden');
         };
+
+        document.getElementById('closeBtn').onclick = closeMenu;
+        overlay.onclick = closeMenu;
 
         // 初始化
         initFromHash();
