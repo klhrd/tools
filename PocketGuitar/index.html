@@ -90,10 +90,27 @@
 
     <!-- 緊湊版指板主體 -->
     <div class="bg-slate-800 p-4 rounded-xl shadow-lg border border-slate-700 overflow-x-auto no-scrollbar shrink-0">
+      
+      <!-- 顏色圖例說明 (新增) -->
+      <div class="flex items-center gap-6 text-xs text-slate-300 mb-3 px-2 font-mono">
+        <span class="flex items-center gap-1.5">
+          <div class="w-3 h-3 bg-red-900/50 border border-red-400 rounded-sm"></div> 
+          悶音 (X) - 該弦不發聲
+        </span>
+        <span class="flex items-center gap-1.5">
+          <div class="w-3 h-3 bg-blue-900/50 border border-blue-400 rounded-sm"></div> 
+          空弦 (0) - 彈奏開放弦
+        </span>
+        <span class="flex items-center gap-1.5">
+          <div class="w-3 h-3 bg-slate-700 border border-slate-500 rounded-sm"></div> 
+          按壓琴格 - 以琴格音為主
+        </span>
+      </div>
+
       <div class="min-w-[800px] relative">
         <!-- 琴格標記點 -->
         <div id="fret-markers" class="absolute top-0 bottom-0 left-0 right-0 flex pointer-events-none z-0"></div>
-        <!-- 弦的渲染區 (調整高度變緊湊) -->
+        <!-- 弦的渲染區 -->
         <div id="fretboard-strings" class="relative z-10 flex flex-col justify-between py-1 gap-1"></div>
         <!-- 琴格數字 -->
         <div id="fret-numbers" class="flex ml-14 text-[10px] text-slate-500 font-mono mt-1"></div>
@@ -184,19 +201,31 @@
     let synth = null;
     let isAudioReady = false;
 
-    // --- 音訊引擎初始化 (升級版音色與音量) ---
+    // --- 音訊引擎初始化 (移除狼音，改用更乾淨的撥弦音色) ---
     async function initAudio() {
       if (!isAudioReady) {
         await Tone.start();
         
-        // 使用 fmtriangle 波形並拉長衰減，讓聲音清脆且大聲，解決不和諧與太小聲的問題
+        // 改用更純粹乾淨的振盪器與濾波組合，移除造成狼音的高強度 FM 調變
         synth = new Tone.PolySynth(Tone.Synth, {
-          oscillator: { type: "fmtriangle", modulationType: "sine", modulationIndex: 2.5 },
-          envelope: { attack: 0.005, decay: 2.5, sustain: 0.1, release: 1.5 }
-        }).toDestination();
+          oscillator: { 
+            type: "pwm", // 脈衝寬度調變波，能產生類似弦樂的豐富泛音且不刺耳
+            modulationFrequency: 0.2 
+          },
+          envelope: { 
+            attack: 0.01, 
+            decay: 2.5, 
+            sustain: 0.05, 
+            release: 1.2 
+          }
+        });
         
-        // 將總音量調為 0dB (原本是 -8dB)
-        Tone.getDestination().volume.value = 0; 
+        // 加上一個輕微的低通濾波器，讓聲音更溫潤，像木吉他
+        const filter = new Tone.Filter(3000, "lowpass").toDestination();
+        synth.connect(filter);
+        
+        // 總音量微調
+        Tone.getDestination().volume.value = -3; 
         
         isAudioReady = true;
         
@@ -252,7 +281,6 @@
         activeNotes.sort((a, b) => a.idx - b.idx);
       }
 
-      // 略微拉大刷弦延遲，聽起來更清楚
       activeNotes.forEach((item, i) => {
         synth.triggerAttackRelease(item.note, "1m", now + i * 0.05);
       });
@@ -295,8 +323,8 @@
         const stringThickness = 1 + (stringIdx * 0.5);
         const isMuted = fretboard[stringIdx] === -1;
         const stringLabel = `${stringIdx + 1}弦`;
-        const nutClass = isMuted ? 'bg-red-900/30 text-red-400' : 
-                         fretboard[stringIdx] === 0 ? 'bg-blue-900/50 text-blue-300' : 'bg-slate-700 text-slate-300 hover:bg-slate-500';
+        const nutClass = isMuted ? 'bg-red-900/50 text-red-400 border border-red-400/50' : 
+                         fretboard[stringIdx] === 0 ? 'bg-blue-900/50 text-blue-300 border border-blue-400/50' : 'bg-slate-700 text-slate-300 hover:bg-slate-500 border border-slate-500';
         
         let fretsHTML = '';
         for (let fretIdx = 0; fretIdx < FRETS; fretIdx++) {
@@ -304,7 +332,6 @@
           const isActive = fretboard[stringIdx] === fretNum;
           const noteName = isActive ? transposeNote(tuning[stringIdx], fretNum).replace(/\d+$/, '') : '';
           
-          // 縮減高度為 h-8 (32px)
           fretsHTML += `
             <div onclick="handleFretClick(${stringIdx}, ${fretNum})" class="flex-1 h-8 flex justify-center items-center cursor-pointer border-r border-slate-600/50 hover:bg-slate-400/20 transition-colors relative group">
               <div class="w-5 h-5 rounded-full flex items-center justify-center shadow-lg transition-all transform ${isActive ? 'bg-blue-500 scale-100 opacity-100' : 'bg-transparent scale-50 opacity-0 group-hover:scale-100 group-hover:opacity-20 group-hover:bg-blue-300'}">
@@ -317,8 +344,8 @@
         stringsHTML += `
           <div class="relative flex items-center h-8 group">
             <div class="absolute left-14 right-0 bg-gradient-to-r from-slate-500 to-slate-400 shadow-sm transition-all duration-200 pointer-events-none ${isMuted ? 'opacity-30' : 'opacity-100'}" style="height: ${stringThickness}px"></div>
-            <div onclick="toggleMuteOrPlay(${stringIdx})" class="flex-shrink-0 w-14 h-8 flex items-center justify-between px-2 cursor-pointer border-r-4 border-slate-900 rounded-l-md transition-colors ${nutClass}">
-              <span class="text-[9px] opacity-60 font-mono">${stringLabel}</span>
+            <div onclick="toggleMuteOrPlay(${stringIdx})" title="點擊切換 空弦/悶音" class="flex-shrink-0 w-14 h-8 flex items-center justify-between px-2 cursor-pointer border-r-4 rounded-l-md transition-colors ${nutClass}">
+              <span class="text-[9px] opacity-80 font-mono">${stringLabel}</span>
               <span class="font-bold text-xs flex items-center gap-1">
                 ${isMuted ? 'X' : openNote.replace(/\d+$/, '')}
               </span>
