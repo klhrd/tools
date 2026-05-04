@@ -8,126 +8,126 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- 引入 Tone.js 用於音訊處理 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <!-- 引入 Tonal.js 用於精準合弦判斷 -->
+  <script src="https://cdn.jsdelivr.net/npm/@tonaljs/tonal/browser/tonal.min.js"></script>
   <style>
     /* 隱藏捲軸但保持可捲動 */
     .no-scrollbar::-webkit-scrollbar {
       display: none;
     }
     .no-scrollbar {
-      -ms-overflow-style: none;  /* IE and Edge */
-      scrollbar-width: none;  /* Firefox */
+      -ms-overflow-style: none;
+      scrollbar-width: none;
     }
   </style>
 </head>
-<body class="min-h-screen bg-slate-900 text-slate-100 font-sans selection:bg-blue-500/30">
+<body class="h-screen bg-slate-900 text-slate-100 font-sans selection:bg-blue-500/30 overflow-hidden flex flex-col">
 
-  <!-- 音訊初始化遮罩 (瀏覽器要求使用者互動才能發聲) -->
-  <div id="audio-overlay" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 transition-opacity duration-300">
+  <!-- 音訊初始化遮罩 -->
+  <div id="audio-overlay" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md flex items-center justify-center z-50 transition-opacity duration-300">
     <div class="bg-slate-800 p-8 rounded-2xl shadow-2xl max-w-md text-center border border-slate-600">
       <svg class="w-16 h-16 text-blue-400 mx-auto mb-4 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path>
       </svg>
       <h2 class="text-2xl font-bold mb-4">準備好彈奏了嗎？</h2>
-      <p class="text-slate-400 mb-8">網頁瀏覽器需要您的點擊互動，才能啟動吉他音效引擎。</p>
+      <p class="text-slate-400 mb-8">瀏覽器需要您的點擊互動，才能啟動高音質音效引擎。</p>
       <button onclick="initAudio()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-lg transition-all shadow-lg hover:shadow-blue-500/25 flex justify-center items-center gap-2">
         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
-        啟動音效引擎
+        啟動吉他
       </button>
     </div>
   </div>
 
-  <div class="max-w-5xl mx-auto space-y-6 p-6">
+  <div class="max-w-6xl mx-auto w-full flex-1 flex flex-col p-4 gap-4 overflow-y-auto no-scrollbar">
     
-    <!-- 頭部設定列 -->
-    <div class="flex flex-col md:flex-row justify-between items-center bg-slate-800 p-4 rounded-xl shadow-lg border border-slate-700">
-      <div class="flex items-center space-x-3 mb-4 md:mb-0">
-        <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path></svg>
-        <h1 class="text-xl font-bold tracking-wider">PocketGuitar</h1>
+    <!-- 頂部高密度工具列 -->
+    <div class="flex flex-wrap md:flex-nowrap justify-between items-center bg-slate-800 p-3 rounded-xl shadow-md border border-slate-700 gap-4 shrink-0">
+      
+      <!-- 標題 -->
+      <div class="flex items-center space-x-2 shrink-0">
+        <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path></svg>
+        <h1 class="text-xl font-bold tracking-wider hidden sm:block">PocketGuitar</h1>
       </div>
       
-      <div class="flex items-center space-x-4">
-        <label class="flex items-center space-x-2 text-sm text-slate-300">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-          <span>調弦設定：</span>
-          <select id="tuning-select" onchange="handleTuningChange(this.value)" class="bg-slate-700 border border-slate-600 text-slate-100 py-1 px-3 rounded-md focus:ring-2 focus:ring-blue-500 outline-none">
-            <!-- 選項由 JS 動態產生 -->
+      <!-- 控制群組 -->
+      <div class="flex flex-wrap items-center justify-end gap-3 flex-1 text-sm">
+        
+        <!-- 合弦搜尋/預設 -->
+        <label class="flex items-center space-x-2 text-emerald-300 font-semibold">
+          <span>快速合弦：</span>
+          <select id="chord-preset" onchange="loadPresetChord(this.value)" class="bg-slate-700 border border-emerald-600/50 text-white py-1.5 px-2 rounded-md focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer">
+            <option value="">-- 選擇合弦 --</option>
+            <!-- 由 JS 動態產生 -->
           </select>
         </label>
+
+        <!-- 調弦設定 -->
+        <label class="flex items-center space-x-2 text-slate-300">
+          <span>調弦：</span>
+          <select id="tuning-select" onchange="handleTuningChange(this.value)" class="bg-slate-700 border border-slate-600 text-slate-100 py-1.5 px-2 rounded-md focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer">
+            <!-- 由 JS 動態產生 -->
+          </select>
+        </label>
+
+        <div class="h-6 w-px bg-slate-600 hidden md:block"></div>
         
-        <button onclick="resetFretboard()" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded-md text-sm transition-colors">
-          重置指位
+        <!-- 刷弦控制 (整合進上方) -->
+        <div class="flex items-center gap-2 shrink-0">
+          <button onclick="playStrum('down')" class="px-4 py-1.5 bg-gradient-to-b from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 rounded-md shadow-sm transform active:scale-95 transition-all font-bold flex items-center gap-1">
+             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg> 下刷
+          </button>
+          <button onclick="playStrum('up')" class="px-4 py-1.5 bg-gradient-to-t from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 rounded-md shadow-sm transform active:scale-95 transition-all font-bold flex items-center gap-1">
+             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg> 上刷
+          </button>
+        </div>
+        
+        <!-- 重置按鈕 -->
+        <button onclick="resetFretboard()" class="px-3 py-1.5 bg-red-900/60 hover:bg-red-800 text-red-200 rounded-md transition-colors border border-red-800/50">
+          清除
         </button>
       </div>
     </div>
 
-    <!-- 核心區域：包含指板與觸發區 -->
-    <div class="flex flex-col xl:flex-row gap-6">
-      
-      <!-- 指板主體 -->
-      <div class="flex-1 bg-slate-800 p-6 rounded-xl shadow-2xl border border-slate-700 overflow-x-auto no-scrollbar">
-        <div class="min-w-[800px] relative">
-          
-          <!-- 琴格標記點 (背景層) -->
-          <div id="fret-markers" class="absolute top-0 bottom-0 left-0 right-0 flex pointer-events-none z-0">
-            <!-- 由 JS 動態產生 -->
-          </div>
-
-          <!-- 弦的渲染區 (互動層) -->
-          <div id="fretboard-strings" class="relative z-10 flex flex-col justify-between py-2 gap-2">
-            <!-- 由 JS 動態產生 -->
-          </div>
-
-          <!-- 琴格數字標示 -->
-          <div id="fret-numbers" class="flex ml-16 text-xs text-slate-500 font-mono mt-2">
-            <!-- 由 JS 動態產生 -->
-          </div>
-
-        </div>
+    <!-- 緊湊版指板主體 -->
+    <div class="bg-slate-800 p-4 rounded-xl shadow-lg border border-slate-700 overflow-x-auto no-scrollbar shrink-0">
+      <div class="min-w-[800px] relative">
+        <!-- 琴格標記點 -->
+        <div id="fret-markers" class="absolute top-0 bottom-0 left-0 right-0 flex pointer-events-none z-0"></div>
+        <!-- 弦的渲染區 (調整高度變緊湊) -->
+        <div id="fretboard-strings" class="relative z-10 flex flex-col justify-between py-1 gap-1"></div>
+        <!-- 琴格數字 -->
+        <div id="fret-numbers" class="flex ml-14 text-[10px] text-slate-500 font-mono mt-1"></div>
       </div>
-
-      <!-- 側邊刷弦控制區 -->
-      <div class="flex xl:flex-col flex-row gap-4 justify-center items-center bg-slate-800 p-6 rounded-xl border border-slate-700 min-w-[120px]">
-         <h3 class="text-sm font-semibold text-slate-400 tracking-widest hidden xl:block mb-4">STRUM</h3>
-         <button onclick="playStrum('down')" class="flex flex-col items-center justify-center p-4 bg-gradient-to-b from-blue-600 to-blue-800 hover:from-blue-500 hover:to-blue-700 rounded-xl shadow-lg transform active:scale-95 transition-all w-24 h-24">
-            <svg class="w-8 h-8 text-white mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
-            <span class="text-xs font-bold text-white">下刷</span>
-         </button>
-
-         <button onclick="playStrum('up')" class="flex flex-col items-center justify-center p-4 bg-gradient-to-t from-emerald-600 to-emerald-800 hover:from-emerald-500 hover:to-emerald-700 rounded-xl shadow-lg transform active:scale-95 transition-all w-24 h-24">
-            <svg class="w-8 h-8 text-white mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>
-            <span class="text-xs font-bold text-white">上刷</span>
-         </button>
-      </div>
-
     </div>
 
-    <!-- 底部資訊區：合弦識別與六線譜渲染 -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <!-- 底部資訊區：分成兩欄，高度壓縮 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-[160px]">
       
-      <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 flex flex-col justify-center items-center relative overflow-hidden">
-         <div class="absolute top-0 right-0 p-4 opacity-5">
-            <svg class="w-32 h-32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path></svg>
+      <!-- 合弦偵測區 -->
+      <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-col justify-center items-center relative overflow-hidden group">
+         <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
+            <svg class="w-48 h-48" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path></svg>
          </div>
-         <h2 class="text-slate-400 text-sm font-semibold tracking-wider mb-2 z-10">偵測結果 (CHORD / NOTES)</h2>
-         <div id="detected-chord" class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 z-10 text-center min-h-[60px]">
+         <h2 class="text-slate-400 text-xs font-semibold tracking-wider mb-2 z-10">精準合弦判斷 (Tonal.js)</h2>
+         <div id="detected-chord" class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 z-10 text-center leading-tight">
            無 (請按弦)
          </div>
-         <div id="active-notes" class="mt-4 flex gap-2 z-10 flex-wrap justify-center min-h-[30px]">
-           <!-- 音符標籤動態產生 -->
+         <div id="active-notes" class="mt-3 flex gap-1.5 z-10 flex-wrap justify-center">
+           <!-- 音符標籤 -->
          </div>
       </div>
 
-      <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 min-h-[200px] flex flex-col">
-         <h2 class="text-slate-400 text-sm font-semibold tracking-wider mb-4 text-center">吉他六線譜 (TABLATURE)</h2>
-         <div class="flex-1 bg-white/90 rounded-lg p-2 overflow-hidden flex items-center">
-            <div id="tab-score" class="w-full flex flex-col justify-center items-start bg-white p-4 rounded text-slate-800 font-mono text-lg relative overflow-hidden">
+      <!-- 六線譜 -->
+      <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-col">
+         <h2 class="text-slate-400 text-xs font-semibold tracking-wider mb-2 text-center">吉他六線譜 (TAB)</h2>
+         <div class="flex-1 bg-slate-100 rounded p-2 overflow-hidden flex items-center justify-center">
+            <div id="tab-score" class="w-full max-w-sm flex flex-col justify-center items-start text-slate-800 font-mono text-base font-bold relative">
                 <!-- 六線譜動態產生 -->
             </div>
          </div>
       </div>
 
     </div>
-    
   </div>
 
   <script>
@@ -154,32 +154,52 @@
 
     // --- 應用程式狀態 ---
     const TUNINGS = {
-      "標準調弦 (Standard)": ["E4", "B3", "G3", "D3", "A2", "E2"],
+      "標準調弦 (Standard)": ["E4", "B3", "G3", "D3", "A2", "E2"], // 1弦 -> 6弦
       "Drop D": ["E4", "B3", "G3", "D3", "A2", "D2"],
       "Open G": ["D4", "B3", "G3", "D3", "G2", "D2"],
-      "半音降調 (Half Step Down)": ["Eb4", "Bb3", "Gb3", "Db3", "Ab2", "Eb2"]
+      "半音降調 (Half Step)": ["Eb4", "Bb3", "Gb3", "Db3", "Ab2", "Eb2"]
+    };
+    
+    // 常見合弦指法對應表 (陣列順序: 1弦 到 6弦)
+    // -1: 悶音, 0: 空弦, >0: 琴格
+    const PRESET_CHORDS = {
+      "C": [0, 1, 0, 2, 3, -1],
+      "Cmaj7": [0, 0, 0, 2, 3, -1],
+      "D": [2, 3, 2, 0, -1, -1],
+      "Dm": [1, 3, 2, 0, -1, -1],
+      "E": [0, 0, 1, 2, 2, 0],
+      "Em": [0, 0, 0, 2, 2, 0],
+      "F": [1, 1, 2, 3, 3, 1],
+      "Fmaj7": [0, 1, 2, 3, -1, -1],
+      "G": [3, 0, 0, 0, 2, 3],
+      "A": [0, 2, 2, 2, 0, -1],
+      "Am": [0, 1, 2, 2, 0, -1],
+      "B7": [2, 0, 2, 1, 2, -1]
     };
     
     let currentTuningName = "標準調弦 (Standard)";
     let tuning = TUNINGS[currentTuningName];
-    // -1 = 悶音, 0 = 空弦, 1~12 = 按壓琴格
     let fretboard = [-1, -1, -1, -1, -1, -1]; 
     const FRETS = 12;
     let synth = null;
     let isAudioReady = false;
 
-    // --- 音訊引擎初始化 ---
+    // --- 音訊引擎初始化 (升級版音色與音量) ---
     async function initAudio() {
       if (!isAudioReady) {
         await Tone.start();
+        
+        // 使用 fmtriangle 波形並拉長衰減，讓聲音清脆且大聲，解決不和諧與太小聲的問題
         synth = new Tone.PolySynth(Tone.Synth, {
-          oscillator: { type: "triangle" },
-          envelope: { attack: 0.005, decay: 0.5, sustain: 0.2, release: 1.5 }
+          oscillator: { type: "fmtriangle", modulationType: "sine", modulationIndex: 2.5 },
+          envelope: { attack: 0.005, decay: 2.5, sustain: 0.1, release: 1.5 }
         }).toDestination();
-        Tone.getDestination().volume.value = -8; 
+        
+        // 將總音量調為 0dB (原本是 -8dB)
+        Tone.getDestination().volume.value = 0; 
+        
         isAudioReady = true;
         
-        // 隱藏遮罩
         const overlay = document.getElementById('audio-overlay');
         overlay.classList.add('opacity-0');
         setTimeout(() => overlay.classList.add('hidden'), 300);
@@ -190,8 +210,10 @@
     async function handleFretClick(stringIdx, fretNum) {
       if (!isAudioReady) await initAudio();
       
+      document.getElementById('chord-preset').value = ""; // 清除預設選單狀態
+
       if (fretboard[stringIdx] === fretNum) {
-        fretboard[stringIdx] = -1; // 取消按壓變悶音
+        fretboard[stringIdx] = -1; 
       } else {
         fretboard[stringIdx] = fretNum;
         const noteToPlay = transposeNote(tuning[stringIdx], fretNum);
@@ -203,12 +225,14 @@
     async function toggleMuteOrPlay(stringIdx) {
       if (!isAudioReady) await initAudio();
       
+      document.getElementById('chord-preset').value = "";
+
       if (fretboard[stringIdx] === -1) {
-        fretboard[stringIdx] = 0; // 解除悶音，變空弦
+        fretboard[stringIdx] = 0; 
         const noteToPlay = tuning[stringIdx];
         if (synth) synth.triggerAttackRelease(noteToPlay, "2n");
       } else {
-        fretboard[stringIdx] = -1; // 變悶音
+        fretboard[stringIdx] = -1; 
       }
       updateUI();
     }
@@ -223,25 +247,36 @@
         .filter(item => item.note !== null);
       
       if (direction === 'down') {
-        activeNotes.sort((a, b) => b.idx - a.idx); // 從粗弦(大索引)到細弦(小索引)
+        activeNotes.sort((a, b) => b.idx - a.idx); // 粗弦(大索引) -> 細弦(小索引)
       } else {
         activeNotes.sort((a, b) => a.idx - b.idx);
       }
 
+      // 略微拉大刷弦延遲，聽起來更清楚
       activeNotes.forEach((item, i) => {
-        synth.triggerAttackRelease(item.note, "1m", now + i * 0.04);
+        synth.triggerAttackRelease(item.note, "1m", now + i * 0.05);
       });
     }
 
     function handleTuningChange(newTuning) {
       currentTuningName = newTuning;
       tuning = TUNINGS[newTuning];
-      fretboard = [0, 0, 0, 0, 0, 0]; // 切換調弦時預設變為全空弦
+      document.getElementById('chord-preset').value = "";
+      fretboard = [0, 0, 0, 0, 0, 0]; 
       updateUI();
+    }
+
+    function loadPresetChord(chordName) {
+      if (!chordName || !PRESET_CHORDS[chordName]) return;
+      fretboard = [...PRESET_CHORDS[chordName]];
+      updateUI();
+      // 選擇後自動發出一次刷弦聲
+      playStrum('down');
     }
 
     function resetFretboard() {
       fretboard = [0, 0, 0, 0, 0, 0];
+      document.getElementById('chord-preset').value = "";
       updateUI();
     }
 
@@ -253,16 +288,15 @@
     }
 
     function renderFretboard() {
-      // 1. 產生弦與琴格
       const stringsContainer = document.getElementById('fretboard-strings');
       let stringsHTML = '';
       
       tuning.forEach((openNote, stringIdx) => {
-        const stringThickness = 1 + (stringIdx * 0.6);
+        const stringThickness = 1 + (stringIdx * 0.5);
         const isMuted = fretboard[stringIdx] === -1;
         const stringLabel = `${stringIdx + 1}弦`;
         const nutClass = isMuted ? 'bg-red-900/30 text-red-400' : 
-                         fretboard[stringIdx] === 0 ? 'bg-blue-900/50 text-blue-300' : 'bg-slate-700 text-slate-300 hover:bg-slate-600';
+                         fretboard[stringIdx] === 0 ? 'bg-blue-900/50 text-blue-300' : 'bg-slate-700 text-slate-300 hover:bg-slate-500';
         
         let fretsHTML = '';
         for (let fretIdx = 0; fretIdx < FRETS; fretIdx++) {
@@ -270,22 +304,23 @@
           const isActive = fretboard[stringIdx] === fretNum;
           const noteName = isActive ? transposeNote(tuning[stringIdx], fretNum).replace(/\d+$/, '') : '';
           
+          // 縮減高度為 h-8 (32px)
           fretsHTML += `
-            <div onclick="handleFretClick(${stringIdx}, ${fretNum})" class="flex-1 h-12 flex justify-center items-center cursor-pointer border-r border-slate-600/50 hover:bg-slate-400/10 transition-colors relative group">
-              <div class="w-6 h-6 rounded-full flex items-center justify-center shadow-lg transition-all transform ${isActive ? 'bg-blue-500 scale-100 opacity-100' : 'bg-transparent scale-50 opacity-0 group-hover:scale-100 group-hover:opacity-20 group-hover:bg-blue-300'}">
-                ${isActive ? `<span class="text-[10px] font-bold text-white drop-shadow-md">${noteName}</span>` : ''}
+            <div onclick="handleFretClick(${stringIdx}, ${fretNum})" class="flex-1 h-8 flex justify-center items-center cursor-pointer border-r border-slate-600/50 hover:bg-slate-400/20 transition-colors relative group">
+              <div class="w-5 h-5 rounded-full flex items-center justify-center shadow-lg transition-all transform ${isActive ? 'bg-blue-500 scale-100 opacity-100' : 'bg-transparent scale-50 opacity-0 group-hover:scale-100 group-hover:opacity-20 group-hover:bg-blue-300'}">
+                ${isActive ? `<span class="text-[9px] font-bold text-white drop-shadow-md">${noteName}</span>` : ''}
               </div>
             </div>
           `;
         }
 
         stringsHTML += `
-          <div class="relative flex items-center h-10 group">
-            <div class="absolute left-16 right-0 bg-gradient-to-r from-slate-500 to-slate-400 shadow-sm transition-all duration-200 pointer-events-none ${isMuted ? 'opacity-30' : 'opacity-100'}" style="height: ${stringThickness}px"></div>
-            <div onclick="toggleMuteOrPlay(${stringIdx})" class="flex-shrink-0 w-16 h-10 flex items-center justify-between px-2 cursor-pointer border-r-4 border-slate-900 rounded-l-md transition-colors ${nutClass}">
-              <span class="text-[10px] opacity-60 font-mono">${stringLabel}</span>
-              <span class="font-bold flex items-center gap-1">
-                ${isMuted ? `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" clip-rule="evenodd"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"></path></svg>` : openNote}
+          <div class="relative flex items-center h-8 group">
+            <div class="absolute left-14 right-0 bg-gradient-to-r from-slate-500 to-slate-400 shadow-sm transition-all duration-200 pointer-events-none ${isMuted ? 'opacity-30' : 'opacity-100'}" style="height: ${stringThickness}px"></div>
+            <div onclick="toggleMuteOrPlay(${stringIdx})" class="flex-shrink-0 w-14 h-8 flex items-center justify-between px-2 cursor-pointer border-r-4 border-slate-900 rounded-l-md transition-colors ${nutClass}">
+              <span class="text-[9px] opacity-60 font-mono">${stringLabel}</span>
+              <span class="font-bold text-xs flex items-center gap-1">
+                ${isMuted ? 'X' : openNote.replace(/\d+$/, '')}
               </span>
             </div>
             ${fretsHTML}
@@ -300,28 +335,44 @@
       const uniqueNoteNames = [...new Set(activeNotes.map(n => n.replace(/\d+$/, '')))];
       
       let chordText = "無 (請按弦)";
-      if (uniqueNoteNames.length === 1) chordText = uniqueNoteNames[0] + " (單音)";
-      else if (uniqueNoteNames.length > 1) chordText = `組合: ${uniqueNoteNames.join(" / ")}`;
 
-      document.getElementById('detected-chord').innerText = chordText;
+      // 使用 Tonal.js 判斷精準合弦
+      if (uniqueNoteNames.length > 0) {
+        const detectedChords = Tonal.Chord.detect(uniqueNoteNames);
+        if (detectedChords.length > 0) {
+          // 只顯示前三個可能的合弦名，避免字太長
+          chordText = detectedChords.slice(0, 3).join(" 或 ");
+        } else if (uniqueNoteNames.length === 1) {
+          chordText = uniqueNoteNames[0] + " (單音)";
+        } else {
+          chordText = `音符: ${uniqueNoteNames.join("-")}`;
+        }
+      }
 
-      const notesHTML = activeNotes.map(note => `<span class="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-slate-300">${note}</span>`).join('');
+      // 如果字太長，稍微縮小字體
+      const chordEl = document.getElementById('detected-chord');
+      if(chordText.length > 10) chordEl.classList.replace('text-4xl', 'text-2xl');
+      else chordEl.classList.replace('text-2xl', 'text-4xl');
+      
+      chordEl.innerText = chordText;
+
+      const notesHTML = activeNotes.map(note => `<span class="px-2 py-0.5 bg-slate-700 rounded text-[10px] font-mono text-slate-300 shadow-sm">${note}</span>`).join('');
       document.getElementById('active-notes').innerHTML = notesHTML;
     }
 
     function renderTablature() {
       const tabContainer = document.getElementById('tab-score');
-      let tabHTML = '<div class="flex flex-col w-full gap-2 py-2">';
+      let tabHTML = '<div class="flex flex-col w-full gap-1.5 py-1">';
       
       fretboard.forEach((fret, idx) => {
         const stringName = tuning[idx].replace(/\d+$/, '');
         const displayFret = fret === -1 ? 'X' : fret;
         tabHTML += `
-          <div class="relative h-6 flex items-center w-full">
-            <div class="w-6 text-center text-sm font-bold text-slate-400 shrink-0">${stringName}</div>
+          <div class="relative h-4 flex items-center w-full">
+            <div class="w-6 text-center text-xs font-bold text-slate-400 shrink-0">${stringName}</div>
             <div class="flex-1 relative h-full flex items-center">
-               <div class="absolute left-0 right-0 h-[2px] bg-slate-300"></div>
-               <div class="relative z-10 px-2 bg-white ml-8 font-bold text-slate-700">${displayFret}</div>
+               <div class="absolute left-0 right-0 h-[1.5px] bg-slate-300"></div>
+               <div class="relative z-10 px-1 bg-slate-100 ml-6 text-sm">${displayFret}</div>
             </div>
           </div>
         `;
@@ -332,7 +383,16 @@
 
     // --- 初始掛載 ---
     window.addEventListener('DOMContentLoaded', () => {
-      // 1. 產生調弦選單
+      // 1. 產生合弦預設選單
+      const presetEl = document.getElementById('chord-preset');
+      Object.keys(PRESET_CHORDS).forEach(name => {
+        const option = document.createElement('option');
+        option.value = name;
+        option.innerText = name;
+        presetEl.appendChild(option);
+      });
+
+      // 2. 產生調弦選單
       const selectEl = document.getElementById('tuning-select');
       Object.keys(TUNINGS).forEach(name => {
         const option = document.createElement('option');
@@ -341,20 +401,20 @@
         selectEl.appendChild(option);
       });
 
-      // 2. 產生琴格標記點背景
+      // 3. 產生琴格標記點背景
       const markersContainer = document.getElementById('fret-markers');
-      let markersHTML = '<div class="w-16 flex-shrink-0"></div>';
+      let markersHTML = '<div class="w-14 flex-shrink-0"></div>';
       for(let i=1; i<=FRETS; i++) {
         const isSingle = [3, 5, 7, 9].includes(i);
         const isDouble = i === 12;
         markersHTML += `<div class="flex-1 flex flex-col justify-center items-center h-full">`;
-        if(isSingle) markersHTML += `<div class="w-4 h-4 rounded-full bg-slate-600/40"></div>`;
-        if(isDouble) markersHTML += `<div class="flex flex-col gap-6"><div class="w-4 h-4 rounded-full bg-slate-600/40"></div><div class="w-4 h-4 rounded-full bg-slate-600/40"></div></div>`;
+        if(isSingle) markersHTML += `<div class="w-3 h-3 rounded-full bg-slate-600/30"></div>`;
+        if(isDouble) markersHTML += `<div class="flex flex-col gap-4"><div class="w-3 h-3 rounded-full bg-slate-600/30"></div><div class="w-3 h-3 rounded-full bg-slate-600/30"></div></div>`;
         markersHTML += `</div>`;
       }
       markersContainer.innerHTML = markersHTML;
 
-      // 3. 產生底部的琴格數字
+      // 4. 產生底部的琴格數字
       const numbersContainer = document.getElementById('fret-numbers');
       let numbersHTML = '';
       for(let i=1; i<=FRETS; i++) {
@@ -362,7 +422,7 @@
       }
       numbersContainer.innerHTML = numbersHTML;
 
-      // 4. 初次渲染 UI
+      // 5. 初次渲染 UI
       updateUI();
     });
 
