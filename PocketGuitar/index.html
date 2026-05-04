@@ -52,26 +52,44 @@
       <!-- 控制群組 -->
       <div class="flex flex-wrap items-center justify-end gap-3 flex-1 text-sm">
         
-        <!-- 合弦搜尋/預設 -->
-        <label class="flex items-center space-x-2 text-emerald-300 font-semibold">
-          <span>快速合弦：</span>
-          <select id="chord-preset" onchange="loadPresetChord(this.value)" class="bg-slate-700 border border-emerald-600/50 text-white py-1.5 px-2 rounded-md focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer">
-            <option value="">-- 選擇合弦 --</option>
-            <!-- 由 JS 動態產生 -->
+        <!-- Root / Type 合弦搜尋器 -->
+        <div class="flex items-center space-x-1.5 bg-slate-700/50 px-2 py-1 rounded-md border border-emerald-600/50">
+          <span class="text-emerald-300 font-semibold mr-1">快組合弦：</span>
+          <select id="chord-root" onchange="updateChordSelection()" class="bg-slate-700 text-white py-1 px-1.5 rounded focus:ring-1 focus:ring-emerald-500 outline-none cursor-pointer border border-slate-600">
+            <option value="">根音</option>
+            <option value="C">C</option>
+            <option value="C#">C# / Db</option>
+            <option value="D">D</option>
+            <option value="Eb">D# / Eb</option>
+            <option value="E">E</option>
+            <option value="F">F</option>
+            <option value="F#">F# / Gb</option>
+            <option value="G">G</option>
+            <option value="Ab">G# / Ab</option>
+            <option value="A">A</option>
+            <option value="Bb">A# / Bb</option>
+            <option value="B">B</option>
           </select>
-        </label>
+          <select id="chord-type" onchange="updateChordSelection()" class="bg-slate-700 text-white py-1 px-1.5 rounded focus:ring-1 focus:ring-emerald-500 outline-none cursor-pointer border border-slate-600">
+            <option value="major">大調 (M)</option>
+            <option value="minor">小調 (m)</option>
+            <option value="7">屬七 (7)</option>
+            <option value="maj7">大七 (maj7)</option>
+            <option value="m7">小七 (m7)</option>
+          </select>
+        </div>
 
         <!-- 調弦設定 -->
-        <label class="flex items-center space-x-2 text-slate-300">
+        <label class="flex items-center space-x-2 text-slate-300 ml-2">
           <span>調弦：</span>
           <select id="tuning-select" onchange="handleTuningChange(this.value)" class="bg-slate-700 border border-slate-600 text-slate-100 py-1.5 px-2 rounded-md focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer">
             <!-- 由 JS 動態產生 -->
           </select>
         </label>
 
-        <div class="h-6 w-px bg-slate-600 hidden md:block"></div>
+        <div class="h-6 w-px bg-slate-600 hidden xl:block"></div>
         
-        <!-- 刷弦控制 (整合進上方) -->
+        <!-- 刷弦控制 -->
         <div class="flex items-center gap-2 shrink-0">
           <button onclick="playStrum('down')" class="px-4 py-1.5 bg-gradient-to-b from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 rounded-md shadow-sm transform active:scale-95 transition-all font-bold flex items-center gap-1">
              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg> 下刷
@@ -91,7 +109,7 @@
     <!-- 緊湊版指板主體 -->
     <div class="bg-slate-800 p-4 rounded-xl shadow-lg border border-slate-700 overflow-x-auto no-scrollbar shrink-0">
       
-      <!-- 顏色圖例說明 (新增) -->
+      <!-- 顏色圖例說明 -->
       <div class="flex items-center gap-6 text-xs text-slate-300 mb-3 px-2 font-mono">
         <span class="flex items-center gap-1.5">
           <div class="w-3 h-3 bg-red-900/50 border border-red-400 rounded-sm"></div> 
@@ -169,29 +187,89 @@
       return `${NOTE_NAMES[idx]}${octave}`;
     };
 
+    // --- 動態合弦產生器 (CAGED 系統演算法) ---
+    // 定義各根音在第 5 弦 (A弦) 與第 6 弦 (E弦) 上的琴格位置
+    const ROOT_FRETS = {
+      'C':  { s5: 3, s6: 8 },
+      'C#': { s5: 4, s6: 9 },
+      'D':  { s5: 5, s6: 10 },
+      'Eb': { s5: 6, s6: 11 },
+      'E':  { s5: 7, s6: 0 },
+      'F':  { s5: 8, s6: 1 },
+      'F#': { s5: 9, s6: 2 },
+      'G':  { s5: 10, s6: 3 },
+      'Ab': { s5: 11, s6: 4 },
+      'A':  { s5: 0, s6: 5 },
+      'Bb': { s5: 1, s6: 6 },
+      'B':  { s5: 2, s6: 7 }
+    };
+
+    // E 型封閉指法模板 (根音在第 6 弦)。陣列順序: 1弦 到 6弦
+    const SHAPE_E = {
+      'major': [0, 0, 1, 2, 2, 0],
+      'minor': [0, 0, 0, 2, 2, 0],
+      '7':     [0, 0, 1, 0, 2, 0],
+      'maj7':  [0, 0, 1, 1, 2, 0],
+      'm7':    [0, 0, 0, 0, 2, 0]
+    };
+
+    // A 型封閉指法模板 (根音在第 5 弦)。陣列順序: 1弦 到 6弦
+    const SHAPE_A = {
+      'major': [0, 2, 2, 2, 0, -1],
+      'minor': [0, 1, 2, 2, 0, -1],
+      '7':     [0, 2, 0, 2, 0, -1],
+      'maj7':  [0, 2, 1, 2, 0, -1],
+      'm7':    [0, 1, 0, 2, 0, -1]
+    };
+
+    // 常見開放合弦覆寫 (確保 C, D, G 等最常見合弦優先使用好彈的開放指法)
+    const OPEN_OVERRIDES = {
+      'C-major': [0, 1, 0, 2, 3, -1],
+      'C-maj7':  [0, 0, 0, 2, 3, -1],
+      'C-7':     [0, 1, 3, 2, 3, -1],
+      'D-major': [2, 3, 2, 0, -1, -1],
+      'D-minor': [1, 3, 2, 0, -1, -1],
+      'D-7':     [2, 1, 2, 0, -1, -1],
+      'D-maj7':  [2, 2, 2, 0, -1, -1],
+      'D-m7':    [1, 1, 2, 0, -1, -1],
+      'G-major': [3, 0, 0, 0, 2, 3],
+      'G-7':     [1, 0, 0, 0, 2, 3]
+    };
+
+    function getDynamicChordFretboard(root, type) {
+       const overrideKey = root + '-' + type;
+       if (OPEN_OVERRIDES[overrideKey]) return OPEN_OVERRIDES[overrideKey];
+
+       const s5Fret = ROOT_FRETS[root].s5;
+       const s6Fret = ROOT_FRETS[root].s6;
+
+       // 決定使用 A 型還是 E 型指法 (挑選離琴枕較近、琴格數字較小的)
+       let useShape = 'A';
+       let offset = s5Fret;
+
+       if (s6Fret <= s5Fret) {
+         useShape = 'E';
+         offset = s6Fret;
+       }
+
+       const template = useShape === 'E' ? SHAPE_E[type] : SHAPE_A[type];
+       
+       return template.map((fretOffset) => {
+         if (fretOffset === -1) return -1;
+         // 如果是開放弦 (offset=0)，直接回傳 template 的指位
+         // 如果是封閉和弦 (offset>0)，原本 template 的 0 會變成食指封閉的位置(offset)
+         if (offset === 0) return fretOffset;
+         return offset + fretOffset;
+       });
+    }
+
+
     // --- 應用程式狀態 ---
     const TUNINGS = {
       "標準調弦 (Standard)": ["E4", "B3", "G3", "D3", "A2", "E2"], // 1弦 -> 6弦
       "Drop D": ["E4", "B3", "G3", "D3", "A2", "D2"],
       "Open G": ["D4", "B3", "G3", "D3", "G2", "D2"],
       "半音降調 (Half Step)": ["Eb4", "Bb3", "Gb3", "Db3", "Ab2", "Eb2"]
-    };
-    
-    // 常見合弦指法對應表 (陣列順序: 1弦 到 6弦)
-    // -1: 悶音, 0: 空弦, >0: 琴格
-    const PRESET_CHORDS = {
-      "C": [0, 1, 0, 2, 3, -1],
-      "Cmaj7": [0, 0, 0, 2, 3, -1],
-      "D": [2, 3, 2, 0, -1, -1],
-      "Dm": [1, 3, 2, 0, -1, -1],
-      "E": [0, 0, 1, 2, 2, 0],
-      "Em": [0, 0, 0, 2, 2, 0],
-      "F": [1, 1, 2, 3, 3, 1],
-      "Fmaj7": [0, 1, 2, 3, -1, -1],
-      "G": [3, 0, 0, 0, 2, 3],
-      "A": [0, 2, 2, 2, 0, -1],
-      "Am": [0, 1, 2, 2, 0, -1],
-      "B7": [2, 0, 2, 1, 2, -1]
     };
     
     let currentTuningName = "標準調弦 (Standard)";
@@ -201,31 +279,34 @@
     let synth = null;
     let isAudioReady = false;
 
-    // --- 音訊引擎初始化 (移除狼音，改用更乾淨的撥弦音色) ---
+    // --- 音訊引擎初始化 (徹底根除狼音版本) ---
     async function initAudio() {
       if (!isAudioReady) {
         await Tone.start();
         
-        // 改用更純粹乾淨的振盪器與濾波組合，移除造成狼音的高強度 FM 調變
+        // 改用最純淨的三角波 (triangle)，完全移除 FM / PWM 調變，避免任何泛音打架產生的金屬狼音。
         synth = new Tone.PolySynth(Tone.Synth, {
           oscillator: { 
-            type: "pwm", // 脈衝寬度調變波，能產生類似弦樂的豐富泛音且不刺耳
-            modulationFrequency: 0.2 
+            type: "triangle"
           },
           envelope: { 
-            attack: 0.01, 
-            decay: 2.5, 
-            sustain: 0.05, 
-            release: 1.2 
+            attack: 0.015,  // 柔和的起音，消除點擊聲
+            decay: 2.5,     // 自然衰減
+            sustain: 0.1, 
+            release: 2.0 
           }
         });
         
-        // 加上一個輕微的低通濾波器，讓聲音更溫潤，像木吉他
-        const filter = new Tone.Filter(3000, "lowpass").toDestination();
-        synth.connect(filter);
+        // 加入溫和的低通濾波器，模擬木吉他共鳴箱的溫潤感
+        const filter = new Tone.Filter(1800, "lowpass");
         
-        // 總音量微調
-        Tone.getDestination().volume.value = -3; 
+        // 加入壓縮器讓刷弦時的音量更平均，不會因為多音齊發而爆音
+        const compressor = new Tone.Compressor(-15, 3);
+        
+        synth.chain(filter, compressor, Tone.Destination);
+        
+        // 由於移除了高頻刺耳泛音，我們將總音量安全地提升
+        Tone.Destination.volume.value = 6; 
         
         isAudioReady = true;
         
@@ -239,7 +320,7 @@
     async function handleFretClick(stringIdx, fretNum) {
       if (!isAudioReady) await initAudio();
       
-      document.getElementById('chord-preset').value = ""; // 清除預設選單狀態
+      document.getElementById('chord-root').value = ""; // 清除預設選單狀態
 
       if (fretboard[stringIdx] === fretNum) {
         fretboard[stringIdx] = -1; 
@@ -254,7 +335,7 @@
     async function toggleMuteOrPlay(stringIdx) {
       if (!isAudioReady) await initAudio();
       
-      document.getElementById('chord-preset').value = "";
+      document.getElementById('chord-root').value = "";
 
       if (fretboard[stringIdx] === -1) {
         fretboard[stringIdx] = 0; 
@@ -289,14 +370,20 @@
     function handleTuningChange(newTuning) {
       currentTuningName = newTuning;
       tuning = TUNINGS[newTuning];
-      document.getElementById('chord-preset').value = "";
+      document.getElementById('chord-root').value = "";
       fretboard = [0, 0, 0, 0, 0, 0]; 
       updateUI();
     }
 
-    function loadPresetChord(chordName) {
-      if (!chordName || !PRESET_CHORDS[chordName]) return;
-      fretboard = [...PRESET_CHORDS[chordName]];
+    function updateChordSelection() {
+      const root = document.getElementById('chord-root').value;
+      const type = document.getElementById('chord-type').value;
+      
+      if (!root) return; // 如果沒選根音就不動作
+      
+      // 動態計算對應的指板陣列
+      fretboard = getDynamicChordFretboard(root, type);
+      
       updateUI();
       // 選擇後自動發出一次刷弦聲
       playStrum('down');
@@ -304,7 +391,7 @@
 
     function resetFretboard() {
       fretboard = [0, 0, 0, 0, 0, 0];
-      document.getElementById('chord-preset').value = "";
+      document.getElementById('chord-root').value = "";
       updateUI();
     }
 
@@ -410,16 +497,7 @@
 
     // --- 初始掛載 ---
     window.addEventListener('DOMContentLoaded', () => {
-      // 1. 產生合弦預設選單
-      const presetEl = document.getElementById('chord-preset');
-      Object.keys(PRESET_CHORDS).forEach(name => {
-        const option = document.createElement('option');
-        option.value = name;
-        option.innerText = name;
-        presetEl.appendChild(option);
-      });
-
-      // 2. 產生調弦選單
+      // 1. 產生調弦選單
       const selectEl = document.getElementById('tuning-select');
       Object.keys(TUNINGS).forEach(name => {
         const option = document.createElement('option');
@@ -428,7 +506,7 @@
         selectEl.appendChild(option);
       });
 
-      // 3. 產生琴格標記點背景
+      // 2. 產生琴格標記點背景
       const markersContainer = document.getElementById('fret-markers');
       let markersHTML = '<div class="w-14 flex-shrink-0"></div>';
       for(let i=1; i<=FRETS; i++) {
@@ -441,7 +519,7 @@
       }
       markersContainer.innerHTML = markersHTML;
 
-      // 4. 產生底部的琴格數字
+      // 3. 產生底部的琴格數字
       const numbersContainer = document.getElementById('fret-numbers');
       let numbersHTML = '';
       for(let i=1; i<=FRETS; i++) {
@@ -449,7 +527,7 @@
       }
       numbersContainer.innerHTML = numbersHTML;
 
-      // 5. 初次渲染 UI
+      // 4. 初次渲染 UI
       updateUI();
     });
 
