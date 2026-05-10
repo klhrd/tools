@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>115年國中教育會考倒數</title>
+    <style>
+        :root {
+            --bg-color: #050505;
+            --gold: #d4af37;
+            --gold-dim: rgba(212, 175, 55, 0.1);
+            --text-color: #e0e0e0;
+            --size: 140px;
+            --border: 4px;
+            /* 使用系統內建的等寬字體，確保數字不抖動 */
+            --font-mono: 'JetBrains Mono', 'Courier New', Courier, monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Cinzel', 'Noto Serif TC', serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 頂部標籤導航 */
+        nav {
+            position: absolute;
+            top: 2rem;
+            display: flex;
+            gap: 1.5rem;
+            z-index: 100;
+        }
+
+        nav a {
+            color: #666;
+            text-decoration: none;
+            font-size: 0.8rem;
+            letter-spacing: 0.1rem;
+            transition: all 0.3s ease;
+            padding: 0.5rem 1.2rem;
+            border: 1px solid transparent;
+            border-radius: 20px;
+        }
+
+        nav a:hover, nav a.active {
+            color: var(--gold);
+            border-color: rgba(212, 175, 55, 0.3);
+            background: rgba(212, 175, 55, 0.05);
+        }
+
+        .header {
+            margin-bottom: 4rem;
+            text-align: center;
+        }
+
+        h1 {
+            font-weight: 300;
+            font-size: 1.1rem;
+            letter-spacing: 0.8rem;
+            color: var(--gold);
+            text-transform: uppercase;
+            opacity: 0.9;
+        }
+
+        /* 模式容器控制 */
+        .mode-container {
+            display: none;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .mode-container.active {
+            display: flex;
+        }
+
+        .unit-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .circle {
+            position: relative;
+            width: var(--size);
+            height: var(--size);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: conic-gradient(var(--gold) 0deg, var(--gold-dim) 0deg);
+        }
+
+        .circle::after {
+            content: '';
+            position: absolute;
+            width: calc(var(--size) - (var(--border) * 2));
+            height: calc(var(--size) - (var(--border) * 2));
+            background: var(--bg-color);
+            border-radius: 50%;
+            z-index: 1;
+        }
+
+        .value {
+            position: relative;
+            z-index: 2;
+            font-family: var(--font-mono); /* 完整模式也使用等寬 */
+            font-size: 2.2rem;
+            font-weight: 400;
+            text-shadow: 0 0 15px rgba(212, 175, 55, 0.4);
+        }
+
+        /* 單一大數字模式樣式 */
+        .single-value-display {
+            font-family: var(--font-mono); /* 核心修復：使用等寬字體防止抖動 */
+            font-size: 5rem;
+            color: var(--gold);
+            text-shadow: 0 0 25px rgba(212, 175, 55, 0.5);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .label {
+            font-family: sans-serif;
+            font-size: 0.75rem;
+            color: #555;
+            letter-spacing: 0.3rem;
+            text-transform: uppercase;
+        }
+
+        /* 響應式優化 */
+        @media (max-width: 600px) {
+            .single-value-display { font-size: 3.5rem; }
+            h1 { font-size: 0.9rem; letter-spacing: 0.4rem; }
+            nav { gap: 0.5rem; }
+            nav a { padding: 0.4rem 0.8rem; font-size: 0.7rem; }
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <nav id="mode-nav">
+        <a href="#full" id="nav-full">完整時間</a>
+        <a href="#hours" id="nav-hours">小時</a>
+        <a href="#minutes" id="nav-minutes">分鐘</a>
+        <a href="#seconds" id="nav-seconds">秒數</a>
+        <a href="#ms" id="nav-ms">毫秒</a>
+    </nav>
+
+    <div class="header">
+        <h1>115年國中教育會考倒數</h1>
+    </div>
+
+    <!-- 完整模式 -->
+    <div id="full-container" class="mode-container">
+        <div class="unit-group"><div class="circle" id="c-full-d"><span class="value" id="v-full-d">0</span></div><span class="label">Days</span></div>
+        <div class="unit-group"><div class="circle" id="c-full-h"><span class="value" id="v-full-h">00</span></div><span class="label">Hours</span></div>
+        <div class="unit-group"><div class="circle" id="c-full-m"><span class="value" id="v-full-m">00</span></div><span class="label">Mins</span></div>
+        <div class="unit-group"><div class="circle" id="c-full-s"><span class="value" id="v-full-s">00</span></div><span class="label">Secs</span></div>
+    </div>
+
+    <!-- 單一數字模式 -->
+    <div id="single-container" class="mode-container">
+        <div class="unit-group">
+            <span class="single-value-display" id="single-value">0</span>
+            <span class="label" id="single-label">UNIT</span>
+        </div>
+    </div>
+
+    <script>
+        const targetDate = new Date('May 16, 2026 08:00:00').getTime();
+
+        function getMode() {
+            const hash = window.location.hash.replace('#', '');
+            const modes = ['full', 'hours', 'minutes', 'seconds', 'ms'];
+            return modes.includes(hash) ? hash : 'full';
+        }
+
+        function updateUI() {
+            const currentMode = getMode();
+            
+            document.querySelectorAll('#mode-nav a').forEach(a => {
+                a.classList.toggle('active', a.getAttribute('href') === '#' + currentMode);
+            });
+
+            if (currentMode === 'full') {
+                document.getElementById('full-container').classList.add('active');
+                document.getElementById('single-container').classList.remove('active');
+            } else {
+                document.getElementById('full-container').classList.remove('active');
+                document.getElementById('single-container').classList.add('active');
+                document.getElementById('single-label').innerText = currentMode.toUpperCase();
+            }
+        }
+
+        function render() {
+            const now = new Date();
+            const nowMs = now.getTime();
+            const distance = targetDate - nowMs;
+            const mode = getMode();
+
+            if (distance < 0) {
+                document.getElementById('single-value').innerText = "0";
+                return;
+            }
+
+            if (mode === 'full') {
+                const d = Math.floor(distance / (1000 * 60 * 60 * 24));
+                const h = Math.floor((distance / (1000 * 60 * 60)) % 24);
+                const m = Math.floor((distance / (1000 * 60)) % 60);
+                const s = Math.floor((distance / 1000) % 60);
+                const ms = now.getMilliseconds();
+
+                document.getElementById('v-full-d').innerText = d;
+                document.getElementById('v-full-h').innerText = h.toString().padStart(2, '0');
+                document.getElementById('v-full-m').innerText = m.toString().padStart(2, '0');
+                document.getElementById('v-full-s').innerText = s.toString().padStart(2, '0');
+
+                draw(document.getElementById('c-full-s'), (ms / 1000) * 360);
+                draw(document.getElementById('c-full-m'), ((now.getSeconds() + ms/1000) / 60) * 360);
+                draw(document.getElementById('c-full-h'), ((now.getMinutes() + now.getSeconds()/60) / 60) * 360);
+                draw(document.getElementById('c-full-d'), ((now.getHours() + now.getMinutes()/60) / 24) * 360);
+
+            } else {
+                let displayValue = "";
+                const valEl = document.getElementById('single-value');
+
+                // 根據模式調整小數點位數
+                if (mode === 'hours') {
+                    // 小時模式顯示 4 位小數
+                    displayValue = (distance / (1000 * 60 * 60)).toFixed(4);
+                } else if (mode === 'minutes') {
+                    // 分鐘模式顯示 3 位小數
+                    displayValue = (distance / (1000 * 60)).toFixed(3);
+                } else if (mode === 'seconds') {
+                    // 秒數模式顯示 3 位小數
+                    displayValue = (distance / 1000).toFixed(3);
+                } else if (mode === 'ms') {
+                    // 毫秒模式維持整數加千分位
+                    displayValue = Math.floor(distance).toLocaleString();
+                }
+                valEl.innerText = displayValue;
+            }
+
+            requestAnimationFrame(render);
+        }
+
+        function draw(el, deg) {
+            el.style.background = `conic-gradient(var(--gold) ${deg}deg, var(--gold-dim) ${deg}deg)`;
+        }
+
+        window.addEventListener('hashchange', updateUI);
+        updateUI();
+        requestAnimationFrame(render);
+    </script>
+</body>
+</html>
