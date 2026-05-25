@@ -1,3 +1,5 @@
+[English](README.md) | [繁體中文](README.zh-Hant.md)
+
 # finger-lottery
 
 A mobile-first multi-touch lottery picker for picking winners on the spot. Everyone puts a finger on the screen, hold for a few seconds, and one gets randomly selected with a smooth liquid fill animation.
