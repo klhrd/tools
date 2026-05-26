@@ -856,10 +856,13 @@ toastEl.classList.remove('show');
 // 側邊設定面板阻斷穿透與手勢
 const uiElementsToBlock = [settingsPanel, menuBtn, backdropOverlay, toastEl];
 uiElementsToBlock.forEach(el => {
-const stop = (e) => e.stopPropagation();
-el.addEventListener('touchstart', stop, { passive: true });
-el.addEventListener('touchmove', stop, { passive: true });
-el.addEventListener('touchend', stop, { passive: true });
+const stop = (e) => {
+  e.stopPropagation();
+  e.preventDefault();
+}
+el.addEventListener('touchstart', stop, { passive: false });
+el.addEventListener('touchmove', stop, { passive: false });
+el.addEventListener('touchend', stop, { passive: false });
 el.addEventListener('mousedown', stop);
 el.addEventListener('mousemove', stop);
 el.addEventListener('mouseup', stop);
