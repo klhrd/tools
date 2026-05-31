@@ -301,7 +301,7 @@
 
     .setting-label {
       flex: 1;
-      padding-right: 16px;
+      padding-right: 12px;
     }
 
     .setting-title {
@@ -317,12 +317,13 @@
       line-height: 1.3;
     }
 
-    /* 微調滑桿 */
+    /* 微調滑桿 - 確保寬度自適應包含在選單內部，絕不溢出 */
     .range-slider-container {
       display: flex;
       align-items: center;
-      gap: 12px;
-      width: 120px;
+      gap: 10px;
+      width: 125px; /* 精準調整，安全貼合選單寬度 */
+      flex-shrink: 0;
     }
 
     .range-slider {
@@ -354,9 +355,10 @@
       font-size: 13px;
       font-weight: 700;
       color: #818cf8;
-      min-width: 28px;
+      width: 32px; /* 穩定固定數值寬度，避免滑動時排版微抖動 */
       text-align: right;
       font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
     }
 
     /* Switch 按鈕 */
@@ -785,6 +787,7 @@
       }
     }
 
+    // 取得當前配置的雜湊字串
     function getCompressedHash() {
       const sec = Math.round(config.duration / 1000);
       const reset = config.resetOnJoin ? '1' : '0';
@@ -796,8 +799,21 @@
       return `${sec}${reset}${confetti}${colName}${info}${minimal}${sound}`;
     }
 
+    // 保存設定到 Local Storage 與更新雜湊
+    function saveSettings() {
+      try {
+        localStorage.setItem('finger_lottery_settings', JSON.stringify(config));
+      } catch (e) {
+        console.warn('LocalStorage save error:', e);
+      }
+      updateUrlHash();
+    }
+
+    // 解析設定：優先從網址 Hash 載入（方便分享），若無則從 Local Storage 讀取，再無則使用預設值
     function parseHash() {
+      let loaded = false;
       const hash = window.location.hash.substring(1);
+
       if (hash && hash.length >= 7) {
         const parts = hash.split('');
         const sec = Math.max(1, Math.min(10, parseInt(parts[0]) || 3));
@@ -809,18 +825,33 @@
         config.showInfoPanel = parts[4] === '1';
         config.minimalMode = parts[5] === '1';
         config.enableSound = parts[6] === '1';
-
-        timerSlider.value = sec;
-        timerVal.textContent = `${sec}s`;
-        resetOnJoinInput.checked = config.resetOnJoin;
-        showConfettiInput.checked = config.showConfetti;
-        useColorNamesInput.checked = config.useColorNames;
-        showInfoPanelInput.checked = config.showInfoPanel;
-        minimalModeInput.checked = config.minimalMode;
-        enableSoundInput.checked = config.enableSound;
-
-        applyUIVisibility();
+        loaded = true;
+      } else {
+        // 嘗試從 Local Storage 載入
+        try {
+          const localData = localStorage.getItem('finger_lottery_settings');
+          if (localData) {
+            const parsed = JSON.parse(localData);
+            Object.assign(config, parsed);
+            loaded = true;
+          }
+        } catch (e) {
+          console.warn('LocalStorage load error:', e);
+        }
       }
+
+      // 如果有任何來源成功載入，更新控制元件
+      const sec = Math.round(config.duration / 1000);
+      timerSlider.value = sec;
+      timerVal.textContent = `${sec}s`;
+      resetOnJoinInput.checked = config.resetOnJoin;
+      showConfettiInput.checked = config.showConfetti;
+      useColorNamesInput.checked = config.useColorNames;
+      showInfoPanelInput.checked = config.showInfoPanel;
+      minimalModeInput.checked = config.minimalMode;
+      enableSoundInput.checked = config.enableSound;
+
+      applyUIVisibility();
     }
 
     function updateUrlHash() {
@@ -842,36 +873,36 @@
       const val = parseInt(e.target.value);
       timerVal.textContent = `${val}s`;
       config.duration = val * 1000;
-      updateUrlHash();
+      saveSettings();
       onTouchCountChanged();
     });
 
     resetOnJoinInput.addEventListener('change', (e) => {
       config.resetOnJoin = e.target.checked;
-      updateUrlHash();
+      saveSettings();
     });
     enableSoundInput.addEventListener('change', (e) => {
       config.enableSound = e.target.checked;
-      updateUrlHash();
+      saveSettings();
       if (config.enableSound) initAudio();
     });
     showConfettiInput.addEventListener('change', (e) => {
       config.showConfetti = e.target.checked;
-      updateUrlHash();
+      saveSettings();
     });
     useColorNamesInput.addEventListener('change', (e) => {
       config.useColorNames = e.target.checked;
-      updateUrlHash();
+      saveSettings();
       onTouchCountChanged();
     });
     showInfoPanelInput.addEventListener('change', (e) => {
       config.showInfoPanel = e.target.checked;
-      updateUrlHash();
+      saveSettings();
       applyUIVisibility();
     });
     minimalModeInput.addEventListener('change', (e) => {
       config.minimalMode = e.target.checked;
-      updateUrlHash();
+      saveSettings();
       applyUIVisibility();
     });
 
@@ -898,7 +929,7 @@
       }, 2500);
     }
 
-    // 【重要修正 1】優化 UI 事件防穿透，避免阻斷按鈕自身的點擊事件
+    // 優化 UI 事件防穿透，避免阻斷按鈕自身的點擊事件
     const uiElementsToBlock = [settingsPanel, menuBtn, backdropOverlay, toastEl];
     uiElementsToBlock.forEach(el => {
       el.addEventListener('touchstart', (e) => {
@@ -1310,7 +1341,7 @@
       onTouchCountChanged();
     }
 
-    // 【重要修正 2】在 Canvas 上明確阻斷預設行為（防止縮放、滑動干擾）
+    // 在 Canvas 上明確阻斷預設行為（防止縮放、滑動干擾）
     canvas.addEventListener('touchstart', handleTouchStart, {
       passive: false
     });
@@ -1324,7 +1355,7 @@
       passive: false
     });
 
-    // 【重要修正 3】新增滑鼠事件模擬（支援 PC 瀏覽器排查測試與單人模擬）
+    // 新增滑鼠事件模擬（支援 PC 瀏覽器排查測試與單人模擬）
     let isMouseDown = false;
     canvas.addEventListener('mousedown', (e) => {
       if (gameState === 'winner') return;
@@ -1356,8 +1387,10 @@
     canvas.addEventListener('mouseup', handleMouseUp);
     canvas.addEventListener('mouseleave', handleMouseUp);
 
-    // 初始化
+    // 初始化讀取 LocalStorage 與 Hash
     parseHash();
+
+    // 啟動主渲染繪製循環
     requestAnimationFrame((timestamp) => {
       lastTime = timestamp;
       draw(timestamp);
