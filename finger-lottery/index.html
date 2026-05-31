@@ -1365,7 +1365,13 @@
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.worker = navigator.serviceWorker.register('/sw.js');
+        navigator.serviceWorker.register('/sw.js')
+          .then(registration => {
+            console.log('Service Worker 註冊成功，範圍在:', registration.scope);
+          })
+          .catch(error => {
+            console.error('Service Worker 註冊失敗:', error);
+          });
       });
     }
   </script>
