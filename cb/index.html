@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clean Bandit - 古典與電音的交響史詩</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome 圖標 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* 嚴格的 3:4 比例與外圍黑幕 (Letterbox) */
+        body {
+            background-color: #000000;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            width: 100vw;
+            margin: 0;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+
+        /* 3:4 容器：最大化契合螢幕，強制 border-radius 為 0 */
+        #app-viewport {
+            position: relative;
+            background-color: #090d16;
+            aspect-ratio: 3 / 4;
+            width: 100%;
+            max-height: 100%;
+            max-width: 100%;
+            overflow: hidden;
+            border-radius: 0px !important;
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.9);
+        }
+
+        /* 視窗比大於 3:4 時 (橫向螢幕)，以高度為基準 */
+        @media (min-aspect-ratio: 3/4) {
+            #app-viewport {
+                width: auto;
+                height: 100vh;
+            }
+        }
+        /* 視窗比小於 3:4 時 (極端窄長螢幕)，以寬度為基準 */
+        @media (max-aspect-ratio: 3/4) {
+            #app-viewport {
+                width: 100vw;
+                height: auto;
+            }
+        }
+
+        /* 投影片切換轉場 (極簡淡入淡出) */
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.4s ease-in-out, transform 0.4s ease-in-out;
+            transform: scale(0.97);
+            border-radius: 0px !important;
+        }
+
+        .slide.active {
+            opacity: 1;
+            visibility: visible;
+            transform: scale(1);
+        }
+
+        /* 強制去除所有可能產生圓角的設計 */
+        * {
+            border-radius: 0px !important;
+        }
+
+        /* 霓虹字體微發光 */
+        .glow-cyan {
+            text-shadow: 0 0 10px rgba(6, 182, 212, 0.4);
+        }
+        .glow-gold {
+            text-shadow: 0 0 10px rgba(212, 175, 55, 0.4);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 3:4 簡報核心視口 -->
+    <div id="app-viewport" class="select-none text-white flex flex-col justify-between">
+
+        <!-- ==================== SLIDE 1: 封面 ==================== -->
+        <div class="slide active flex flex-col justify-between p-8 bg-gradient-to-b from-[#060a12] via-[#0c1322] to-[#04060b]" data-index="0">
+            <!-- 幾何框架裝飾 -->
+            <div class="absolute inset-4 border border-cyan-500/10 pointer-events-none"></div>
+            <div class="absolute top-10 left-10 w-16 h-0.5 bg-yellow-500/60"></div>
+            <div class="absolute bottom-10 right-10 w-16 h-0.5 bg-cyan-500/60"></div>
+
+            <div class="z-10 flex justify-between items-center text-[10px] tracking-[0.2em] text-gray-500 font-bold">
+                <span>PRESENTATION</span>
+                <span>CLEAN BANDIT</span>
+            </div>
+
+            <div class="z-10 text-center my-auto">
+                <p class="text-[10px] tracking-[0.4em] text-cyan-400 font-bold mb-4 uppercase glow-cyan">英倫電子交響巨擘</p>
+                <h1 class="text-4xl font-black tracking-wider leading-none text-white glow-gold">
+                    CLEAN<br><span class="text-yellow-500">BANDIT</span>
+                </h1>
+                <p class="text-xs tracking-[0.2em] text-gray-400 mt-6 font-light">
+                    古典與電音的交響史詩
+                </p>
+                <div class="w-10 h-0.5 bg-yellow-500 mx-auto mt-6"></div>
+            </div>
+
+            <div class="z-10 text-center space-y-4">
+                <p class="text-[11px] text-gray-500 tracking-wider">
+                    從劍橋學院到後現代視覺藝術的音樂革命
+                </p>
+                <p class="text-[9px] text-cyan-500/80 tracking-widest animate-pulse font-mono">
+                    [ 點擊右側進下一頁 / 支援左右方向鍵 ]
+                </p>
+            </div>
+        </div>
+
+
+        <!-- ==================== SLIDE 2: 成團背景 ==================== -->
+        <div class="slide flex flex-col justify-between p-8 bg-[#0b0f19]" data-index="1">
+            <div class="absolute inset-4 border border-white/5 pointer-events-none"></div>
+
+            <div class="z-10 flex justify-between items-center text-[10px] tracking-widest text-gray-500">
+                <span>01. ORIGINS</span>
+                <span>BACKGROUND</span>
+            </div>
+
+            <div class="z-10 my-auto space-y-6">
+                <div class="border-l-2 border-yellow-500 pl-4">
+                    <span class="text-[9px] tracking-widest text-yellow-500 font-bold uppercase">起源故事</span>
+                    <h2 class="text-xl font-bold mt-1 text-white">劍橋耶穌學院的相遇</h2>
+                </div>
+
+                <p class="text-xs text-gray-300 leading-relaxed">
+                    樂團靈魂人物 <span class="text-cyan-400 font-semibold">Grace Chatto</span> 與 <span class="text-cyan-400 font-semibold">Patterson 兄弟</span>（Jack 與 Luke）在英國劍橋大學讀書時結識。
+                </p>
+
+                <div class="bg-slate-950 p-4 border border-white/5 space-y-3">
+                    <div class="flex items-start space-x-3">
+                        <span class="text-yellow-500 mt-0.5 text-xs"><i class="fa-solid fa-violin"></i></span>
+                        <p class="text-[11px] text-gray-400 leading-normal">
+                            Grace 當時領軍一支古典弦樂四重奏，而 Jack 正好是主打電子樂的製作人。
+                        </p>
+                    </div>
+                    <div class="flex items-start space-x-3 pt-2 border-t border-white/5">
+                        <span class="text-cyan-400 mt-0.5 text-xs"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
+                        <p class="text-[11px] text-gray-400 leading-normal">
+                            Jack 嘗試將 Grace 的提琴錄音進行數位取樣與混音，意外拼湊出了古典旋律與 House 舞曲完美交融的革命性音色。
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="z-10 text-right">
+                <span class="text-[10px] text-gray-600 font-mono">ESTABLISHED IN 2008</span>
+            </div>
+        </div>
+
+
+        <!-- ==================== 新增 SLIDE 3: 核心成員專長表 ==================== -->
+        <div class="slide flex flex-col justify-between p-8 bg-[#0a0e17]" data-index="2">
+            <div class="absolute inset-4 border border-yellow-500/10 pointer-events-none"></div>
+
+            <div class="z-10 flex justify-between items-center text-[10px] tracking-widest text-gray-500">
+                <span>02. MEMBERS</span>
+                <span>ROSTER & ROLES</span>
+            </div>
+
+            <div class="z-10 my-auto space-y-5">
+                <div class="border-l-2 border-yellow-500 pl-4">
+                    <span class="text-[9px] tracking-widest text-yellow-500 font-bold uppercase">成員編制</span>
+                    <h2 class="text-xl font-bold mt-1 text-white">核心成員與樂器專長</h2>
+                </div>
+
+                <!-- 俐落無圓角對照表 -->
+                <div class="w-full text-left border border-white/10 text-xs">
+                    <!-- 表頭 -->
+                    <div class="grid grid-cols-3 bg-slate-950 p-2.5 font-bold text-gray-400 border-b border-white/10">
+                        <div>成員</div>
+                        <div>主要樂器</div>
+                        <div>樂團專長 / 角色</div>
+                    </div>
+                    <!-- 團員 1 -->
+                    <div class="grid grid-cols-3 p-2.5 border-b border-white/5 bg-white/[0.01]">
+                        <div class="font-semibold text-cyan-400">Grace Chatto</div>
+                        <div class="text-gray-300">大提琴<br><span class="text-[10px] text-gray-500">Cello / Vocals</span></div>
+                        <div class="text-gray-400 text-[11px]">古典器樂統籌、主導視覺美學與 MV 導演</div>
+                    </div>
+                    <!-- 團員 2 -->
+                    <div class="grid grid-cols-3 p-2.5 border-b border-white/5 bg-white/[0.03]">
+                        <div class="font-semibold text-yellow-500">Jack Patterson</div>
+                        <div class="text-gray-300">鍵盤、貝斯<br><span class="text-[10px] text-gray-500">Keys / Bass</span></div>
+                        <div class="text-gray-400 text-[11px]">主要音樂製作人、詞曲創作、取樣混音大師</div>
+                    </div>
+                    <!-- 團員 3 -->
+                    <div class="grid grid-cols-3 p-2.5 border-b border-white/5 bg-white/[0.01]">
+                        <div class="font-semibold text-purple-400">Luke Patterson</div>
+                        <div class="text-gray-300">電子鼓、打擊樂<br><span class="text-[10px] text-gray-500">Drums / Beats</span></div>
+                        <div class="text-gray-400 text-[11px]">節奏骨架設計、現場打擊樂編排控制</div>
+                    </div>
+                    <!-- 離團元老 -->
+                    <div class="grid grid-cols-3 p-2.5 bg-white/[0.01] opacity-60">
+                        <div class="text-gray-400 font-medium">Neil Amin-Smith<br><span class="text-[9px] text-gray-500">(2016年退團)</span></div>
+                        <div class="text-gray-500">小提琴<br><span class="text-[9px]">Violin</span></div>
+                        <div class="text-gray-500 text-[10px]">早期古典與流行樂句橋樑、鋼琴彈奏</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="z-10 text-[10px] text-gray-600 font-mono">
+                THE CORE SYMPHONY TRIO
+            </div>
+        </div>
+
+
+        <!-- ==================== SLIDE 4: 名字由來 ==================== -->
+        <div class="slide flex flex-col justify-between p-8 bg-[#0a0d14]" data-index="3">
+            <div class="absolute inset-4 border border-white/5 pointer-events-none"></div>
+
+            <div class="z-10 flex justify-between items-center text-[10px] tracking-widest text-gray-500">
+                <span>03. IDENTITY</span>
+                <span>THE NAME</span>
+            </div>
+
+            <div class="z-10 my-auto space-y-6">
+                <div class="border-l-2 border-cyan-500 pl-4">
+                    <span class="text-[9px] tracking-widest text-cyan-400 font-bold uppercase">樂團命名</span>
+                    <h2 class="text-xl font-bold mt-1 text-white">清純的盜賊</h2>
+                </div>
+
+                <div class="bg-cyan-950/20 p-4 border border-cyan-500/10 text-center">
+                    <span class="text-cyan-400 font-mono text-xs tracking-widest block mb-1">俄文原意</span>
+                    <span class="text-lg font-bold text-white tracking-wide">Чистая бандитка</span>
+                    <span class="text-[11px] text-gray-400 block mt-1">(Chistaya Banditka)</span>
+                </div>
+
+                <p class="text-xs text-gray-300 leading-relaxed">
+                    樂團名字源自於此。Grace 曾在俄羅斯求學並居住過一段時間，其友人曾用這個俄語片語來開玩笑地形容 Grace 妹妹的調皮個性，直譯為**「乾淨的盜賊」**或**「清純的淘氣鬼」**。
+                </p>
+
+                <p class="text-xs text-gray-400 leading-relaxed italic border-t border-white/5 pt-3">
+                    這名字也隱隱揭示了他們的音樂靈魂：大膽地「盜取」並取樣巴哈、莫札特等古典大師作品，再將其「洗清」重組為乾淨、時髦的現代電音。
+                </p>
+            </div>
+
+            <div class="z-10 text-[10px] text-gray-600 font-mono">
+                CLEAN BANDIT = PURE ROGUE
+            </div>
+        </div>
+
+
+        <!-- ==================== SLIDE 5: 第一時期 ==================== -->
+        <div class="slide flex flex-col justify-between p-8 bg-gradient-to-br from-[#0a101d] to-[#121a2b]" data-index="4">
+            <div class="absolute inset-4 border border-cyan-500/10 pointer-events-none"></div>
+
+            <div class="z-10 flex justify-between items-center text-[10px] tracking-widest text-cyan-400 font-bold">
+                <span>PHASE 01 (2008 - 2015)</span>
+                <span>CLASSIC ERA</span>
+            </div>
+
+            <div class="z-10 my-auto space-y-5">
+                <div>
+                    <span class="bg-cyan-500/20 text-cyan-400 text-[8px] font-bold px-2 py-0.5 tracking-wider uppercase">獨立起步與交融期</span>
+                    <h2 class="text-2xl font-black text-white mt-2 leading-tight">古典與浩室的初次碰撞</h2>
+                    <p class="text-[10px] text-cyan-400/80 mt-1">陣容：四人體制 (Grace, Jack, Luke, Neil)</p>
+                </div>
+
+                <p class="text-xs text-gray-300 leading-relaxed">
+                    此時期帶有強烈的劍橋學術感。他們將巴哈、莫札特的悠揚弦樂，注入冰冷沉穩的 Deep House 節拍中，大膽挑戰主流樂壇。
+                </p>
+
+                <div class="space-y-2">
+                    <div class="bg-black/40 p-3 border-l-2 border-cyan-500">
+                        <h4 class="text-xs font-bold text-white flex justify-between">
+                            <span>《Rather Be》</span>
+                            <span class="text-cyan-400">2014</span>
+                        </h4>
+                        <p class="text-[10px] text-gray-400 mt-1">攜手 Jess Glynne，一舉奪下葛萊美「最佳舞曲錄製」獎。</p>
+                    </div>
+                    <div class="bg-black/40 p-3 border-l-2 border-cyan-500">
+                        <h4 class="text-xs font-bold text-white flex justify-between">
+                            <span>《Mozart's House》</span>
+                            <span class="text-cyan-400">2013</span>
+                        </h4>
+                        <p class="text-[10px] text-gray-400 mt-1">直接對莫札特作品進行極具衝擊感的電子取樣。</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="z-10 text-[10px] text-cyan-500/60 font-mono">
+                ALBUM: "NEW EYES"
+            </div>
+        </div>
+
+
+        <!-- ==================== SLIDE 6: 第二時期 ==================== -->
+        <div class="slide flex flex-col justify-between p-8 bg-gradient-to-br from-[#0c0d12] to-[#250d18]" data-index="5">
+            <div class="absolute inset-4 border border-rose-500/10 pointer-events-none"></div>
+
+            <div class="z-10 flex justify-between items-center text-[10px] tracking-widest text-rose-400 font-bold">
+                <span>PHASE 02 (2016 - 2018)</span>
+                <span>GOLDEN ERA</span>
+            </div>
+
+            <div class="z-10 my-auto space-y-5">
+                <div>
+                    <span class="bg-rose-500/20 text-rose-400 text-[8px] font-bold px-2 py-0.5 tracking-wider uppercase">商業巔峰期</span>
+                    <h2 class="text-2xl font-black text-white mt-2 leading-tight">全球神曲製造機的誕生</h2>
+                    <p class="text-[10px] text-rose-400/80 mt-1">陣容：三人體制 (小提琴手 Neil Amin-Smith 退團)</p>
+                </div>
+
+                <p class="text-xs text-gray-300 leading-relaxed">
+                    陣容縮編為三人，但商業成績達到頂峰。曲風減少了實驗感，大膽融入拉丁熱情與雷鬼動（Reggaeton）節奏，締造數十億次收聽。
+                </p>
+
+                <div class="space-y-2">
+                    <div class="bg-black/40 p-3 border-l-2 border-rose-500">
+                        <h4 class="text-xs font-bold text-white flex justify-between">
+                            <span>《Rockabye》</span>
+                            <span class="text-rose-400">9週冠軍</span>
+                        </h4>
+                        <p class="text-[10px] text-gray-400 mt-1">與 Sean Paul 及 Anne-Marie 合作，創下英國榜霸榜紀錄。</p>
+                    </div>
+                    <div class="bg-black/40 p-3 border-l-2 border-rose-500">
+                        <h4 class="text-xs font-bold text-white flex justify-between">
+                            <span>《Symphony》</span>
+                            <span class="text-rose-400">Zara Larsson</span>
+                        </h4>
+                        <p class="text-[10px] text-gray-400 mt-1">史詩級交響樂與熱帶浩室融合的催淚巨作。</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="z-10 text-[10px] text-rose-500/60 font-mono">
+                ALBUM: "WHAT IS LOVE?"
+            </div>
+        </div>
+
+
+        <!-- ==================== SLIDE 7: 第三時期 ==================== -->
+        <div class="slide flex flex-col justify-between p-8 bg-gradient-to-br from-[#0c0d12] to-[#1d0d2b]" data-index="6">
+            <div class="absolute inset-4 border border-purple-500/10 pointer-events-none"></div>
+
+            <div class="z-10 flex justify-between items-center text-[10px] tracking-widest text-purple-400 font-bold">
+                <span>PHASE 03 (2019 - PRESENT)</span>
+                <span>COLLAB ERA</span>
+            </div>
+
+            <div class="z-10 my-auto space-y-5">
+                <div>
+                    <span class="bg-purple-500/20 text-purple-400 text-[8px] font-bold px-2 py-0.5 tracking-wider uppercase">多元聯名與探索期</span>
+                    <h2 class="text-2xl font-black text-white mt-2 leading-tight">打破傳統框架的跨界合作</h2>
+                    <p class="text-[10px] text-purple-400/80 mt-1">陣容：穩定的鐵三角製作核心</p>
+                </div>
+
+                <p class="text-xs text-gray-300 leading-relaxed">
+                    不再執著於推出正規大碟，改以更高頻率的「單曲聯名」主導市場。風格嘗試了復古迪斯可（Disco）、摩登流行與前衛 Future House。
+                </p>
+
+                <div class="space-y-2">
+                    <div class="bg-black/40 p-3 border-l-2 border-purple-500">
+                        <h4 class="text-xs font-bold text-white flex justify-between">
+                            <span>《Higher》</span>
+                            <span class="text-purple-400">iann dior</span>
+                        </h4>
+                        <p class="text-[10px] text-gray-400 mt-1">與饒舌新星合作，展現更為輕快、摩登的流行律動。</p>
+                    </div>
+                    <div class="bg-black/40 p-3 border-l-2 border-purple-500">
+                        <h4 class="text-xs font-bold text-white flex justify-between">
+                            <span>《Drive》</span>
+                            <span class="text-purple-400">Topic & A7S</span>
+                        </h4>
+                        <p class="text-[10px] text-gray-400 mt-1">探索沉浸式的歐陸深層浩室節奏。</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="z-10 text-[10px] text-purple-500/60 font-mono">
+                SINGLE-DRIVEN ERA
+            </div>
+        </div>
+
+
+        <!-- ==================== SLIDE 8: 後現代 1 (自製視覺) ==================== -->
+        <div class="slide flex flex-col justify-between p-8 bg-[#080d16]" data-index="7">
+            <div class="absolute inset-4 border border-emerald-500/10 pointer-events-none"></div>
+
+            <div class="z-10 flex justify-between items-center text-[10px] tracking-widest text-emerald-400 font-bold">
+                <span>08. POST-MODERN I</span>
+                <span>VISUAL ART</span>
+            </div>
+
+            <div class="z-10 my-auto space-y-6">
+                <div class="border-l-2 border-emerald-500 pl-4">
+                    <span class="text-[9px] tracking-widest text-emerald-400 font-bold uppercase">後現代影像藝術</span>
+                    <h2 class="text-xl font-bold mt-1 text-white">完全自主的視覺掌控力</h2>
+                </div>
+
+                <p class="text-xs text-gray-300 leading-relaxed">
+                    Clean Bandit 的偉大不只在於聽覺，更在於全方位的後現代視覺操盤。
+                </p>
+
+                <div class="bg-emerald-950/20 p-4 border border-emerald-500/10 space-y-3">
+                    <h3 class="text-xs font-bold text-white uppercase"><i class="fa-solid fa-clapperboard text-emerald-400 mr-2"></i>A Clean Film Production</h3>
+                    <p class="text-[11px] text-gray-400 leading-relaxed">
+                        他們成立了自己的影像工作室。樂團靈魂 Grace Chatto 與 Jack Patterson 親自擔任導演與剪輯師，執導了幾乎所有的官方音樂錄影帶（MV），擺脫唱片公司傳統視覺公式。
+                    </p>
+                </div>
+
+                <p class="text-[11px] text-gray-500 leading-normal">
+                    不管是《Rather Be》裡的築地市場追星幻想，還是《Rockabye》中極具敘事感的舞者動態，全部出自團員親手策劃。
+                </p>
+            </div>
+
+            <div class="z-10 text-[10px] text-emerald-500/60 font-mono">
+                DIRECTED BY GRACE CHATTO & JACK PATTERSON
+            </div>
+        </div>
+
+
+        <!-- ==================== SLIDE 9: 後現代 2 (獨立精神) ==================== -->
+        <div class="slide flex flex-col justify-between p-8 bg-[#090b10]" data-index="8">
+            <div class="absolute inset-4 border border-white/5 pointer-events-none"></div>
+
+            <div class="z-10 flex justify-between items-center text-[10px] tracking-widest text-gray-500">
+                <span>09. POST-MODERN II</span>
+                <span>DIGITAL DIY</span>
+            </div>
+
+            <div class="z-10 my-auto space-y-6">
+                <div class="border-l-2 border-yellow-500 pl-4">
+                    <span class="text-[9px] tracking-widest text-yellow-500 font-bold uppercase">獨立靈魂的延續</span>
+                    <h2 class="text-xl font-bold mt-1 text-white">數位洪流下的家庭作坊</h2>
+                </div>
+
+                <p class="text-xs text-gray-300 leading-relaxed">
+                    即使擁有數十億串流，Clean Bandit 骨子裡仍流著龐克與獨立音樂人「自己動手做」的後現代精神：
+                </p>
+
+                <!-- 亮點區 -->
+                <div class="grid grid-cols-2 gap-3 text-left">
+                    <div class="bg-white/5 p-3 border border-white/5">
+                        <span class="text-yellow-500 text-sm block mb-1"><i class="fa-solid fa-users"></i></span>
+                        <h4 class="text-xs font-bold text-white">家庭核心參與</h4>
+                        <p class="text-[10px] text-gray-400 mt-1">Grace 的父親 Ricky 甚至會親自幫忙手工搭建 MV 道具與舞台背景。</p>
+                    </div>
+                    <div class="bg-white/5 p-3 border border-white/5">
+                        <span class="text-cyan-500 text-sm block mb-1"><i class="fa-solid fa-network-wired"></i></span>
+                        <h4 class="text-xs font-bold text-white">跨媒體數位實驗</h4>
+                        <p class="text-[10px] text-gray-400 mt-1">不依賴單一實體形式，純熟運用跨平台數位聯名開闢市場。</p>
+                    </div>
+                </div>
+
+                <p class="text-[11px] text-gray-400 italic">
+                    不論市場如何變遷，他們始終手握完整的創作自由，在高度商業的世界裡保有一塊高尚而古典的自留地。
+                </p>
+            </div>
+
+            <div class="z-10 text-[10px] text-gray-600 font-mono">
+                100% CREATIVE INDEPENDENCE
+            </div>
+        </div>
+
+
+        <!-- ==================== SLIDE 10: 總結 ==================== -->
+        <div class="slide flex flex-col justify-between p-8 bg-gradient-to-b from-[#060a12] to-[#030508]" data-index="9">
+            <div class="absolute inset-4 border border-yellow-500/10 pointer-events-none"></div>
+
+            <div class="z-10 flex justify-between items-center text-[10px] tracking-widest text-gray-500">
+                <span>10. EPILOGUE</span>
+                <span>THE FUTURE</span>
+            </div>
+
+            <div class="z-10 my-auto text-center space-y-6">
+                <p class="text-[10px] tracking-[0.3em] text-yellow-500 font-bold uppercase glow-gold">總結</p>
+                <h2 class="text-2xl font-black text-white tracking-wide">不設主唱的冒險終章</h2>
+                <div class="w-10 h-0.5 bg-yellow-500 mx-auto"></div>
+
+                <!-- 簡短時期總攬 -->
+                <div class="max-w-xs mx-auto text-left text-[11px] space-y-3 pt-4 text-gray-300">
+                    <div class="flex items-center space-x-2">
+                        <span class="w-2 h-2 bg-cyan-500 shrink-0"></span>
+                        <p><strong>第一時期：</strong> 劍橋實驗與本格古典電音大獲成功</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="w-2 h-2 bg-rose-500 shrink-0"></span>
+                        <p><strong>第二時期：</strong> 多元雷鬼動與霸榜級商業神曲巔峰</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="w-2 h-2 bg-purple-500 shrink-0"></span>
+                        <p><strong>第三時期：</strong> 數位時代的全球跨界聯名大師</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="w-2 h-2 bg-emerald-500 shrink-0"></span>
+                        <p><strong>後現代：</strong> A Clean Film 自主影像獨立美學</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="z-10 text-center space-y-2">
+                <p class="text-[11px] text-gray-500 font-bold tracking-widest uppercase">Thank You</p>
+                <p class="text-[9px] text-gray-600 font-mono">Classic meets Electronic forever.</p>
+            </div>
+        </div>
+
+
+        <!-- ==================== 控制導覽列 (底欄控制) ==================== -->
+        <div class="absolute bottom-4 left-0 right-0 z-20 flex flex-col items-center justify-center space-y-2 px-8">
+            <!-- 無圓角進度條 -->
+            <div class="w-full bg-slate-900 h-0.5 overflow-hidden">
+                <div id="progress-bar" class="bg-gradient-to-r from-cyan-500 via-rose-500 to-yellow-500 h-full transition-all duration-300" style="width: 10%;"></div>
+            </div>
+
+            <!-- 按鈕 & 分頁指示器 -->
+            <div class="flex justify-between items-center w-full">
+                <button id="btn-prev" class="px-3 py-1 bg-white/5 hover:bg-white/10 text-white text-[10px] tracking-wider transition-colors duration-200 uppercase disabled:opacity-20" disabled>
+                    Prev
+                </button>
+
+                <!-- 分頁指示點 (點擊亦可直達) -->
+                <div class="flex space-x-1.5" id="dots-container"></div>
+
+                <button id="btn-next" class="px-3 py-1 bg-white/5 hover:bg-white/10 text-white text-[10px] tracking-wider transition-colors duration-200 uppercase">
+                    Next
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 簡報邏輯控管 JavaScript -->
+    <script>
+        const slides = document.querySelectorAll('.slide');
+        const prevBtn = document.getElementById('btn-prev');
+        const nextBtn = document.getElementById('btn-next');
+        const progressBar = document.getElementById('progress-bar');
+        const dotsContainer = document.getElementById('dots-container');
+
+        let currentSlide = 0;
+        const totalSlides = slides.length;
+
+        // 生成分頁點
+        function initDots() {
+            dotsContainer.innerHTML = '';
+            for (let i = 0; i < totalSlides; i++) {
+                const dot = document.createElement('button');
+                // 強制去除圓角，寬高一致或寬度拉長 (0px border-radius)
+                dot.className = `w-1.5 h-1.5 transition-all duration-300 ${i === currentSlide ? 'bg-yellow-500' : 'bg-gray-700 hover:bg-gray-500'}`;
+                dot.setAttribute('aria-label', `Go to slide ${i + 1}`);
+                dot.addEventListener('click', (e) => {
+                    e.stopPropagation(); // 阻止點擊冒泡
+                    goToSlide(i);
+                });
+                dotsContainer.appendChild(dot);
+            }
+        }
+
+        // 精準跳頁
+        function goToSlide(index) {
+            if (index < 0 || index >= totalSlides) return;
+
+            // 關閉前一頁
+            slides[currentSlide].classList.remove('active');
+
+            // 啟用當前頁
+            currentSlide = index;
+            slides[currentSlide].classList.add('active');
+
+            // 更新進度條
+            const progressPercent = ((currentSlide + 1) / totalSlides) * 100;
+            progressBar.style.width = `${progressPercent}%`;
+
+            // 控制按鈕狀態
+            prevBtn.disabled = currentSlide === 0;
+            nextBtn.disabled = currentSlide === totalSlides - 1;
+
+            // 更新點樣式 (3:4 無圓角風格)
+            const dots = dotsContainer.querySelectorAll('button');
+            dots.forEach((dot, idx) => {
+                if (idx === currentSlide) {
+                    dot.className = 'w-3.5 h-1.5 bg-yellow-500 transition-all duration-300';
+                } else {
+                    dot.className = 'w-1.5 h-1.5 bg-gray-700 hover:bg-gray-500 transition-all duration-300';
+                }
+            });
+        }
+
+        // 下一頁與上一頁
+        function nextSlide() {
+            if (currentSlide < totalSlides - 1) {
+                goToSlide(currentSlide + 1);
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 0) {
+                goToSlide(currentSlide - 1);
+            }
+        }
+
+        // 控制鍵按鈕監聽
+        prevBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            prevSlide();
+        });
+        nextBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            nextSlide();
+        });
+
+        // 螢幕主體點擊切換頁面 (點擊右半邊下頁，左半邊上頁)
+        document.getElementById('app-viewport').addEventListener('click', (e) => {
+            // 若點擊到控制按鈕/分頁點則不觸發背景點擊
+            if (e.target.closest('button')) return;
+
+            const rect = e.currentTarget.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+
+            if (clickX > rect.width / 2) {
+                nextSlide();
+            } else {
+                prevSlide();
+            }
+        });
+
+        // 鍵盤操控 (左右方向鍵、空白鍵與 Enter 鍵)
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') {
+                e.preventDefault();
+                nextSlide();
+            } else if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                prevSlide();
+            }
+        });
+
+        // 行動裝置滑動 (Swipe) 手勢控制
+        let touchStartX = 0;
+        let touchEndX = 0;
+
+        const viewport = document.getElementById('app-viewport');
+        viewport.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+        }, { passive: true });
+
+        viewport.addEventListener('touchend', (e) => {
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipe();
+        }, { passive: true });
+
+        function handleSwipe() {
+            const swipeThreshold = 50; 
+            if (touchStartX - touchEndX > swipeThreshold) {
+                nextSlide(); // 向左滑動 -> 下一頁
+            } else if (touchEndX - touchStartX > swipeThreshold) {
+                prevSlide(); // 向右滑動 -> 上一頁
+            }
+        }
+
+        // 初始化簡報
+        initDots();
+        goToSlide(0);
+    </script>
+</body>
+</html>
