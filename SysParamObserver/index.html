@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SysParamObserver // 螢幕與視窗參數觀測儀</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tailwind Configuration for Industrial Theme -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            industrial: {
+              black: '#121212',
+              dark: '#1a1a1a',
+              gray: '#2a2a2a',
+              lightgray: '#8a8a8a',
+              concrete: '#e0e0e0',
+              orange: '#f97316', // 工業警示橙
+            }
+          },
+          fontFamily: {
+            mono: ['JetBrains Mono', 'Fira Code', 'Courier New', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Google Fonts for Monospace text -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons for Minimalist Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    /* 工業風網格背景 */
+    .industrial-grid {
+      background-size: 30px 30px;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    }
+    /* 橘色呼吸指示燈 */
+    .indicator-active {
+      box-shadow: 0 0 10px rgba(249, 115, 22, 0.8);
+    }
+    /* 自訂捲軸 */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #121212;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #333333;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #f97316;
+    }
+  </style>
+</head>
+<body class="bg-industrial-black text-industrial-concrete font-mono h-full flex flex-col overflow-x-hidden industrial-grid selection:bg-industrial-orange selection:text-white">
+
+  <!-- 頂部導覽列 -->
+  <header class="border-b border-industrial-gray bg-industrial-black/90 backdrop-blur-md sticky top-0 z-40 px-3 sm:px-6 py-3.5 flex justify-between items-center">
+    <div class="flex items-center space-x-2.5 min-w-0">
+      <!-- 運作中指示燈 -->
+      <span class="relative flex h-2.5 w-2.5 flex-shrink-0">
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-industrial-orange opacity-75"></span>
+        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-industrial-orange indicator-active"></span>
+      </span>
+      <div class="min-w-0">
+        <!-- 窄螢幕下自動縮短標題長度 -->
+        <h1 class="text-xs sm:text-sm md:text-base font-bold tracking-wider text-white truncate">
+          <span class="hidden sm:inline">SysParamObserver</span>
+          <span class="inline sm:hidden">SysParamObs</span>
+          <span class="text-industrial-orange">v2.8</span>
+        </h1>
+        <p class="text-[9px] text-industrial-lightgray tracking-wide hidden md:block">Real-time hardware & viewport detector</p>
+      </div>
+    </div>
+    
+    <!-- 右側控制區：僅剩餘狀態與配置按鈕，保持窄版極簡 -->
+    <div class="flex items-center space-x-3 flex-shrink-0">
+      <div class="text-right text-[10px] hidden sm:block border-r border-industrial-gray pr-3">
+        <span class="text-industrial-lightgray block">Status</span>
+        <span class="text-emerald-500 font-bold" id="sys-status">monitoring...</span>
+      </div>
+      
+      <!-- 精簡漢堡選單按鈕 (僅圖標) -->
+      <button id="menu-btn" class="p-2 border border-industrial-gray rounded-md hover:border-industrial-orange hover:text-industrial-orange transition-all duration-200 bg-industrial-dark focus:outline-none flex items-center justify-center" aria-label="Toggle Menu">
+        <i data-lucide="sliders" class="w-4.5 h-4.5 text-industrial-orange"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- 側邊控制面板 (Drawer) -->
+  <aside id="sidebar" class="fixed right-0 top-0 h-full w-80 bg-industrial-dark border-l border-industrial-gray z-50 transform translate-x-full transition-transform duration-300 ease-in-out shadow-2xl flex flex-col">
+    <!-- 側邊欄頂部 -->
+    <div class="p-5 border-b border-industrial-gray flex justify-between items-center bg-industrial-black">
+      <div class="flex items-center space-x-2">
+        <i data-lucide="sliders" class="w-4 h-4 text-industrial-orange"></i>
+        <h2 class="text-xs font-bold tracking-wider text-white">觀測項目顯示設定</h2>
+      </div>
+      <button id="close-btn" class="p-1 hover:text-industrial-orange transition-colors" aria-label="Close Menu">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <!-- 項目篩選勾選區 -->
+    <div class="flex-1 overflow-y-auto p-5 space-y-6 text-xs">
+      <!-- 類別：視窗與內部尺寸 -->
+      <div>
+        <div class="flex items-center justify-between mb-3 border-b border-industrial-gray/50 pb-1">
+          <h3 class="font-bold text-industrial-orange">01 // 視窗與尺寸</h3>
+          <button onclick="toggleGroup('grp-viewport', true)" class="text-[10px] text-industrial-lightgray hover:text-white underline">全選</button>
+        </div>
+        <div class="space-y-2.5" id="grp-viewport">
+          <label class="flex items-start space-x-2.5 cursor-pointer group">
+            <input type="checkbox" checked data-target="card-viewport-size" class="mt-0.5 accent-industrial-orange rounded border-industrial-gray bg-industrial-black">
+            <span class="group-hover:text-white transition-colors">可視區域寬高 (含捲軸)</span>
+          </label>
+          <label class="flex items-start space-x-2.5 cursor-pointer group">
+            <input type="checkbox" checked data-target="card-client-size" class="mt-0.5 accent-industrial-orange rounded border-industrial-gray bg-industrial-black">
+            <span class="group-hover:text-white transition-colors">可視區域寬高 (不含捲軸)</span>
+          </label>
+          <label class="flex items-start space-x-2.5 cursor-pointer group">
+            <input type="checkbox" checked data-target="card-aspect-ratio" class="mt-0.5 accent-industrial-orange rounded border-industrial-gray bg-industrial-black">
+            <span class="group-hover:text-white transition-colors">目前視窗長寬比</span>
+          </label>
+          <label class="flex items-start space-x-2.5 cursor-pointer group">
+            <input type="checkbox" checked data-target="card-outer-size" class="mt-0.5 accent-industrial-orange rounded border-industrial-gray bg-industrial-black">
+            <span class="group-hover:text-white transition-colors">瀏覽器外框總寬高</span>
+          </label>
+          <label class="flex items-start space-x-2.5 cursor-pointer group">
+            <input type="checkbox" checked data-target="card-screen-pos" class="mt-0.5 accent-industrial-orange rounded border-industrial-gray bg-industrial-black">
+            <span class="group-hover:text-white transition-colors">視窗在螢幕上絕對座標</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- 類別：顯示器螢幕資訊 -->
+      <div>
+        <div class="flex items-center justify-between mb-3 border-b border-industrial-gray/50 pb-1">
+          <h3 class="font-bold text-industrial-orange">02 // 螢幕與顯示</h3>
+          <button onclick="toggleGroup('grp-screen', true)" class="text-[10px] text-industrial-lightgray hover:text-white underline">全選</button>
+        </div>
+        <div class="space-y-2.5" id="grp-screen">
+          <label class="flex items-start space-x-2.5 cursor-pointer group">
+            <input type="checkbox" checked data-target="card-screen-res" class="mt-0.5 accent-industrial-orange rounded border-industrial-gray bg-industrial-black">
+            <span class="group-hover:text-white transition-colors">螢幕邏輯解析度</span>
+          </label>
+          <label class="flex items-start space-x-2.5 cursor-pointer group">
+            <input type="checkbox" checked data-target="card-avail-res" class="mt-0.5 accent-industrial-orange rounded border-industrial-gray bg-industrial-black">
+            <span class="group-hover:text-white transition-colors">螢幕可用解析度</span>
+          </label>
+          <label class="flex items-start space-x-2.5 cursor-pointer group">
+            <input type="checkbox" checked data-target="card-dpr" class="mt-0.5 accent-industrial-orange rounded border-industrial-gray bg-industrial-black">
+            <span class="group-hover:text-white transition-colors">裝置像素比 (DPR)</span>
+          </label>
+          <label class="flex items-start space-x-2.5 cursor-pointer group">
+            <input type="checkbox" checked data-target="card-phys-pixels" class="mt-0.5 accent-industrial-orange rounded border-industrial-gray bg-industrial-black">
+            <span class="group-hover:text-white transition-colors">硬體真實物理像素數</span>
+          </label>
+          <label class="flex items-start space-x-2.5 cursor-pointer group">
+            <input type="checkbox" checked data-target="card-color-depth" class="mt-0.5 accent-industrial-orange rounded border-industrial-gray bg-industrial-black">
+            <span class="group-hover:text-white transition-colors">螢幕色彩 / 像素深度</span>
+          </label>
+          <label class="flex items-start space-x-2.5 cursor-pointer group">
+            <input type="checkbox" checked data-target="card-refresh-rate" class="mt-0.5 accent-industrial-orange rounded border-industrial-gray bg-industrial-black">
+            <span class="group-hover:text-white transition-colors">螢幕重整更新率 (FPS)</span>
+          </label>
+          <label class="flex items-start space-x-2.5 cursor-pointer group">
+            <input type="checkbox" checked data-target="card-hdr" class="mt-0.5 accent-industrial-orange rounded border-industrial-gray bg-industrial-black">
+            <span class="group-hover:text-white transition-colors">動態範圍 (HDR)</span>
+          </label>
+          <label class="flex items-start space-x-2.5 cursor-pointer group">
+            <input type="checkbox" checked data-target="card-gpu" class="mt-0.5 accent-industrial-orange rounded border-industrial-gray bg-industrial-black">
+            <span class="group-hover:text-white transition-colors">顯示卡硬體規格 (GPU)</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- 類別：環境與操作狀態 -->
+      <div>
+        <div class="flex items-center justify-between mb-3 border-b border-industrial-gray/50 pb-1">
+          <h3 class="font-bold text-industrial-orange">03 // 環境與狀態</h3>
+          <button onclick="toggleGroup('grp-state', true)" class="text-[10px] text-industrial-lightgray hover:text-white underline">全選</button>
+        </div>
+        <div class="space-y-2.5" id="grp-state">
+          <label class="flex items-start space-x-2.5 cursor-pointer group">
+            <input type="checkbox" checked data-target="card-orientation" class="mt-0.5 accent-industrial-orange rounded border-industrial-gray bg-industrial-black">
+            <span class="group-hover:text-white transition-colors">手機螢幕旋轉方向</span>
+          </label>
+          <label class="flex items-start space-x-2.5 cursor-pointer group">
+            <input type="checkbox" checked data-target="card-theme" class="mt-0.5 accent-industrial-orange rounded border-industrial-gray bg-industrial-black">
+            <span class="group-hover:text-white transition-colors">系統深色/淺色模式</span>
+          </label>
+          <label class="flex items-start space-x-2.5 cursor-pointer group">
+            <input type="checkbox" checked data-target="card-zoom" class="mt-0.5 accent-industrial-orange rounded border-industrial-gray bg-industrial-black">
+            <span class="group-hover:text-white transition-colors">網頁縮放比例估計</span>
+          </label>
+          <label class="flex items-start space-x-2.5 cursor-pointer group">
+            <input type="checkbox" checked data-target="card-touch" class="mt-0.5 accent-industrial-orange rounded border-industrial-gray bg-industrial-black">
+            <span class="group-hover:text-white transition-colors">多點觸控面板支援</span>
+          </label>
+          <label class="flex items-start space-x-2.5 cursor-pointer group">
+            <input type="checkbox" checked data-target="card-multi-screen" class="mt-0.5 accent-industrial-orange rounded border-industrial-gray bg-industrial-black">
+            <span class="group-hover:text-white transition-colors">多螢幕系統偵測</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- 側邊欄底部 (加入複製按鈕與管理選項) -->
+    <div class="p-5 border-t border-industrial-gray bg-industrial-black space-y-2">
+      <!-- 複製報告按鈕 (移至此處，更符合設定邏輯) -->
+      <button id="copy-report-btn" class="w-full bg-industrial-dark hover:bg-industrial-gray text-industrial-orange border border-industrial-gray hover:border-industrial-orange font-bold text-xs py-2 px-4 rounded tracking-wider flex items-center justify-center space-x-1.5 transition-all duration-200">
+        <i data-lucide="copy" class="w-4 h-4"></i>
+        <span>複製當前診斷報告</span>
+      </button>
+      
+      <button onclick="toggleAllCheckboxes(true)" class="w-full bg-industrial-orange hover:bg-orange-600 text-white font-bold text-xs py-2 px-4 rounded tracking-wider transition-colors duration-200">
+        顯示全部項目
+      </button>
+      <button onclick="toggleAllCheckboxes(false)" class="w-full border border-industrial-gray hover:border-industrial-orange text-industrial-concrete hover:text-industrial-orange font-bold text-xs py-2 px-4 rounded tracking-wider transition-colors duration-200">
+        隱藏所有項目
+      </button>
+    </div>
+  </aside>
+
+  <!-- 背景遮罩 (Overlay) -->
+  <div id="overlay" class="fixed inset-0 bg-black/60 opacity-0 pointer-events-none transition-opacity duration-300 z-40"></div>
+
+  <!-- 主要儀表板內容區 -->
+  <main class="flex-1 p-4 md:p-6 max-w-7xl mx-auto w-full">
+    
+    <!-- 頂部核心摘要看板 -->
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <!-- 核心視窗寬高 -->
+      <div class="bg-industrial-dark border-l-4 border-industrial-orange p-4 rounded-r-lg flex flex-col justify-between">
+        <span class="text-[10px] text-industrial-lightgray font-semibold tracking-wider">Active Viewport Size</span>
+        <span id="banner-viewport" class="text-2xl md:text-3xl font-bold tracking-tight text-white my-1.5">0000 × 0000</span>
+        <div class="flex justify-between text-[10px] text-industrial-lightgray border-t border-industrial-gray/50 pt-2">
+          <span>Ratio: <strong id="banner-ratio" class="text-industrial-orange">1.00</strong></span>
+          <span id="banner-orientation" class="font-semibold text-white">Unknown</span>
+        </div>
+      </div>
+      <!-- 物理硬體解析度 -->
+      <div class="bg-industrial-dark border-l-4 border-zinc-500 p-4 rounded-r-lg flex flex-col justify-between">
+        <span class="text-[10px] text-industrial-lightgray font-semibold tracking-wider">Screen Hardware Resolution</span>
+        <span id="banner-screen" class="text-2xl md:text-3xl font-bold tracking-tight text-white my-1.5">0000 × 0000</span>
+        <div class="flex justify-between text-[10px] text-industrial-lightgray border-t border-industrial-gray/50 pt-2">
+          <span>DPR: <strong id="banner-dpr" class="text-industrial-orange">1.0</strong></span>
+          <span>Color: <strong id="banner-color" class="text-white">--</strong></span>
+        </div>
+      </div>
+      <!-- 目前環境指標 -->
+      <div class="bg-industrial-dark border-l-4 border-zinc-700 p-4 rounded-r-lg flex flex-col justify-between">
+        <span class="text-[10px] text-industrial-lightgray font-semibold tracking-wider">System Environment Prefs</span>
+        <div class="flex items-center space-x-3 my-1">
+          <span id="banner-theme-icon" class="text-industrial-orange"><i data-lucide="moon" class="w-6 h-6"></i></span>
+          <div>
+            <span id="banner-theme" class="text-lg font-bold text-white block leading-tight">Dark Mode</span>
+            <span class="text-[9px] text-industrial-lightgray">prefers-color-scheme</span>
+          </div>
+        </div>
+        <div class="flex justify-between text-[10px] text-industrial-lightgray border-t border-industrial-gray/50 pt-1.5">
+          <span>Refresh: <strong id="banner-hz" class="text-white">-- Hz</strong></span>
+          <span>Zoom: <strong id="banner-zoom" class="text-white">--</strong></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 狀態參數分區 -->
+    <div class="space-y-6">
+      
+      <!-- 區段一：視窗與內部尺寸 -->
+      <section class="section-container" id="sec-viewport">
+        <div class="flex items-center space-x-2.5 mb-4 border-b border-industrial-gray pb-2">
+          <span class="bg-industrial-orange text-industrial-black text-xs font-black px-1.5 py-0.5 rounded-sm">01</span>
+          <h2 class="text-xs font-bold tracking-wider text-white">視窗與內部尺寸 // Viewport & Window Dimensions</h2>
+        </div>
+        
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- 卡片 1-1 -->
+          <div id="card-viewport-size" class="bg-industrial-dark p-4 border border-industrial-gray rounded-lg hover:border-industrial-orange/40 transition-colors duration-200 flex flex-col justify-between">
+            <div>
+              <div class="text-[9px] text-industrial-orange font-mono mb-1">JS: window.innerWidth / Height</div>
+              <h3 class="text-xs text-zinc-400 font-semibold mb-2">可視區域寬高 (含捲軸)</h3>
+              <p class="text-xl md:text-2xl font-bold text-white mb-2 break-all" id="val-viewport-size">-- × -- px</p>
+            </div>
+            <p class="text-[10px] text-industrial-lightgray leading-relaxed border-t border-industrial-gray/40 pt-2">目前網頁呈現給使用者的實際畫面像素寬與高。</p>
+          </div>
+          <!-- 卡片 1-2 -->
+          <div id="card-client-size" class="bg-industrial-dark p-4 border border-industrial-gray rounded-lg hover:border-industrial-orange/40 transition-colors duration-200 flex flex-col justify-between">
+            <div>
+              <div class="text-[9px] text-industrial-orange font-mono mb-1">JS: clientWidth / Height</div>
+              <h3 class="text-xs text-zinc-400 font-semibold mb-2">可視區域寬高 (不含捲軸)</h3>
+              <p class="text-xl md:text-2xl font-bold text-white mb-2 break-all" id="val-client-size">-- × -- px</p>
+            </div>
+            <p class="text-[10px] text-industrial-lightgray leading-relaxed border-t border-industrial-gray/40 pt-2">扣除捲軸寬度後的淨渲染空間，最精準的網頁內容寬度。</p>
+          </div>
+          <!-- 卡片 1-3 -->
+          <div id="card-aspect-ratio" class="bg-industrial-dark p-4 border border-industrial-gray rounded-lg hover:border-industrial-orange/40 transition-colors duration-200 flex flex-col justify-between">
+            <div>
+              <div class="text-[9px] text-industrial-orange font-mono mb-1">Calculation</div>
+              <h3 class="text-xs text-zinc-400 font-semibold mb-2">目前視窗長寬比</h3>
+              <div class="mb-2">
+                <p class="text-xl md:text-2xl font-bold text-white break-all" id="val-aspect-ratio">--</p>
+                <span class="text-[10px] text-industrial-lightgray block mt-0.5" id="val-aspect-friendly">--</span>
+              </div>
+            </div>
+            <p class="text-[10px] text-industrial-lightgray leading-relaxed border-t border-industrial-gray/40 pt-2">以精確小數點（寬除以高）與最接近的常用硬體比例標籤。</p>
+          </div>
+          <!-- 卡片 1-4 -->
+          <div id="card-outer-size" class="bg-industrial-dark p-4 border border-industrial-gray rounded-lg hover:border-industrial-orange/40 transition-colors duration-200 flex flex-col justify-between">
+            <div>
+              <div class="text-[9px] text-industrial-orange font-mono mb-1">JS: window.outerWidth / Height</div>
+              <h3 class="text-xs text-zinc-400 font-semibold mb-2">瀏覽器外框總寬高</h3>
+              <p class="text-xl md:text-2xl font-bold text-white mb-2 break-all" id="val-outer-size">-- × -- px</p>
+            </div>
+            <p class="text-[10px] text-industrial-lightgray leading-relaxed border-t border-industrial-gray/40 pt-2">包含瀏覽器分頁標籤、網址列、工具列以及視窗外框的總寬高。</p>
+          </div>
+          <!-- 卡片 1-5 -->
+          <div id="card-screen-pos" class="bg-industrial-dark p-4 border border-industrial-gray rounded-lg hover:border-industrial-orange/40 transition-colors duration-200 flex flex-col justify-between">
+            <div>
+              <div class="text-[9px] text-industrial-orange font-mono mb-1">JS: window.screenX / Y</div>
+              <h3 class="text-xs text-zinc-400 font-semibold mb-2">視窗在螢幕上絕對座標</h3>
+              <p class="text-xl md:text-2xl font-bold text-white mb-2 break-all" id="val-screen-pos">X: --, Y: --</p>
+            </div>
+            <p class="text-[10px] text-industrial-lightgray leading-relaxed border-t border-industrial-gray/40 pt-2">此網頁視窗左上角，相對於整個作業系統桌面左上角的 X/Y 像素座標。</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 區段二：顯示器螢幕資訊 -->
+      <section class="section-container" id="sec-screen">
+        <div class="flex items-center space-x-2.5 mb-4 border-b border-industrial-gray pb-2">
+          <span class="bg-industrial-orange text-industrial-black text-xs font-black px-1.5 py-0.5 rounded-sm">02</span>
+          <h2 class="text-xs font-bold tracking-wider text-white">顯示器螢幕資訊 // Screen & Display Specifications</h2>
+        </div>
+        
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- 卡片 2-1 -->
+          <div id="card-screen-res" class="bg-industrial-dark p-4 border border-industrial-gray rounded-lg hover:border-industrial-orange/40 transition-colors duration-200 flex flex-col justify-between">
+            <div>
+              <div class="text-[9px] text-industrial-orange font-mono mb-1">JS: screen.width / height</div>
+              <h3 class="text-xs text-zinc-400 font-semibold mb-2">螢幕邏輯解析度</h3>
+              <p class="text-xl md:text-2xl font-bold text-white mb-2 break-all" id="val-screen-res">-- × -- px</p>
+            </div>
+            <p class="text-[10px] text-industrial-lightgray leading-relaxed border-t border-industrial-gray/40 pt-2">作業系統設定的邏輯解析度，為高 DPI 系統縮放前的基本尺寸。</p>
+          </div>
+          <!-- 卡片 2-2 -->
+          <div id="card-avail-res" class="bg-industrial-dark p-4 border border-industrial-gray rounded-lg hover:border-industrial-orange/40 transition-colors duration-200 flex flex-col justify-between">
+            <div>
+              <div class="text-[9px] text-industrial-orange font-mono mb-1">JS: screen.availWidth / Height</div>
+              <h3 class="text-xs text-zinc-400 font-semibold mb-2">螢幕可用解析度</h3>
+              <p class="text-xl md:text-2xl font-bold text-white mb-2 break-all" id="val-avail-res">-- × -- px</p>
+            </div>
+            <p class="text-[10px] text-industrial-lightgray leading-relaxed border-t border-industrial-gray/40 pt-2">螢幕解析度自動扣除系統工作列、Mac 導覽列與 Dock 後的淨展開空間。</p>
+          </div>
+          <!-- 卡片 2-3 -->
+          <div id="card-dpr" class="bg-industrial-dark p-4 border border-industrial-gray rounded-lg hover:border-industrial-orange/40 transition-colors duration-200 flex flex-col justify-between">
+            <div>
+              <div class="text-[9px] text-industrial-orange font-mono mb-1">JS: devicePixelRatio</div>
+              <h3 class="text-xs text-zinc-400 font-semibold mb-2">裝置像素比 (DPR)</h3>
+              <p class="text-xl md:text-2xl font-bold text-white mb-2 break-all" id="val-dpr">--</p>
+            </div>
+            <p class="text-[10px] text-industrial-lightgray leading-relaxed border-t border-industrial-gray/40 pt-2">每個 CSS 像素對應的物理像素比。1x 傳統螢幕、2x Retina、3x 高級旗艦手機。</p>
+          </div>
+          <!-- 卡片 2-4 -->
+          <div id="card-phys-pixels" class="bg-industrial-dark p-4 border border-industrial-gray rounded-lg hover:border-industrial-orange/40 transition-colors duration-200 flex flex-col justify-between">
+            <div>
+              <div class="text-[9px] text-industrial-orange font-mono mb-1">Math: screen * dpr</div>
+              <h3 class="text-xs text-zinc-400 font-semibold mb-2">硬體真實物理像素數</h3>
+              <p class="text-xl md:text-2xl font-bold text-white mb-2 break-all" id="val-phys-pixels">-- × -- px</p>
+            </div>
+            <p class="text-[10px] text-industrial-lightgray leading-relaxed border-t border-industrial-gray/40 pt-2">顯示器面板真正的物理發光像素顆粒數。設計高清素材時以此為基礎。</p>
+          </div>
+          <!-- 卡片 2-5 -->
+          <div id="card-color-depth" class="bg-industrial-dark p-4 border border-industrial-gray rounded-lg hover:border-industrial-orange/40 transition-colors duration-200 flex flex-col justify-between">
+            <div>
+              <div class="text-[9px] text-industrial-orange font-mono mb-1">JS: screen.colorDepth / pixelDepth</div>
+              <h3 class="text-xs text-zinc-400 font-semibold mb-2">螢幕色彩深度 / 像素深度</h3>
+              <p class="text-xl md:text-2xl font-bold text-white mb-2 break-all" id="val-color-depth">-- bits / -- bits</p>
+            </div>
+            <p class="text-[10px] text-industrial-lightgray leading-relaxed border-t border-industrial-gray/40 pt-2">調色盤色深（通常 24 位元代表 1670萬色，或高精細的 32 位元）。</p>
+          </div>
+          <!-- 卡片 2-6 -->
+          <div id="card-refresh-rate" class="bg-industrial-dark p-4 border border-industrial-gray rounded-lg hover:border-industrial-orange/40 transition-colors duration-200 flex flex-col justify-between">
+            <div>
+              <div class="text-[9px] text-industrial-orange font-mono mb-1">Frame Timing</div>
+              <h3 class="text-xs text-zinc-400 font-semibold mb-2">螢幕重整更新率 (Hz)</h3>
+              <p class="text-xl md:text-2xl font-bold text-white mb-2 break-all" id="val-refresh-rate">-- Hz</p>
+            </div>
+            <p class="text-[10px] text-industrial-lightgray leading-relaxed border-t border-industrial-gray/40 pt-2">透過 JS 連續幀率運算推估，可辨識 60Hz 辦公螢幕或 144Hz+ 電競螢幕。</p>
+          </div>
+          <!-- 卡片 2-7 -->
+          <div id="card-hdr" class="bg-industrial-dark p-4 border border-industrial-gray rounded-lg hover:border-industrial-orange/40 transition-colors duration-200 flex flex-col justify-between col-span-1 sm:col-span-2 lg:col-span-3">
+            <div>
+              <div class="text-[9px] text-industrial-orange font-mono mb-1">CSS: dynamic-range</div>
+              <h3 class="text-xs text-zinc-400 font-semibold mb-2">高動態範圍 (HDR 支援)</h3>
+              <p class="text-xl md:text-2xl font-bold text-white mb-2 break-all" id="val-hdr">--</p>
+            </div>
+            <p class="text-[10px] text-industrial-lightgray leading-relaxed border-t border-industrial-gray/40 pt-2">偵測使用者硬體是否支援高對比與寬廣色域的高動態顯示模式。</p>
+          </div>
+          <!-- 卡片 2-8 (全新擴充：硬體顯示卡偵測) -->
+          <div id="card-gpu" class="bg-industrial-dark p-4 border border-industrial-gray rounded-lg hover:border-industrial-orange/40 transition-colors duration-200 flex flex-col justify-between col-span-1 sm:col-span-2 lg:col-span-3">
+            <div>
+              <div class="text-[9px] text-industrial-orange font-mono mb-1">JS: WebGL Extension Context</div>
+              <h3 class="text-xs text-zinc-400 font-semibold mb-2">顯示卡硬體規格 (GPU)</h3>
+              <p class="text-sm md:text-base font-bold text-white mb-2 break-all whitespace-pre-line" id="val-gpu">偵測中...</p>
+            </div>
+            <p class="text-[10px] text-industrial-lightgray leading-relaxed border-t border-industrial-gray/40 pt-2">利用 WebGL 安全繪圖緩衝擴充功能，提取真實的物理顯示晶片與製造廠商名稱。</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 區段三：環境與操作狀態 -->
+      <section class="section-container" id="sec-state">
+        <div class="flex items-center space-x-2.5 mb-4 border-b border-industrial-gray pb-2">
+          <span class="bg-industrial-orange text-industrial-black text-xs font-black px-1.5 py-0.5 rounded-sm">03</span>
+          <h2 class="text-xs font-bold tracking-wider text-white">環境與狀態 // Environment & State Monitor</h2>
+        </div>
+        
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <!-- 卡片 3-1 -->
+          <div id="card-orientation" class="bg-industrial-dark p-4 border border-industrial-gray rounded-lg hover:border-industrial-orange/40 transition-colors duration-200 flex flex-col justify-between">
+            <div>
+              <div class="text-[9px] text-industrial-orange font-mono mb-1">JS: screen.orientation</div>
+              <h3 class="text-xs text-zinc-400 font-semibold mb-2">手機螢幕旋轉方向</h3>
+              <p class="text-xl md:text-2xl font-bold text-white mb-2 break-all" id="val-orientation">--</p>
+            </div>
+            <p class="text-[10px] text-industrial-lightgray leading-relaxed border-t border-industrial-gray/40 pt-2">行動裝置水平、垂直或顛倒拿持的動態感應狀態。</p>
+          </div>
+          <!-- 卡片 3-2 -->
+          <div id="card-theme" class="bg-industrial-dark p-4 border border-industrial-gray rounded-lg hover:border-industrial-orange/40 transition-colors duration-200 flex flex-col justify-between">
+            <div>
+              <div class="text-[9px] text-industrial-orange font-mono mb-1">CSS: prefers-color-scheme</div>
+              <h3 class="text-xs text-zinc-400 font-semibold mb-2">系統深色/淺色模式</h3>
+              <p class="text-xl md:text-2xl font-bold text-white mb-2 break-all" id="val-theme">--</p>
+            </div>
+            <p class="text-[10px] text-industrial-lightgray leading-relaxed border-t border-industrial-gray/40 pt-2">使用者在操作系統底層設定的黑夜或白天色彩偏好。</p>
+          </div>
+          <!-- 卡片 3-3 -->
+          <div id="card-zoom" class="bg-industrial-dark p-4 border border-industrial-gray rounded-lg hover:border-industrial-orange/40 transition-colors duration-200 flex flex-col justify-between">
+            <div>
+              <div class="text-[9px] text-industrial-orange font-mono mb-1">Deduction</div>
+              <h3 class="text-xs text-zinc-400 font-semibold mb-2">網頁縮放比例估計</h3>
+              <p class="text-xl md:text-2xl font-bold text-white mb-2 break-all" id="val-zoom">-- %</p>
+            </div>
+            <p class="text-[10px] text-industrial-lightgray leading-relaxed border-t border-industrial-gray/40 pt-2">推算使用者目前在瀏覽器中（Ctrl + / -）手動縮放網頁內容的百分比。</p>
+          </div>
+          <!-- 卡片 3-5 (全新擴充：觸控螢幕功能偵測) -->
+          <div id="card-touch" class="bg-industrial-dark p-4 border border-industrial-gray rounded-lg hover:border-industrial-orange/40 transition-colors duration-200 flex flex-col justify-between">
+            <div>
+              <div class="text-[9px] text-industrial-orange font-mono mb-1">JS: navigator.maxTouchPoints</div>
+              <h3 class="text-xs text-zinc-400 font-semibold mb-2">多點觸控面板支援</h3>
+              <p class="text-xl md:text-2xl font-bold text-white mb-2 break-all" id="val-touch">--</p>
+            </div>
+            <p class="text-[10px] text-industrial-lightgray leading-relaxed border-t border-industrial-gray/40 pt-2">偵測當前顯示硬體是否內建觸控玻璃，以及裝置所允許的最大同時感應接觸點數量。</p>
+          </div>
+          <!-- 卡片 3-4 -->
+          <div id="card-multi-screen" class="bg-industrial-dark p-4 border border-industrial-gray rounded-lg hover:border-industrial-orange/40 transition-colors duration-200 flex flex-col justify-between col-span-1 sm:col-span-2">
+            <div>
+              <div class="text-[9px] text-industrial-orange font-mono mb-1">JS: getScreenDetails</div>
+              <h3 class="text-xs text-zinc-400 font-semibold mb-2">多螢幕系統偵測</h3>
+              <div class="flex items-center space-x-2 my-1">
+                <span class="h-2 w-2 rounded-full bg-industrial-orange animate-pulse inline-block"></span>
+                <p class="text-base font-bold text-white break-words" id="val-multi-screen">--</p>
+              </div>
+            </div>
+            <div class="border-t border-industrial-gray/40 pt-2">
+              <p class="text-[10px] text-industrial-lightgray leading-relaxed mb-2">是否偵測到連線多台顯示器。若要抓取排列位置可點按下方請求授權。</p>
+              <button id="btn-request-screens" class="text-[10px] border border-industrial-gray hover:border-industrial-orange hover:text-industrial-orange py-1 px-2.5 rounded transition-colors duration-200">
+                [ 請求多螢幕檢測權限 ]
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- 頁尾 -->
+  <footer class="border-t border-industrial-gray bg-industrial-dark text-[11px] text-industrial-lightgray px-4 md:px-6 py-5 mt-10">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
+      <div class="space-y-1">
+        <p class="font-bold text-industrial-concrete tracking-wide">Sys Log Stream // 系統觀察日誌</p>
+        <p class="text-[10px] font-mono text-zinc-500 break-all" id="log-console">> System booted. Listening for hardware interfaces...</p>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span>Stable // Web API 2026</span>
+        <span class="border border-industrial-gray px-2 py-0.5 rounded text-[10px] font-bold text-industrial-concrete">DPR: <span id="footer-dpr-val">1.0</span></span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- JavaScript 觀測邏輯 -->
+  <script>
+    // 初始化 Lucide 圖標
+    lucide.createIcons();
+
+    // 取得元件
+    const menuBtn = document.getElementById('menu-btn');
+    const closeBtn = document.getElementById('close-btn');
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('overlay');
+    const logConsole = document.getElementById('log-console');
+    const multiScreenBtn = document.getElementById('btn-request-screens');
+    const copyReportBtn = document.getElementById('copy-report-btn');
+
+    // 顯示卡 WebGL 硬體抓取邏輯 (全域變數快取)
+    let cachedGpuInfo = "偵測中...";
+    function detectGPU() {
+      try {
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        if (!gl) {
+          cachedGpuInfo = "不支援 WebGL (無法獲取顯示卡硬體)";
+          return;
+        }
+        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+        if (debugInfo) {
+          const vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
+          const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+          cachedGpuInfo = `${renderer}\n廠商: ${vendor}`;
+        } else {
+          cachedGpuInfo = `標準繪圖器: ${gl.getParameter(gl.RENDERER)}\n廠商: ${gl.getParameter(gl.VENDOR)}`;
+        }
+      } catch (e) {
+        cachedGpuInfo = "安全沙盒限制，無法取得 GPU 規格";
+      }
+    }
+    detectGPU();
+
+    // 多點觸控偵測邏輯
+    let cachedTouchInfo = "不支援觸控螢幕";
+    function detectTouch() {
+      const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      const maxPoints = navigator.maxTouchPoints || 0;
+      if (hasTouch) {
+        cachedTouchInfo = `支援觸控 (最多 ${maxPoints} 個接觸點)`;
+      } else {
+        cachedTouchInfo = "不支援觸控硬體";
+      }
+    }
+    detectTouch();
+
+    // 控制選單 / 側邊欄
+    function openMenu() {
+      sidebar.classList.remove('translate-x-full');
+      overlay.classList.remove('opacity-0', 'pointer-events-none');
+      writeLog("開啟觀測項目配置面板");
+    }
+
+    // 關閉選單
+    function closeMenu() {
+      sidebar.classList.add('translate-x-full');
+      overlay.classList.add('opacity-0', 'pointer-events-none');
+      writeLog("關閉觀測項目配置面板");
+    }
+
+    menuBtn.addEventListener('click', openMenu);
+    closeBtn.addEventListener('click', closeMenu);
+    overlay.addEventListener('click', closeMenu);
+
+    // 系統日誌寫入器
+    function writeLog(message) {
+      const now = new Date();
+      const timeStr = now.toTimeString().split(' ')[0];
+      logConsole.textContent = `> [${timeStr}] ${message}`;
+    }
+
+    // 複製系統參數報告
+    copyReportBtn.addEventListener('click', () => {
+      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const zoomLevel = Math.round(((window.outerWidth - 8) / window.innerWidth) * 100);
+      
+      const reportText = `[SysParamObserver - 系統觀測報告]\n` +
+        `----------------------------------------\n` +
+        `觀測時間: ${new Date().toLocaleString()}\n` +
+        `1. 視窗與尺寸\n` +
+        `   - 網頁可視區域 (含捲軸): ${window.innerWidth} x ${window.innerHeight} px\n` +
+        `   - 網頁可視區域 (不含捲軸): ${document.documentElement.clientWidth} x ${document.documentElement.clientHeight} px\n` +
+        `   - 目前長寬比例: ${(window.innerWidth / window.innerHeight).toFixed(4)} (${getAspectRatioName(window.innerWidth, window.innerHeight)})\n` +
+        `   - 瀏覽器總寬高: ${window.outerWidth} x ${window.outerHeight} px\n` +
+        `2. 螢幕與顯示規格\n` +
+        `   - 邏輯螢幕解析度: ${window.screen.width} x ${window.screen.height} px\n   - 螢幕可用解析度: ${window.screen.availWidth} x ${window.screen.availHeight} px\n` +
+        `   - 裝置像素比 (DPR): ${window.devicePixelRatio || 1}x\n` +
+        `   - 實體硬體物理像素: ${Math.round(window.screen.width * (window.devicePixelRatio || 1))} x ${Math.round(window.screen.height * (window.devicePixelRatio || 1))} px\n` +
+        `   - 色彩深度: ${window.screen.colorDepth}-bit / 像素深度: ${window.screen.pixelDepth}-bit\n` +
+        `   - 推估螢幕重整率: ~ ${fps} Hz\n` +
+        `   - 顯示卡硬體 (GPU): ${cachedGpuInfo.replace('\n', ' ')}\n` +
+        `3. 操作環境與偏好\n` +
+        `   - 行動裝置方向: ${((window.screen.orientation && window.screen.orientation.type) || 'Unknown').toUpperCase()}\n` +
+        `   - 系統外觀主題: ${isDark ? 'Dark Mode (深色模式)' : 'Light Mode (淺色模式)'}\n` +
+        `   - 瀏覽器縮放比: ~ ${zoomLevel}%\n` +
+        `   - 觸控支援度: ${cachedTouchInfo}\n` +
+        `----------------------------------------\n` +
+        `報告產生自 SysParamObserver // Stable 2026`;
+
+      // 使用傳統離線 textarea 複製方式，兼顧 iframe 安全沙盒
+      const tempTextArea = document.createElement('textarea');
+      tempTextArea.value = reportText;
+      tempTextArea.style.position = 'fixed';
+      tempTextArea.style.opacity = '0';
+      document.body.appendChild(tempTextArea);
+      tempTextArea.select();
+      
+      try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+          writeLog("已成功產出觀測報告，並複製至系統剪貼簿！");
+        } else {
+          writeLog("複製失敗，請手動複製控制台日誌。");
+        }
+      } catch (err) {
+        writeLog(`複製出錯: ${err.message}`);
+      }
+      document.body.removeChild(tempTextArea);
+    });
+
+    // 勾選框與卡片控制
+    const checkboxes = document.querySelectorAll('aside input[type="checkbox"]');
+    
+    checkboxes.forEach(cb => {
+      cb.addEventListener('change', () => {
+        const targetId = cb.getAttribute('data-target');
+        const targetCard = document.getElementById(targetId);
+        
+        if (targetCard) {
+          if (cb.checked) {
+            targetCard.classList.remove('hidden');
+            writeLog(`觀測器顯示: ${cb.nextElementSibling.textContent}`);
+          } else {
+            targetCard.classList.add('hidden');
+            writeLog(`觀測器隱藏: ${cb.nextElementSibling.textContent}`);
+          }
+        }
+        checkSectionsVisibility();
+      });
+    });
+
+    // 群組全選
+    function toggleGroup(groupId, state) {
+      const groupContainer = document.getElementById(groupId);
+      const groupCheckboxes = groupContainer.querySelectorAll('input[type="checkbox"]');
+      groupCheckboxes.forEach(cb => {
+        cb.checked = state;
+        const targetId = cb.getAttribute('data-target');
+        const targetCard = document.getElementById(targetId);
+        if (targetCard) {
+          if (state) targetCard.classList.remove('hidden');
+          else targetCard.classList.add('hidden');
+        }
+      });
+      checkSectionsVisibility();
+      writeLog(`變更分類項目狀態`);
+    }
+
+    // 全選/取消全選
+    function toggleAllCheckboxes(state) {
+      checkboxes.forEach(cb => {
+        cb.checked = state;
+        const targetId = cb.getAttribute('data-target');
+        const targetCard = document.getElementById(targetId);
+        if (targetCard) {
+          if (state) targetCard.classList.remove('hidden');
+          else targetCard.classList.add('hidden');
+        }
+      });
+      checkSectionsVisibility();
+      writeLog(state ? "展開並觀測所有參數卡片" : "收合所有參數卡片");
+    }
+
+    // 檢查區段顯示與隱藏
+    function checkSectionsVisibility() {
+      const sections = ['sec-viewport', 'sec-screen', 'sec-state'];
+      sections.forEach(secId => {
+        const section = document.getElementById(secId);
+        const cards = section.querySelectorAll('[id^="card-"]');
+        let hasVisibleCard = false;
+        cards.forEach(card => {
+          if (!card.classList.contains('hidden')) {
+            hasVisibleCard = true;
+          }
+        });
+        
+        if (hasVisibleCard) {
+          section.classList.remove('hidden');
+        } else {
+          section.classList.add('hidden');
+        }
+      });
+    }
+
+    // 螢幕重整更新率 (Hz) 實時偵測器
+    let frameTimes = [];
+    let fps = 60; // 默認值
+    function getRefreshRate() {
+      return new Promise((resolve) => {
+        let count = 0;
+        let lastTime = performance.now();
+        
+        function checkFrame(time) {
+          const delta = time - lastTime;
+          lastTime = time;
+          if (delta > 0) {
+            frameTimes.push(1000 / delta);
+          }
+          if (frameTimes.length > 60) {
+            frameTimes.shift();
+          }
+          count++;
+          if (count < 30) {
+            requestAnimationFrame(checkFrame);
+          } else {
+            const sum = frameTimes.reduce((a, b) => a + b, 0);
+            const avg = sum / frameTimes.length;
+            const commonRates = [60, 75, 90, 120, 144, 165, 240, 360];
+            const closest = commonRates.reduce((prev, curr) => {
+              return (Math.abs(curr - avg) < Math.abs(prev - avg) ? curr : prev);
+            });
+            resolve(closest);
+          }
+        }
+        requestAnimationFrame(checkFrame);
+      });
+    }
+
+    getRefreshRate().then(hz => {
+      fps = hz;
+      updateMetrics();
+      writeLog(`螢幕重整更新率測得約 ${hz}Hz`);
+    });
+
+    // 比例逼近
+    function getAspectRatioName(width, height) {
+      const r = gcd(width, height);
+      const wRatio = width / r;
+      const hRatio = height / r;
+      
+      const decimal = width / height;
+      if (Math.abs(decimal - 1.777) < 0.02) return '16:9 (寬螢幕)';
+      if (Math.abs(decimal - 1.6) < 0.02) return '16:10 (黃金比例)';
+      if (Math.abs(decimal - 1.333) < 0.02) return '4:3 (標準比例)';
+      if (Math.abs(decimal - 1.5) < 0.02) return '3:2 (工作文書螢幕)';
+      if (Math.abs(decimal - 2.333) < 0.05) return '21:9 (超寬螢幕)';
+      if (Math.abs(decimal - 1.0) < 0.01) return '1:1 (等比例正方形)';
+      if (Math.abs(decimal - 0.562) < 0.02) return '9:16 (直式行動螢幕)';
+      
+      return `${wRatio}:${hRatio}`;
+    }
+
+    function gcd(a, b) {
+      return (b == 0) ? a : gcd(b, a % b);
+    }
+
+    // 核心偵測與更新
+    function updateMetrics() {
+      // 1. 視窗與內部尺寸
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const clientWidth = document.documentElement.clientWidth;
+      const clientHeight = document.documentElement.clientHeight;
+      const aspectDecimal = viewportWidth / viewportHeight;
+      const aspectFriendly = getAspectRatioName(viewportWidth, viewportHeight);
+      const outerWidth = window.outerWidth;
+      const outerHeight = window.outerHeight;
+      const screenX = window.screenX !== undefined ? window.screenX : window.screenLeft;
+      const screenY = window.screenY !== undefined ? window.screenY : window.screenTop;
+
+      // 2. 顯示器螢幕資訊
+      const screenWidth = window.screen.width;
+      const screenHeight = window.screen.height;
+      const availWidth = window.screen.availWidth;
+      const availHeight = window.screen.availHeight;
+      const dpr = window.devicePixelRatio || 1;
+      const realWidth = Math.round(screenWidth * dpr);
+      const realHeight = Math.round(screenHeight * dpr);
+      const colorDepth = window.screen.colorDepth;
+      const pixelDepth = window.screen.pixelDepth;
+      
+      const isHDR = window.matchMedia('(dynamic-range: high)').matches ? '支援 HDR (高動態範圍)' : '僅支援標準 SDR (標準動態範圍)';
+
+      // 3. 環境與操作狀態
+      let orientationName = 'UNKNOWN';
+      if (window.screen.orientation && window.screen.orientation.type) {
+        orientationName = window.screen.orientation.type;
+      } else if (window.orientation !== undefined) {
+        orientationName = window.orientation % 180 === 0 ? 'PORTRAIT' : 'LANDSCAPE';
+      } else {
+        orientationName = viewportWidth > viewportHeight ? 'landscape' : 'portrait';
+      }
+
+      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const themeText = isDark ? 'Dark Mode (深色模式)' : 'Light Mode (淺色模式)';
+      
+      // 估計縮放比例
+      let zoomLevel = 100;
+      try {
+        zoomLevel = Math.round(((window.outerWidth - 8) / window.innerWidth) * 100);
+        if (isNaN(zoomLevel) || zoomLevel < 30 || zoomLevel > 500) {
+          zoomLevel = Math.round((window.devicePixelRatio) * 100);
+        }
+      } catch (e) {
+        zoomLevel = '無法偵測';
+      }
+
+      const isMultiScreenSupported = ('getScreenDetails' in window || 'isExtended' in window);
+      const multiScreenText = isMultiScreenSupported ? '支援多顯示器檢測' : '不支援多顯示器 API';
+
+      // 渲染至網頁頂部看板
+      document.getElementById('banner-viewport').textContent = `${viewportWidth} × ${viewportHeight}`;
+      document.getElementById('banner-ratio').textContent = aspectDecimal.toFixed(2);
+      document.getElementById('banner-orientation').textContent = orientationName.replace('-primary', '').replace('-secondary', '').toUpperCase();
+      document.getElementById('banner-screen').textContent = `${realWidth} × ${realHeight}`;
+      document.getElementById('banner-dpr').textContent = dpr.toFixed(1);
+      document.getElementById('banner-color').textContent = `${colorDepth}-bit`;
+      document.getElementById('banner-theme').textContent = isDark ? 'Dark Mode' : 'Light Mode';
+      document.getElementById('banner-hz').textContent = `${fps} Hz`;
+      document.getElementById('banner-zoom').textContent = typeof zoomLevel === 'number' ? `${zoomLevel}%` : zoomLevel;
+
+      const themeIconContainer = document.getElementById('banner-theme-icon');
+      if (isDark) {
+        themeIconContainer.innerHTML = '<i data-lucide="moon" class="w-5 h-5 text-industrial-orange"></i>';
+      } else {
+        themeIconContainer.innerHTML = '<i data-lucide="sun" class="w-5 h-5 text-industrial-orange"></i>';
+      }
+
+      // 卡片更新
+      document.getElementById('val-viewport-size').innerHTML = `${viewportWidth} × ${viewportHeight} <span class="text-xs text-zinc-500">px</span>`;
+      document.getElementById('val-client-size').innerHTML = `${clientWidth} × ${clientHeight} <span class="text-xs text-zinc-500">px</span>`;
+      document.getElementById('val-aspect-ratio').innerHTML = `${aspectDecimal.toFixed(4)}`;
+      document.getElementById('val-aspect-friendly').textContent = aspectFriendly;
+      document.getElementById('val-outer-size').innerHTML = `${outerWidth} × ${outerHeight} <span class="text-xs text-zinc-500">px</span>`;
+      document.getElementById('val-screen-pos').textContent = `X: ${screenX} px, Y: ${screenY} px`;
+
+      document.getElementById('val-screen-res').innerHTML = `${screenWidth} × ${screenHeight} <span class="text-xs text-zinc-500">px</span>`;
+      document.getElementById('val-avail-res').innerHTML = `${availWidth} × ${availHeight} <span class="text-xs text-zinc-500">px</span>`;
+      document.getElementById('val-dpr').textContent = `${dpr.toFixed(2)}x`;
+      document.getElementById('val-phys-pixels').innerHTML = `${realWidth} × ${realHeight} <span class="text-xs text-zinc-500">px</span>`;
+      document.getElementById('val-color-depth').innerHTML = `${colorDepth} bits/color <span class="text-zinc-600">/</span> ${pixelDepth} bits/pixel`;
+      document.getElementById('val-refresh-rate').innerHTML = `~ ${fps} Hz (FPS)`;
+      document.getElementById('val-hdr').textContent = isHDR;
+      document.getElementById('val-gpu').textContent = cachedGpuInfo;
+
+      document.getElementById('val-orientation').textContent = orientationName.toUpperCase();
+      document.getElementById('val-theme').textContent = themeText;
+      document.getElementById('val-zoom').innerHTML = typeof zoomLevel === 'number' ? `${zoomLevel} <span class="text-xs text-zinc-500">%</span>` : zoomLevel;
+      document.getElementById('val-touch').textContent = cachedTouchInfo;
+      document.getElementById('val-multi-screen').textContent = multiScreenText;
+      document.getElementById('footer-dpr-val').textContent = dpr.toFixed(1);
+
+      lucide.createIcons();
+    }
+
+    // 監聽器
+    window.addEventListener('resize', () => {
+      updateMetrics();
+      writeLog(`視窗大小調整 // 寬度: ${window.innerWidth}px, 高度: ${window.innerHeight}px`);
+    });
+
+    if (window.screen.orientation) {
+      window.screen.orientation.addEventListener('change', () => {
+        updateMetrics();
+        writeLog(`螢幕旋轉 // 方向: ${window.screen.orientation.type}`);
+      });
+    } else {
+      window.addEventListener('orientationchange', () => {
+        updateMetrics();
+        writeLog(`螢幕旋轉`);
+      });
+    }
+
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+      updateMetrics();
+      writeLog(`配色方案變更: ${e.matches ? 'Dark' : 'Light'}`);
+    });
+
+    // 每 500ms 檢查並更新視窗座標
+    setInterval(() => {
+      const screenX = window.screenX !== undefined ? window.screenX : window.screenLeft;
+      const screenY = window.screenY !== undefined ? window.screenY : window.screenTop;
+      const targetPosSpan = document.getElementById('val-screen-pos');
+      if (targetPosSpan) {
+        targetPosSpan.innerHTML = `X: ${screenX} <span class="text-xs text-zinc-500">px</span>, Y: ${screenY} <span class="text-xs text-zinc-500">px</span>`;
+      }
+    }, 500);
+
+    // 請求多螢幕 API
+    multiScreenBtn.addEventListener('click', async () => {
+      if ('getScreenDetails' in window) {
+        try {
+          writeLog("請求讀取多螢幕細節權限...");
+          const screenDetails = await window.getScreenDetails();
+          const count = screenDetails.screens.length;
+          document.getElementById('val-multi-screen').innerHTML = `偵測到 ${count} 個顯示器連線中`;
+          writeLog(`多螢幕授權成功: 當前連線數 ${count}`);
+        } catch (err) {
+          document.getElementById('val-multi-screen').textContent = "權限遭拒絕或不支援";
+          writeLog(`多螢幕偵測授權失敗: ${err.message}`);
+        }
+      } else {
+        writeLog("不支援 getScreenDetails API");
+      }
+    });
+
+    updateMetrics();
+  </script>
+</body>
+</html>
